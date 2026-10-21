@@ -1,6 +1,6 @@
 /**
  * Optional title discovery + artwork. Nothing personal is ever sent — only the search text.
- *  - AniList (anime): public GraphQL, no key. https://docs.anilist.co
+ *  - Kitsu (anime): public JSON:API, no key, CORS enabled. https://kitsu.docs.apiary.io
  *  - TVmaze (TV): public REST, no key, CORS enabled, CC BY-SA (attribution required). https://www.tvmaze.com/api
  *  - TMDB (movies + TV): needs the user's own API key, stored only in this browser. https://developer.themoviedb.org
  * The app works fully without any of these.
@@ -29,7 +29,7 @@ export interface MetaResult {
 
 export class MetadataError extends Error {}
 
-export const PROVIDER_LABEL: Record<Provider, string> = { anilist: 'AniList', tvmaze: 'TVmaze', tmdb: 'TMDB' }
+export const PROVIDER_LABEL: Record<Provider, string> = { kitsu: 'Kitsu', anilist: 'AniList', tvmaze: 'TVmaze', tmdb: 'TMDB' }
 
 const stripHtml = (s: string | null | undefined) =>
   (s ?? '')
@@ -60,61 +60,51 @@ async function request<T>(url: string, init: RequestInit = {}, provider: Provide
   }
 }
 
-// ---------- AniList ----------
+// ---------- Kitsu ----------
 
-interface AniMedia {
-  id: number
-  siteUrl: string
-  format: string | null
-  episodes: number | null
-  status: string | null
-  seasonYear: number | null
-  startDate: { year: number | null }
-  title: { romaji: string | null; english: string | null; native: string | null }
-  synonyms: string[]
-  description: string | null
-  genres: string[]
-  coverImage: { extraLarge: string | null; large: string | null }
-  bannerImage: string | null
+interface KitsuAnime {
+  id: string
+  attributes: {
+    slug: string
+    canonicalTitle: string
+    titles: Record<string, string | null>
+    abbreviatedTitles: string[] | null
+    synopsis: string | null
+    startDate: string | null
+    subtype: string | null
+    status: string | null
+    episodeCount: number | null
+    posterImage: { original?: string; large?: string } | null
+    coverImage: { original?: string; large?: string } | null
+  }
+  relationships: { categories: { data: { id: string }[] } }
 }
 
-const ANILIST_QUERY = `query ($search: String) {
-  Page(perPage: 12) {
-    media(search: $search, type: ANIME, sort: SEARCH_MATCH, isAdult: false) {
-      id siteUrl format episodes status seasonYear startDate { year }
-      title { romaji english native } synonyms description(asHtml: false) genres
-      coverImage { extraLarge large } bannerImage
-    }
-  }
-}`
-
-async function searchAniList(q: string): Promise<MetaResult[]> {
-  const data = await request<{ data: { Page: { media: AniMedia[] } } }>(
-    'https://graphql.anilist.co',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ query: ANILIST_QUERY, variables: { search: q } }),
-    },
-    'anilist',
+async function searchKitsu(q: string): Promise<MetaResult[]> {
+  const url = `https://kitsu.app/api/edge/anime?filter[text]=${encodeURIComponent(q)}&page[limit]=12&include=categories&fields[categories]=title`
+  const res = await request<{ data: KitsuAnime[]; included?: { id: string; attributes: { title: string } }[] }>(
+    url,
+    { headers: { Accept: 'application/vnd.api+json' } },
+    'kitsu',
   )
-  return data.data.Page.media.map((m) => {
-    const title = m.title.english || m.title.romaji || m.title.native || 'Untitled'
-    const alts = [m.title.romaji, m.title.native, ...m.synonyms].filter((s): s is string => !!s && s !== title)
+  const category = new Map(res.included?.map((c) => [c.id, c.attributes.title]))
+  return res.data.map(({ id, attributes: a, relationships }) => {
+    const title = a.titles.en || a.canonicalTitle || a.titles.en_jp || 'Untitled'
+    const alts = [a.canonicalTitle, a.titles.en_jp, a.titles.ja_jp, ...(a.abbreviatedTitles ?? [])].filter((s): s is string => !!s && s !== title)
     return {
-      source: { provider: 'anilist', id: String(m.id), url: m.siteUrl },
+      source: { provider: 'kitsu', id, url: `https://kitsu.app/anime/${a.slug}` },
       title,
       altTitles: [...new Set(alts)].slice(0, 4),
-      mediaType: m.format === 'MOVIE' ? 'movie' : 'anime',
-      year: m.seasonYear ?? m.startDate.year,
-      synopsis: stripHtml(m.description),
-      genres: m.genres,
-      posterUrl: m.coverImage.extraLarge ?? m.coverImage.large,
-      backdropUrl: m.bannerImage,
-      totalEpisodes: m.episodes,
+      mediaType: a.subtype === 'movie' ? 'movie' : 'anime',
+      year: a.startDate ? Number(a.startDate.slice(0, 4)) : null,
+      synopsis: stripHtml(a.synopsis),
+      genres: relationships.categories.data.map((c) => category.get(c.id)).filter((g): g is string => !!g),
+      posterUrl: a.posterImage?.original ?? a.posterImage?.large ?? null,
+      backdropUrl: a.coverImage?.original ?? a.coverImage?.large ?? null,
+      totalEpisodes: a.episodeCount,
       totalSeasons: null,
       seasonEpisodeCounts: {},
-      ongoing: m.status === 'RELEASING' || m.status === 'NOT_YET_RELEASED',
+      ongoing: a.status === 'current' || a.status === 'upcoming' || a.status === 'unreleased' || a.status === 'tba',
     }
   })
 }
@@ -247,15 +237,15 @@ async function tmdbDetails(r: MetaResult, key: string): Promise<MetaResult> {
 
 export function availableProviders(mediaType: MediaType): Provider[] {
   const hasTmdb = !!getPrefs().tmdbKey
-  if (mediaType === 'anime') return hasTmdb ? ['anilist', 'tvmaze', 'tmdb'] : ['anilist', 'tvmaze']
-  if (mediaType === 'movie') return hasTmdb ? ['tmdb', 'anilist'] : ['anilist']
+  if (mediaType === 'anime') return ['kitsu']
+  if (mediaType === 'movie') return hasTmdb ? ['tmdb', 'kitsu'] : ['kitsu']
   return hasTmdb ? ['tvmaze', 'tmdb'] : ['tvmaze']
 }
 
 export async function searchTitles(q: string, provider: Provider): Promise<MetaResult[]> {
   const query = q.trim()
   if (!query) return []
-  if (provider === 'anilist') return searchAniList(query)
+  if (provider === 'kitsu') return searchKitsu(query)
   if (provider === 'tvmaze') return searchTvMaze(query)
   const key = getPrefs().tmdbKey
   if (!key) throw new MetadataError('Add your TMDB API key in Settings to search TMDB.')

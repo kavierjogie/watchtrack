@@ -33,7 +33,7 @@ export default defineConfig({
         runtimeCaching: [
           {
             // Public poster artwork from metadata providers, so saved titles show posters offline.
-            urlPattern: ({ url }) => ['s4.anilist.co', 'static.tvmaze.com', 'image.tmdb.org'].includes(url.hostname),
+            urlPattern: ({ url }) => ['media.kitsu.app', 'static.tvmaze.com', 'image.tmdb.org'].includes(url.hostname),
             handler: 'CacheFirst',
             options: {
               cacheName: 'posters',

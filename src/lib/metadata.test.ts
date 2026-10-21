@@ -6,34 +6,36 @@ const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.
 afterEach(() => vi.unstubAllGlobals())
 
 describe('metadata providers (mocked network)', () => {
-  it('maps AniList results and strips HTML from synopsis', async () => {
+  it('maps Kitsu results, genres from included categories, and strips HTML from synopsis', async () => {
     vi.stubGlobal('fetch', vi.fn(() =>
       json({
-        data: {
-          Page: {
-            media: [
-              {
-                id: 97940,
-                siteUrl: 'https://anilist.co/anime/97940',
-                format: 'TV',
-                episodes: 170,
-                status: 'FINISHED',
-                seasonYear: 2017,
-                startDate: { year: 2017 },
-                title: { romaji: 'Black Clover', english: 'Black Clover', native: 'ブラッククローバー' },
-                synonyms: [],
-                description: 'Asta<br>wants to be <i>Wizard King</i>.',
-                genres: ['Action', 'Fantasy'],
-                coverImage: { extraLarge: 'https://s4.anilist.co/x.jpg', large: null },
-                bannerImage: null,
-              },
-            ],
+        data: [
+          {
+            id: '13209',
+            attributes: {
+              slug: 'black-clover-tv',
+              canonicalTitle: 'Black Clover',
+              titles: { en: 'Black Clover', en_jp: 'Black Clover', ja_jp: 'ブラッククローバー' },
+              abbreviatedTitles: [],
+              synopsis: 'Asta<br>wants to be <i>Wizard King</i>.',
+              startDate: '2017-10-03',
+              subtype: 'TV',
+              status: 'finished',
+              episodeCount: 170,
+              posterImage: { original: 'https://media.kitsu.app/x.jpg' },
+              coverImage: null,
+            },
+            relationships: { categories: { data: [{ id: '1' }, { id: '2' }] } },
           },
-        },
+        ],
+        included: [
+          { id: '1', attributes: { title: 'Action' } },
+          { id: '2', attributes: { title: 'Fantasy' } },
+        ],
       }),
     ))
-    const [r] = await searchTitles('black clover', 'anilist')
-    expect(r).toMatchObject({ title: 'Black Clover', mediaType: 'anime', year: 2017, totalEpisodes: 170, ongoing: false, posterUrl: 'https://s4.anilist.co/x.jpg' })
+    const [r] = await searchTitles('black clover', 'kitsu')
+    expect(r).toMatchObject({ title: 'Black Clover', mediaType: 'anime', year: 2017, totalEpisodes: 170, ongoing: false, posterUrl: 'https://media.kitsu.app/x.jpg', genres: ['Action', 'Fantasy'] })
     expect(r.synopsis).toBe('Asta\nwants to be Wizard King.')
     expect(r.altTitles).toEqual(['ブラッククローバー'])
   })
@@ -56,6 +58,6 @@ describe('metadata providers (mocked network)', () => {
     vi.stubGlobal('fetch', vi.fn(() => json({}, 429)))
     await expect(searchTitles('x', 'tvmaze')).rejects.toThrow(/rate-limiting/)
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
-    await expect(searchTitles('x', 'anilist')).rejects.toBeInstanceOf(MetadataError)
+    await expect(searchTitles('x', 'kitsu')).rejects.toBeInstanceOf(MetadataError)
   })
 })

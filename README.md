@@ -101,7 +101,7 @@ Search is only used to fill in title details and posters. Only the search text i
 
 | Provider | Used for | Key | Notes |
 | --- | --- | --- | --- |
-| [AniList](https://docs.anilist.co) | Anime (and anime movies) | None | Public GraphQL API. Rate limited (normally 90/min, currently 30/min). |
+| [Kitsu](https://kitsu.docs.apiary.io) | Anime (and anime movies) | None | Public JSON:API, CORS-enabled. |
 | [TVmaze](https://www.tvmaze.com/api) | TV series, per-season episode counts | None | CORS-enabled; data is CC BY-SA, so a source link is shown on each title. |
 | [TMDB](https://developer.themoviedb.org) | Movies + extra TV results | **Your own** | Paste a free v3 API key or read-access token in Settings. Stored only in this browser. Attribution is shown in Settings. |
 
@@ -118,7 +118,7 @@ src/
     db.ts           IndexedDB (idb): schema, migrations, CRUD, quota errors
     backup.ts       export / validate / plan / apply import
     notesImport.ts  Notes-list parser for the import wizard
-    metadata.ts     AniList / TVmaze / TMDB clients
+    metadata.ts     Kitsu / TVmaze / TMDB clients
     prefs.ts        small UI preferences (localStorage)
   state/          React context for the library + action hooks (toasts, undo, confirmations)
   components/     UI building blocks (cards, modals, forms, filters)

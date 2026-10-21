@@ -40,7 +40,8 @@ export type Poster =
   | { kind: 'remote'; url: string }
 
 export interface MetadataSource {
-  provider: 'anilist' | 'tvmaze' | 'tmdb'
+  /** 'anilist' only appears on titles saved before it was replaced by Kitsu. */
+  provider: 'kitsu' | 'anilist' | 'tvmaze' | 'tmdb'
   id: string
   url: string
 }

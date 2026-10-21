@@ -161,7 +161,7 @@ export function SettingsPage() {
       <Card title="Artwork & metadata (optional)">
         <div className="space-y-2 text-sm text-muted">
           <p>
-            Search uses <strong className="text-fg">AniList</strong> for anime and <strong className="text-fg">TVmaze</strong> for TV — both free, no key needed. Only your search
+            Search uses <strong className="text-fg">Kitsu</strong> for anime and <strong className="text-fg">TVmaze</strong> for TV — both free, no key needed. Only your search
             text is sent; your progress never leaves this device.
           </p>
           <p>
@@ -169,7 +169,7 @@ export function SettingsPage() {
             <a className="text-accent-text underline" href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer">
               TMDB API key
             </a>
-            . It's stored only in this browser and sent only to TMDB. Without it, add movies manually or via AniList.
+            . It's stored only in this browser and sent only to TMDB. Without it, search anime movies via Kitsu or add movies manually.
           </p>
         </div>
         <form
@@ -202,7 +202,7 @@ export function SettingsPage() {
       </Card>
 
       <section className="space-y-2 px-1 text-xs text-muted">
-        <p>Credits: anime data from AniList; TV data from TVmaze (CC BY-SA). This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+        <p>Credits: anime data from Kitsu; TV data from TVmaze (CC BY-SA). This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
         <p>No analytics, tracking or telemetry.</p>
       </section>
 
