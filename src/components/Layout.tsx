@@ -23,7 +23,9 @@ export function Layout() {
   const { error } = useLibrary()
   const add = params.get('add')
 
-  useEffect(() => window.scrollTo(0, 0), [pathname])
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
 
   const openAdd = () =>
     setParams((p) => {
