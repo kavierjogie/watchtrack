@@ -53,7 +53,8 @@ async function request<T>(url: string, init: RequestInit = {}, provider: Provide
     return (await res.json()) as T
   } catch (err) {
     if (err instanceof MetadataError) throw err
-    throw new MetadataError(`Couldn't reach ${PROVIDER_LABEL[provider]}. Check your connection or add the title manually.`)
+    // A blocked/CORS-less error response also lands here, so it isn't always the user's connection.
+    throw new MetadataError(`Couldn't reach ${PROVIDER_LABEL[provider]} — it may be down. Try another source or add the title manually.`)
   } finally {
     clearTimeout(timer)
   }
@@ -246,7 +247,7 @@ async function tmdbDetails(r: MetaResult, key: string): Promise<MetaResult> {
 
 export function availableProviders(mediaType: MediaType): Provider[] {
   const hasTmdb = !!getPrefs().tmdbKey
-  if (mediaType === 'anime') return hasTmdb ? ['anilist', 'tmdb'] : ['anilist']
+  if (mediaType === 'anime') return hasTmdb ? ['anilist', 'tvmaze', 'tmdb'] : ['anilist', 'tvmaze']
   if (mediaType === 'movie') return hasTmdb ? ['tmdb', 'anilist'] : ['anilist']
   return hasTmdb ? ['tvmaze', 'tmdb'] : ['tvmaze']
 }
