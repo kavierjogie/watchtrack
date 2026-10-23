@@ -74,7 +74,7 @@ export function ImportNotesPage() {
           </div>
           <label className="block">
             <span className="label">Your notes</span>
-            <textarea className="input min-h-72 py-2 font-mono text-xs" value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste your list here…" />
+            <textarea className="input min-h-72 py-2 font-mono text-base sm:text-xs" value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste your list here…" />
           </label>
           <label className="block max-w-xs">
             <span className="label">Lines without a heading are</span>

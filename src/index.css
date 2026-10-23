@@ -60,6 +60,8 @@ body {
 
 body {
   min-height: 100dvh;
+  /* Long unbroken titles, notes and URLs wrap instead of widening the page. */
+  overflow-wrap: break-word;
 }
 
 :focus-visible {
@@ -89,8 +91,9 @@ body {
 @utility icon-btn {
   @apply press inline-flex size-10 shrink-0 items-center justify-center rounded-xl text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-40;
 }
+/* 16px on phones: iOS zooms into smaller fields on focus and leaves the page zoomed (and scrollable sideways). */
 @utility input {
-  @apply min-h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none;
+  @apply min-h-10 w-full min-w-0 rounded-xl border border-line bg-surface px-3 text-base text-fg sm:text-sm placeholder:text-muted focus:border-accent focus:outline-none;
 }
 @utility label {
   @apply mb-1.5 block text-xs font-medium text-muted;

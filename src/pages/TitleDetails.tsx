@@ -199,7 +199,7 @@ function Details({ t }: { t: Title }) {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-6">
           {t.synopsis && (
             <section>
