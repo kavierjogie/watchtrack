@@ -237,7 +237,8 @@ async function tmdbDetails(r: MetaResult, key: string): Promise<MetaResult> {
 
 export function availableProviders(mediaType: MediaType): Provider[] {
   const hasTmdb = !!getPrefs().tmdbKey
-  if (mediaType === 'anime') return ['kitsu']
+  // Anime is the form's default type, so keep TVmaze one tap away for regular series (picking a result switches the type).
+  if (mediaType === 'anime') return ['kitsu', 'tvmaze']
   if (mediaType === 'movie') return hasTmdb ? ['tmdb', 'kitsu'] : ['kitsu']
   return hasTmdb ? ['tvmaze', 'tmdb'] : ['tvmaze']
 }

@@ -66,4 +66,10 @@ describe('notes import', () => {
     expect(dups.has(row('Black Clover').key)).toBe(true)
     expect(dups.size).toBe(1)
   })
+
+  it('uses the chosen default type for lines before any heading', () => {
+    const [a, b] = parseNotes('*Supergirl. | S6 e3\n### Anime\nNaruto | 12', 'tv')
+    expect(a).toMatchObject({ title: 'Supergirl.', mediaType: 'tv', numbering: 'seasonal', season: 6, lastEpisode: 3 })
+    expect(b.mediaType).toBe('anime')
+  })
 })

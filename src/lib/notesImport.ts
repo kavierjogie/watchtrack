@@ -123,8 +123,9 @@ export function parseLine(line: string, section: Section, index: number): Parsed
   return row
 }
 
-export function parseNotes(text: string): ParsedRow[] {
-  let section: Section = { mediaType: 'anime', status: 'watching', assumedStatus: true }
+/** `defaultType` applies to lines before any heading that names a type. */
+export function parseNotes(text: string, defaultType: MediaType = 'anime'): ParsedRow[] {
+  let section: Section = { mediaType: defaultType, status: 'watching', assumedStatus: true }
   const rows: ParsedRow[] = []
   text.split(/\r?\n/).forEach((line, i) => {
     const trimmed = line.trim()

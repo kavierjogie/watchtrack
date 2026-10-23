@@ -18,6 +18,7 @@ export function ImportNotesPage() {
   const navigate = useNavigate()
   const confirm = useConfirm()
   const [text, setText] = useState('')
+  const [defaultType, setDefaultType] = useState<MediaType>('anime')
   const [rows, setRows] = useState<ParsedRow[] | null>(null)
   const [reviewOnly, setReviewOnly] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -25,7 +26,7 @@ export function ImportNotesPage() {
   const dups = useMemo(() => (rows ? findDuplicates(rows, lib.titles) : new Set<string>()), [rows, lib.titles])
 
   const parse = () => {
-    const parsed = parseNotes(text)
+    const parsed = parseNotes(text, defaultType)
     if (!parsed.length) return toast.error('No titles found', { description: 'Put one title per line, e.g. "Black Clover | 172".' })
     const d = findDuplicates(parsed, lib.titles)
     setRows(parsed.map((r) => (d.has(r.key) ? { ...r, include: false } : r)))
@@ -74,6 +75,16 @@ export function ImportNotesPage() {
           <label className="block">
             <span className="label">Your notes</span>
             <textarea className="input min-h-72 py-2 font-mono text-xs" value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste your list here…" />
+          </label>
+          <label className="block max-w-xs">
+            <span className="label">Lines without a heading are</span>
+            <select className="input" value={defaultType} onChange={(e) => setDefaultType(e.target.value as MediaType)}>
+              {(Object.keys(MEDIA_LABEL) as MediaType[]).map((m) => (
+                <option key={m} value={m}>
+                  {MEDIA_LABEL[m]}
+                </option>
+              ))}
+            </select>
           </label>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-primary" onClick={parse} disabled={!text.trim()}>
