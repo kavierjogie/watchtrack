@@ -1,4 +1,5 @@
 import { CircleCheck, CirclePause, Ellipsis, ExternalLink, ListPlus, Pencil, Play, Undo2 } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Title } from '../lib/types'
@@ -41,27 +42,37 @@ export function TitleMenu({ t }: { t: Title }) {
       <button type="button" className="icon-btn size-9" aria-label={`More actions for ${t.title}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <Ellipsis className="size-5" />
       </button>
-      {open && (
-        <ul role="menu" className="absolute bottom-full right-0 z-20 mb-1 w-52 overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-xl">
-          {items.map(({ label, icon: Icon, run }) => (
-            <li key={label} role="none">
-              <button
-                type="button"
-                role="menuitem"
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"
-                onClick={() => {
-                  setOpen(false)
-                  run()
-                }}
-              >
-                <Icon className="size-4 text-muted" aria-hidden />
-                {label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {editing && t.progress && <ProgressEditor title={t} open onClose={() => setEditing(false)} />}
+      <AnimatePresence>
+        {open && (
+          // Grows out of the ⋯ button (bottom-right corner) and shrinks back into it.
+          <motion.ul
+            role="menu"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ type: 'spring', bounce: 0, duration: 0.2 }}
+            className="absolute bottom-full right-0 z-20 mb-1 w-52 origin-bottom-right overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-xl"
+          >
+            {items.map(({ label, icon: Icon, run }) => (
+              <li key={label} role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"
+                  onClick={() => {
+                    setOpen(false)
+                    run()
+                  }}
+                >
+                  <Icon className="size-4 text-muted" aria-hidden />
+                  {label}
+                </button>
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>{editing && t.progress && <ProgressEditor title={t} open onClose={() => setEditing(false)} />}</AnimatePresence>
     </div>
   )
 }

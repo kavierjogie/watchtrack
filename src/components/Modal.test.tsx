@@ -13,6 +13,8 @@ beforeAll(() => {
     this.open = true
   }
   HTMLDialogElement.prototype.getBoundingClientRect = () => DOMRect.fromRect({ x: 100, y: 100, width: 400, height: 400 })
+  // jsdom has no matchMedia; report a desktop-sized, motion-friendly screen.
+  window.matchMedia ??= (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList
 })
 
 let root: ReturnType<typeof createRoot> | null = null

@@ -1,3 +1,4 @@
+import { AnimatePresence } from 'framer-motion'
 import { CircleCheck, CirclePause, House, Library, ListPlus, Play, Plus, Settings, type LucideIcon } from 'lucide-react'
 import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation, useSearchParams } from 'react-router-dom'
@@ -85,7 +86,7 @@ export function Layout() {
       {/* Mobile bottom navigation */}
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/75 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 lg:hidden reduce-transparency:bg-surface reduce-transparency:backdrop-blur-none"
       >
         <ul className="mx-auto grid max-w-md grid-cols-5">
           {NAV.filter((n) => n.mobile)
@@ -102,7 +103,7 @@ export function Layout() {
         </ul>
       </nav>
 
-      {add && <TitleForm open onClose={closeAdd} defaultStatus={ADD_STATUS[add]} />}
+      <AnimatePresence>{add && <TitleForm open onClose={closeAdd} defaultStatus={ADD_STATUS[add]} />}</AnimatePresence>
     </div>
   )
 }

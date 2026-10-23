@@ -1,4 +1,5 @@
 import { Download, FileUp, HardDrive, Smartphone, Trash2, Upload } from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -207,7 +208,7 @@ export function SettingsPage() {
         <p>No analytics, tracking or telemetry.</p>
       </section>
 
-      {plan && <ImportDialog plan={plan} onClose={() => setPlan(null)} />}
+      <AnimatePresence>{plan && <ImportDialog plan={plan} onClose={() => setPlan(null)} />}</AnimatePresence>
     </div>
   )
 }

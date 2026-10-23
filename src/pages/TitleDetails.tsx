@@ -1,4 +1,5 @@
 import { ArrowLeft, Check, Clapperboard, ExternalLink, History, Pencil, Sparkles, Star, Trash2, Undo2 } from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -376,9 +377,9 @@ function Details({ t }: { t: Title }) {
         </aside>
       </div>
 
-      {editProgress && <ProgressEditor title={t} open onClose={closeEditor} />}
-      {editDetails && <TitleForm open existing={t} onClose={() => setEditDetails(false)} />}
-      {special && <SpecialDialog onClose={() => setSpecial(false)} onSave={(label) => void actions.logSpecial(t, label).then(() => setSpecial(false))} />}
+      <AnimatePresence>{editProgress && <ProgressEditor title={t} open onClose={closeEditor} />}</AnimatePresence>
+      <AnimatePresence>{editDetails && <TitleForm open existing={t} onClose={() => setEditDetails(false)} />}</AnimatePresence>
+      <AnimatePresence>{special && <SpecialDialog onClose={() => setSpecial(false)} onSave={(label) => void actions.logSpecial(t, label).then(() => setSpecial(false))} />}</AnimatePresence>
     </article>
   )
 }

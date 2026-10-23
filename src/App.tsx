@@ -1,3 +1,4 @@
+import { MotionConfig } from 'framer-motion'
 import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
@@ -24,30 +25,33 @@ export default function App() {
   }, [theme])
 
   return (
-    <BrowserRouter>
-      <LibraryProvider>
-        <ConfirmProvider>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="continue" element={<ContinuePage />} />
-              <Route path="library" element={<LibraryPage />} />
-              <Route path="plan" element={<PlanPage />} />
-              <Route path="on-hold" element={<OnHoldPage />} />
-              <Route path="completed" element={<CompletedPage />} />
-              <Route path="title/:id" element={<TitleDetails />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="import" element={<ImportNotesPage />} />
-              <Route path="*" element={<Dashboard />} />
-            </Route>
-          </Routes>
-          <Toaster
-            position="top-center"
-            theme={theme === 'system' ? 'system' : theme}
-            toastOptions={{ classNames: { toast: '!rounded-2xl !border-line !bg-surface !text-fg', description: '!text-muted', actionButton: '!bg-accent !text-white' } }}
-          />
-        </ConfirmProvider>
-      </LibraryProvider>
-    </BrowserRouter>
+    // "user": with Reduce Motion on, Motion drops slides/scales and keeps gentle opacity fades.
+    <MotionConfig reducedMotion="user">
+      <BrowserRouter>
+        <LibraryProvider>
+          <ConfirmProvider>
+            <Routes>
+              <Route element={<Layout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="continue" element={<ContinuePage />} />
+                <Route path="library" element={<LibraryPage />} />
+                <Route path="plan" element={<PlanPage />} />
+                <Route path="on-hold" element={<OnHoldPage />} />
+                <Route path="completed" element={<CompletedPage />} />
+                <Route path="title/:id" element={<TitleDetails />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="import" element={<ImportNotesPage />} />
+                <Route path="*" element={<Dashboard />} />
+              </Route>
+            </Routes>
+            <Toaster
+              position="top-center"
+              theme={theme === 'system' ? 'system' : theme}
+              toastOptions={{ classNames: { toast: '!rounded-2xl !border-line !bg-surface !text-fg', description: '!text-muted', actionButton: '!bg-accent !text-white' } }}
+            />
+          </ConfirmProvider>
+        </LibraryProvider>
+      </BrowserRouter>
+    </MotionConfig>
   )
 }

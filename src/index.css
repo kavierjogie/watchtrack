@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant reduce-transparency (@media (prefers-reduced-transparency: reduce));
 
 :root {
   --bg: #f6f6f8;
@@ -45,7 +46,8 @@
   --color-danger: var(--danger);
   --color-success: var(--success);
   --color-warn: var(--warn);
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* The platform's own UI font: same look everywhere it's installed, with its optical sizing and tracking tuned in. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 html,
@@ -65,8 +67,12 @@ body {
   outline-offset: 2px;
 }
 
+/* Press feedback lives on pointer-down (:active) and is quick; touch screens have no hover to fall back on. */
+@utility press {
+  @apply transition-[color,background-color,border-color,filter,scale] duration-100 ease-out not-disabled:active:scale-[0.97];
+}
 @utility btn {
-  @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  @apply press inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50;
 }
 @utility btn-primary {
   @apply btn bg-accent text-white hover:brightness-110;
@@ -81,7 +87,7 @@ body {
   @apply btn bg-danger text-white hover:brightness-110;
 }
 @utility icon-btn {
-  @apply inline-flex size-10 shrink-0 items-center justify-center rounded-xl text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-40;
+  @apply press inline-flex size-10 shrink-0 items-center justify-center rounded-xl text-muted hover:bg-surface-2 hover:text-fg disabled:opacity-40;
 }
 @utility input {
   @apply min-h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-fg placeholder:text-muted focus:border-accent focus:outline-none;
@@ -93,7 +99,7 @@ body {
   @apply rounded-2xl border border-line bg-surface;
 }
 @utility chip {
-  @apply inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line px-3 text-xs font-medium text-muted transition-colors hover:text-fg aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent-text;
+  @apply press inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line px-3 text-xs font-medium text-muted hover:text-fg aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent-text;
 }
 
 .skeleton {
@@ -111,6 +117,32 @@ body {
   .skeleton {
     animation: none;
   }
+}
+
+/* Modal backdrop fades in (@starting-style) and out (data-closing while the panel's exit animation runs). */
+dialog::backdrop {
+  background: rgb(0 0 0 / 0.6);
+  transition: background-color 200ms ease-out;
+}
+@starting-style {
+  dialog[open]::backdrop {
+    background: rgb(0 0 0 / 0);
+  }
+}
+dialog[data-closing] {
+  pointer-events: none;
+}
+dialog[data-closing]::backdrop {
+  background: rgb(0 0 0 / 0);
+}
+
+/* Brief cross-fade while switching light/dark, so the whole screen doesn't flash (added by applyTheme). */
+.theme-fade,
+.theme-fade * {
+  transition:
+    background-color 250ms ease,
+    border-color 250ms ease,
+    color 250ms ease !important;
 }
 
 .scrollbar-none::-webkit-scrollbar {
