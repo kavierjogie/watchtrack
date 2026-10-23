@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 
 interface ModalProps {
   open: boolean
@@ -15,6 +15,17 @@ interface ModalProps {
 /** Native <dialog>: focus trapping, Esc to close and inert background for free. */
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null)
+  const pressedBackdrop = useRef(false)
+
+  // Backdrop clicks target the <dialog> itself, but so does a click whose press started inside it
+  // (e.g. selecting text in a field and releasing outside) or one on the dialog's own scrollbar.
+  // Only a press and release both outside the dialog's box count as "click outside to close".
+  const onBackdrop = (e: MouseEvent) => {
+    const d = ref.current
+    if (e.target !== d || !d) return false
+    const r = d.getBoundingClientRect()
+    return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom
+  }
 
   useEffect(() => {
     const d = ref.current
@@ -33,7 +44,11 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
         e.preventDefault()
         onClose()
       }}
-      onClick={(e) => e.target === ref.current && onClose()}
+      onPointerDown={(e) => (pressedBackdrop.current = onBackdrop(e))}
+      onClick={(e) => {
+        if (pressedBackdrop.current && onBackdrop(e)) onClose()
+        pressedBackdrop.current = false
+      }}
       aria-label={title}
       className={`m-0 mt-auto max-h-[92dvh] w-full max-w-none bg-transparent p-0 text-fg backdrop:bg-black/60 sm:m-auto ${width}`}
     >
