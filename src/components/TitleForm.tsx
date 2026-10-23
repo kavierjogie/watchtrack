@@ -1,10 +1,10 @@
-import { ImagePlus, Loader2, Search, Trash2 } from 'lucide-react'
+import { ImagePlus, Loader2, RotateCw, Search, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
 import { titleKey } from '../lib/backup'
 import { deleteImage, putImage, validateImage } from '../lib/db'
 import { today } from '../lib/format'
-import { availableProviders, downloadPoster, enrich, PROVIDER_LABEL, searchTitles, type MetaResult, type Provider } from '../lib/metadata'
+import { downloadPoster, enrich, PROVIDER_LABEL, searchAll, type MetaResult, type SearchState } from '../lib/metadata'
 import { getPrefs } from '../lib/prefs'
 import { describePosition, emptyProgress } from '../lib/progress'
 import { createTitle } from '../lib/titles'
@@ -86,7 +86,13 @@ export function TitleForm({
   }, [poster])
 
   const duplicate =
-    !editing && form.title.trim() ? lib.titles.find((t) => titleKey(t) === titleKey({ title: form.title, mediaType: form.mediaType })) : undefined
+    !editing && form.title.trim()
+      ? lib.titles.find(
+          (t) =>
+            titleKey(t) === titleKey({ title: form.title, mediaType: form.mediaType }) ||
+            (meta && t.source?.provider === meta.source.provider && t.source.id === meta.source.id),
+        )
+      : undefined
 
   const applyMeta = (r: MetaResult) => {
     setMeta(r)
@@ -222,7 +228,7 @@ export function TitleForm({
         </>
       }
     >
-      {!editing && <MetadataSearch mediaType={form.mediaType} onPick={applyMeta} picked={meta} />}
+      {!editing && <MetadataSearch onPick={applyMeta} picked={meta} />}
 
       <form id="title-form" onSubmit={(e) => void submit(e)} className="space-y-5">
         <div className="flex gap-4">
@@ -338,68 +344,109 @@ export function TitleForm({
   )
 }
 
-function MetadataSearch({ mediaType, onPick, picked }: { mediaType: MediaType; onPick: (r: MetaResult) => void; picked: MetaResult | null }) {
-  const providers = availableProviders(mediaType)
-  const [chosen, setProvider] = useState<Provider>(providers[0])
-  const provider = providers.includes(chosen) ? chosen : providers[0]
-  const [q, setQ] = useState('')
-  const [results, setResults] = useState<MetaResult[] | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+const MIN_QUERY = 2
+const DEBOUNCE_MS = 350
 
-  async function run(e?: FormEvent) {
-    e?.preventDefault()
-    if (!q.trim()) return
-    setBusy('search')
-    setError(null)
-    try {
-      setResults(await searchTitles(q, provider))
-    } catch (err) {
-      setResults(null)
-      setError(err instanceof Error ? err.message : 'Search failed.')
-    } finally {
-      setBusy(null)
+function MetadataSearch({ onPick, picked }: { onPick: (r: MetaResult) => void; picked: MetaResult | null }) {
+  const lib = useLibrary()
+  const [q, setQ] = useState('')
+  const [attempt, setAttempt] = useState(0)
+  const [search, setSearch] = useState<SearchState | null>(null)
+  const [showResults, setShowResults] = useState(true)
+  const [busy, setBusy] = useState<string | null>(null)
+  const skipDebounce = useRef(false)
+  const query = q.trim()
+  const active = query.length >= MIN_QUERY
+
+  useEffect(() => {
+    if (query.length < MIN_QUERY) return
+    // Each run owns its AbortController: a newer query (or closing the form) cancels it and silences its results.
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => void searchAll(query, ctrl.signal, setSearch), skipDebounce.current ? 0 : DEBOUNCE_MS)
+    skipDebounce.current = false
+    return () => {
+      clearTimeout(timer)
+      ctrl.abort()
     }
+  }, [query, attempt])
+
+  const current = active && search?.query === query ? search : null
+  const loading = active && (!current || current.pending > 0)
+  // Until the new query answers, keep showing the previous results rather than flashing an empty list.
+  const results = active ? ((current ?? search)?.results ?? []) : []
+  const retry = () => {
+    skipDebounce.current = true
+    setSearch(null) // show "Searching…" instead of the previous error until the new answers arrive
+    setAttempt((n) => n + 1)
   }
+
+  const inLibrary = (r: MetaResult) =>
+    lib.titles.some((t) => (t.source?.provider === r.source.provider && t.source.id === r.source.id) || titleKey(t) === titleKey(r))
 
   async function pick(r: MetaResult) {
     setBusy(r.source.id)
     onPick(await enrich(r))
-    setResults(null)
+    setShowResults(false)
     setBusy(null)
   }
 
   return (
     <div className="mb-5 space-y-3 rounded-2xl bg-surface-2 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium">Find artwork & details <span className="font-normal text-muted">(optional)</span></p>
-        <div className="flex gap-1">
-          {providers.map((p) => (
-            <button key={p} type="button" className="chip min-h-7" aria-pressed={provider === p} onClick={() => setProvider(p)}>
-              {PROVIDER_LABEL[p]}
-            </button>
-          ))}
-        </div>
-      </div>
+      <p className="text-sm font-medium">
+        Find artwork & details <span className="font-normal text-muted">(optional)</span>
+      </p>
       {/* Not a <form>: it sits inside the dialog next to the main form. */}
-      <div className="flex gap-2">
+      <div className="relative">
+        {loading ? (
+          <Loader2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted" aria-hidden />
+        ) : (
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+        )}
         <input
-          className="input"
+          className="input pl-9"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && void run(e)}
-          placeholder={`Search ${PROVIDER_LABEL[provider]}…`}
-          aria-label="Search title"
+          onChange={(e) => {
+            setQ(e.target.value)
+            setShowResults(true)
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return
+            e.preventDefault()
+            if (active) retry()
+          }}
+          placeholder="Search anime, series, or movies…"
+          aria-label="Search anime, series, or movies"
+          autoComplete="off"
+          enterKeyHint="search"
         />
-        <button type="button" className="btn-primary" onClick={() => void run()} disabled={!!busy || !q.trim()}>
-          {busy === 'search' ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Search className="size-4" aria-hidden />}
-          <span className="sr-only sm:not-sr-only">Search</span>
-        </button>
       </div>
-      {error && <p className="text-xs text-danger">{error}</p>}
-      {results && results.length === 0 && <p className="text-xs text-muted">No matches. Try another spelling or add it manually below.</p>}
-      {results && results.length > 0 && (
-        <ul className="grid max-h-72 gap-1 overflow-y-auto">
+
+      {showResults && (
+        <div role="status" aria-live="polite" className="text-xs text-muted empty:hidden">
+          {current?.error ? (
+            <span className="flex flex-wrap items-center gap-2 text-danger">
+              {current.error}
+              <button type="button" className="btn-ghost min-h-7 px-2 text-xs" onClick={retry}>
+                <RotateCw className="size-3.5" aria-hidden /> Retry
+              </button>
+            </span>
+          ) : current && !loading && results.length === 0 ? (
+            `No matches for "${query}". Try another spelling, or fill in the details below.`
+          ) : loading && results.length === 0 ? (
+            'Searching…'
+          ) : current && !loading && current.failed.length > 0 ? (
+            <span className="flex flex-wrap items-center gap-2">
+              {current.failed.map((p) => PROVIDER_LABEL[p]).join(' and ')} didn't respond, so some results may be missing.
+              <button type="button" className="btn-ghost min-h-7 px-2 text-xs" onClick={retry}>
+                <RotateCw className="size-3.5" aria-hidden /> Retry
+              </button>
+            </span>
+          ) : null}
+        </div>
+      )}
+
+      {showResults && results.length > 0 && (
+        <ul className="grid max-h-72 grid-cols-1 gap-1 overflow-y-auto" aria-label="Search results">
           {results.map((r) => (
             <li key={`${r.source.provider}-${r.source.id}`}>
               <button
@@ -408,23 +455,25 @@ function MetadataSearch({ mediaType, onPick, picked }: { mediaType: MediaType; o
                 disabled={!!busy}
                 className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-surface"
               >
-                <Poster poster={r.posterUrl ? { kind: 'remote', url: r.posterUrl } : null} title={r.title} mediaType={r.mediaType} className="w-10 shrink-0 rounded-md" />
+                <Poster poster={r.thumbUrl ? { kind: 'remote', url: r.thumbUrl } : null} title={r.title} mediaType={r.mediaType} className="w-10 shrink-0 rounded-md" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{r.title}</span>
-                  <span className="block truncate text-xs text-muted">
-                    {MEDIA_LABEL[r.mediaType]}
-                    {r.year ? ` · ${r.year}` : ''}
-                    {r.totalEpisodes ? ` · ${r.totalEpisodes} eps` : ''}
-                    {r.altTitles[0] ? ` · ${r.altTitles[0]}` : ''}
+                  <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted">
+                    <span className="shrink-0 rounded-md bg-surface px-1.5 py-0.5 text-[11px] font-medium text-fg">{MEDIA_LABEL[r.mediaType]}</span>
+                    <span className="truncate">{[r.year, r.totalEpisodes ? `${r.totalEpisodes} eps` : null, r.altTitles[0]].filter(Boolean).join(' · ')}</span>
                   </span>
                 </span>
-                {busy === r.source.id && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                <span className="flex shrink-0 flex-col items-end gap-1 text-[11px] text-muted">
+                  {busy === r.source.id ? <Loader2 className="size-4 animate-spin" aria-hidden /> : inLibrary(r) && <span className="text-accent-text">In library</span>}
+                  <span>{PROVIDER_LABEL[r.source.provider]}</span>
+                </span>
               </button>
             </li>
           ))}
         </ul>
       )}
-      {picked && !results && (
+
+      {picked && !showResults && (
         <p className="text-xs text-muted">
           Filled from{' '}
           <a href={picked.source.url} target="_blank" rel="noreferrer" className="text-accent-text underline">

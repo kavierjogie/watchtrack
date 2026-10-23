@@ -31,8 +31,10 @@ export interface Backup {
   images: BackupImage[]
 }
 
-export const titleKey = (t: { title: string; mediaType: MediaType }) =>
-  `${t.mediaType}:${t.title.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '')}`
+/** Case, accent and punctuation-insensitive form of a name, for comparisons only. */
+export const normTitle = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '')
+
+export const titleKey = (t: { title: string; mediaType: MediaType }) => `${t.mediaType}:${normTitle(t.title)}`
 
 async function blobToBase64(blob: Blob): Promise<string> {
   const bytes = new Uint8Array(await blob.arrayBuffer())

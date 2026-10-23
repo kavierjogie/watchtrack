@@ -5,6 +5,7 @@
  *  - TMDB (movies + TV): needs the user's own API key, stored only in this browser. https://developer.themoviedb.org
  * The app works fully without any of these.
  */
+import { normTitle } from './backup'
 import { getPrefs } from './prefs'
 import type { MediaType, MetadataSource } from './types'
 
@@ -16,9 +17,13 @@ export interface MetaResult {
   altTitles: string[]
   mediaType: MediaType
   year: number | null
+  /** First release/air date (YYYY-MM-DD) when the provider has one; used to match the same title across providers. */
+  date: string | null
   synopsis: string
   genres: string[]
   posterUrl: string | null
+  /** Small version of the poster for result lists (full-size originals are megabytes). */
+  thumbUrl: string | null
   backdropUrl: string | null
   totalEpisodes: number | null
   totalSeasons: number | null
@@ -45,6 +50,8 @@ async function request<T>(url: string, init: RequestInit = {}, provider: Provide
   if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new MetadataError("You're offline. Add the title manually.")
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 10000)
+  // The caller can cancel too (e.g. a newer search replaced this one).
+  init.signal?.addEventListener('abort', () => ctrl.abort())
   try {
     const res = await fetch(url, { ...init, signal: ctrl.signal })
     if (res.status === 429) throw new MetadataError(`${PROVIDER_LABEL[provider]} is rate-limiting requests. Wait a minute and try again.`)
@@ -74,17 +81,17 @@ interface KitsuAnime {
     subtype: string | null
     status: string | null
     episodeCount: number | null
-    posterImage: { original?: string; large?: string } | null
+    posterImage: { small?: string; large?: string; original?: string } | null
     coverImage: { original?: string; large?: string } | null
   }
   relationships: { categories: { data: { id: string }[] } }
 }
 
-async function searchKitsu(q: string): Promise<MetaResult[]> {
+async function searchKitsu(q: string, signal?: AbortSignal): Promise<MetaResult[]> {
   const url = `https://kitsu.app/api/edge/anime?filter[text]=${encodeURIComponent(q)}&page[limit]=12&include=categories&fields[categories]=title`
   const res = await request<{ data: KitsuAnime[]; included?: { id: string; attributes: { title: string } }[] }>(
     url,
-    { headers: { Accept: 'application/vnd.api+json' } },
+    { headers: { Accept: 'application/vnd.api+json' }, signal },
     'kitsu',
   )
   const category = new Map(res.included?.map((c) => [c.id, c.attributes.title]))
@@ -97,9 +104,11 @@ async function searchKitsu(q: string): Promise<MetaResult[]> {
       altTitles: [...new Set(alts)].slice(0, 4),
       mediaType: a.subtype === 'movie' ? 'movie' : 'anime',
       year: a.startDate ? Number(a.startDate.slice(0, 4)) : null,
+      date: a.startDate,
       synopsis: stripHtml(a.synopsis),
       genres: relationships.categories.data.map((c) => category.get(c.id)).filter((g): g is string => !!g),
       posterUrl: a.posterImage?.original ?? a.posterImage?.large ?? null,
+      thumbUrl: a.posterImage?.small ?? a.posterImage?.large ?? a.posterImage?.original ?? null,
       backdropUrl: a.coverImage?.original ?? a.coverImage?.large ?? null,
       totalEpisodes: a.episodeCount,
       totalSeasons: null,
@@ -120,20 +129,23 @@ interface MazeShow {
   summary: string | null
   status: string
   type: string
+  language: string | null
   image: { medium: string; original: string } | null
 }
 
-async function searchTvMaze(q: string): Promise<MetaResult[]> {
-  const rows = await request<{ show: MazeShow }[]>(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(q)}`, {}, 'tvmaze')
+async function searchTvMaze(q: string, signal?: AbortSignal): Promise<MetaResult[]> {
+  const rows = await request<{ show: MazeShow }[]>(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(q)}`, { signal }, 'tvmaze')
   return rows.map(({ show }) => ({
     source: { provider: 'tvmaze', id: String(show.id), url: show.url },
     title: show.name,
     altTitles: [],
-    mediaType: show.type === 'Animation' && show.genres.includes('Anime') ? 'anime' : 'tv',
+    mediaType: show.type === 'Animation' && (show.genres.includes('Anime') || show.language === 'Japanese') ? 'anime' : 'tv',
     year: show.premiered ? Number(show.premiered.slice(0, 4)) : null,
+    date: show.premiered,
     synopsis: stripHtml(show.summary),
     genres: show.genres,
     posterUrl: show.image?.original ?? show.image?.medium ?? null,
+    thumbUrl: show.image?.medium ?? show.image?.original ?? null,
     backdropUrl: null,
     totalEpisodes: null,
     totalSeasons: null,
@@ -180,11 +192,11 @@ interface TmdbItem {
   genre_ids?: number[]
 }
 
-async function searchTmdb(q: string, key: string): Promise<MetaResult[]> {
+async function searchTmdb(q: string, key: string, signal?: AbortSignal): Promise<MetaResult[]> {
   const { query, init } = tmdbInit(key)
   const data = await request<{ results: TmdbItem[] }>(
     `https://api.themoviedb.org/3/search/multi?include_adult=false&query=${encodeURIComponent(q)}${query}`,
-    init,
+    { ...init, signal },
     'tmdb',
   )
   return data.results
@@ -200,9 +212,11 @@ async function searchTmdb(q: string, key: string): Promise<MetaResult[]> {
         altTitles: original && original !== title ? [original] : [],
         mediaType: kind === 'movie' ? 'movie' : r.original_language === 'ja' && r.genre_ids?.includes(16) ? 'anime' : 'tv',
         year: date ? Number(date.slice(0, 4)) : null,
+        date: date || null,
         synopsis: r.overview,
         genres: [],
         posterUrl: r.poster_path ? `${TMDB_IMG}w500${r.poster_path}` : null,
+        thumbUrl: r.poster_path ? `${TMDB_IMG}w92${r.poster_path}` : null,
         backdropUrl: r.backdrop_path ? `${TMDB_IMG}w1280${r.backdrop_path}` : null,
         totalEpisodes: null,
         totalSeasons: null,
@@ -235,22 +249,138 @@ async function tmdbDetails(r: MetaResult, key: string): Promise<MetaResult> {
 
 // ---------- Public API ----------
 
-export function availableProviders(mediaType: MediaType): Provider[] {
-  const hasTmdb = !!getPrefs().tmdbKey
-  // Anime is the form's default type, so keep TVmaze one tap away for regular series (picking a result switches the type).
-  if (mediaType === 'anime') return ['kitsu', 'tvmaze']
-  if (mediaType === 'movie') return hasTmdb ? ['tmdb', 'kitsu'] : ['kitsu']
-  return hasTmdb ? ['tvmaze', 'tmdb'] : ['tvmaze']
+/** Every source the unified search asks. TMDB only joins when the user has added their own key. */
+export function searchProviders(): Provider[] {
+  return getPrefs().tmdbKey ? ['kitsu', 'tvmaze', 'tmdb'] : ['kitsu', 'tvmaze']
 }
 
-export async function searchTitles(q: string, provider: Provider): Promise<MetaResult[]> {
+export async function searchTitles(q: string, provider: Provider, signal?: AbortSignal): Promise<MetaResult[]> {
   const query = q.trim()
   if (!query) return []
-  if (provider === 'kitsu') return searchKitsu(query)
-  if (provider === 'tvmaze') return searchTvMaze(query)
+  if (provider === 'kitsu') return searchKitsu(query, signal)
+  if (provider === 'tvmaze') return searchTvMaze(query, signal)
   const key = getPrefs().tmdbKey
   if (!key) throw new MetadataError('Add your TMDB API key in Settings to search TMDB.')
-  return searchTmdb(query, key)
+  return searchTmdb(query, key, signal)
+}
+
+// ---------- Unified search ----------
+
+/** Which provider's record wins when the same title comes from several (richest data for that type first). */
+const PRIORITY: Record<MediaType, Provider[]> = {
+  anime: ['kitsu', 'tvmaze', 'tmdb'],
+  tv: ['tvmaze', 'tmdb', 'kitsu'],
+  movie: ['tmdb', 'kitsu', 'tvmaze'],
+}
+
+const names = (r: MetaResult) => [r.title, ...r.altTitles].map(normTitle).filter(Boolean)
+
+const wordsOf = (s: string) => s.toLowerCase().normalize('NFKD').split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+
+/** 3 = exact name, 2 = name starts with the query, 1 = every query word starts a word of the name, 0 = unrelated. */
+function relevance(r: MetaResult, q: string, words: string[]): number {
+  const ns = names(r)
+  if (ns.includes(q)) return 3
+  if (ns.some((n) => n.startsWith(q))) return 2
+  const titles = [r.title, ...r.altTitles].map(wordsOf)
+  if (titles.some((tw) => words.every((w) => tw.some((t) => t.startsWith(w))))) return 1
+  return 0
+}
+
+/**
+ * Conservative: same type, and either the same name in the same year, or the same premiere day where one name
+ * is a shortened form of the other ("Demon Slayer" vs "Demon Slayer: Kimetsu no Yaiba"). Seasons, remakes and
+ * films have their own dates, so they stay separate. When unsure, don't merge.
+ */
+export function sameTitle(a: MetaResult, b: MetaResult): boolean {
+  if (a.mediaType !== b.mediaType) return false
+  const an = names(a)
+  const bn = names(b)
+  if (a.year != null && a.year === b.year && an.some((n) => bn.includes(n))) return true
+  return !!a.date && a.date === b.date && an.some((x) => bn.some((y) => Math.min(x.length, y.length) >= 4 && (x.startsWith(y) || y.startsWith(x))))
+}
+
+function merge(a: MetaResult, b: MetaResult): MetaResult {
+  const order = PRIORITY[a.mediaType]
+  const [main, other] = order.indexOf(a.source.provider) <= order.indexOf(b.source.provider) ? [a, b] : [b, a]
+  return {
+    ...main,
+    // The other provider's name goes first: it's often the common short name ("Demon Slayer").
+    altTitles: [...new Set([other.title, ...main.altTitles, ...other.altTitles])].filter((t) => t !== main.title).slice(0, 5),
+    synopsis: main.synopsis || other.synopsis,
+    genres: main.genres.length ? main.genres : other.genres,
+    // Poster and thumbnail travel together so they always show the same artwork.
+    ...(main.posterUrl ? {} : { posterUrl: other.posterUrl, thumbUrl: other.thumbUrl }),
+    backdropUrl: main.backdropUrl ?? other.backdropUrl,
+  }
+}
+
+/** One list from several providers: same titles merged, unrelated filler dropped, best matches first. */
+export function combineResults(query: string, lists: MetaResult[][]): MetaResult[] {
+  const q = normTitle(query)
+  const words = wordsOf(query)
+  const rows: { r: MetaResult; providers: Set<Provider>; score: number; rank: number }[] = []
+  for (const list of lists) {
+    list.forEach((r, rank) => {
+      const score = relevance(r, q, words)
+      const twin = rows.find((row) => !row.providers.has(r.source.provider) && sameTitle(row.r, r))
+      if (!twin) return void rows.push({ r, providers: new Set([r.source.provider]), score, rank })
+      twin.r = merge(twin.r, r)
+      twin.providers.add(r.source.provider)
+      twin.score = Math.max(twin.score, score)
+      twin.rank = Math.min(twin.rank, rank)
+    })
+  }
+  // Providers always return something (Kitsu answers "Breaking Bad" or gibberish with unrelated anime), so keep only
+  // results whose name actually matches. ponytail: no typo tolerance; add fuzzy matching if misspellings come up a lot.
+  return rows
+    .filter((row) => row.score > 0)
+    .sort((x, y) => y.score - x.score || x.rank - y.rank)
+    .map((row) => row.r)
+}
+
+export interface SearchState {
+  query: string
+  results: MetaResult[]
+  /** Providers still loading. */
+  pending: number
+  /** Providers that failed this search. */
+  failed: Provider[]
+  /** Set only when every provider failed. */
+  error: string | null
+}
+
+/**
+ * Ask every provider at once and report after each answer, so fast sources show up without waiting for slow ones.
+ * Nothing is reported once `signal` aborts, so an older search can never overwrite a newer one.
+ */
+export async function searchAll(query: string, signal: AbortSignal, onUpdate: (s: SearchState) => void): Promise<void> {
+  const providers = searchProviders()
+  const lists: MetaResult[][] = providers.map(() => [])
+  const failed: Provider[] = []
+  let pending = providers.length
+  let firstError: string | null = null
+  await Promise.all(
+    providers.map(async (p, i) => {
+      try {
+        lists[i] = await searchTitles(query, p, signal)
+      } catch (err) {
+        failed.push(p)
+        firstError ??= err instanceof Error ? err.message : 'Search failed.'
+      }
+      pending--
+      if (signal.aborted) return
+      const allFailed = pending === 0 && failed.length === providers.length
+      onUpdate({
+        query,
+        results: combineResults(query, lists),
+        pending,
+        failed: [...failed],
+        // The offline message is the useful one; otherwise a per-provider message would wrongly blame just one source.
+        error: allFailed ? (typeof navigator !== 'undefined' && navigator.onLine === false ? firstError : "Couldn't reach any search source. Check your connection and try again.") : null,
+      })
+    }),
+  )
 }
 
 /** Fetch extra details (season/episode counts, genres). Falls back to the search result on failure. */
@@ -268,7 +398,8 @@ export async function enrich(r: MetaResult): Promise<MetaResult> {
 /** Try to download a poster so it works offline. Returns null if the host blocks it (CORS) or it fails. */
 export async function downloadPoster(url: string): Promise<Blob | null> {
   try {
-    const res = await fetch(url, { mode: 'cors' })
+    // Saving waits on this, so don't let a slow image host hold the form; the remote URL is the fallback.
+    const res = await fetch(url, { mode: 'cors', signal: AbortSignal.timeout(10000) })
     if (!res.ok) return null
     const blob = await res.blob()
     return blob.type.startsWith('image/') ? blob : null

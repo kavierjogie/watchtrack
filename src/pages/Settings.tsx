@@ -161,15 +161,16 @@ export function SettingsPage() {
       <Card title="Artwork & metadata (optional)">
         <div className="space-y-2 text-sm text-muted">
           <p>
-            Search uses <strong className="text-fg">Kitsu</strong> for anime and <strong className="text-fg">TVmaze</strong> for TV — both free, no key needed. Only your search
-            text is sent; your progress never leaves this device.
+            Search checks <strong className="text-fg">Kitsu</strong> (anime) and <strong className="text-fg">TVmaze</strong> (TV) together — both free, no key needed. Only
+            your search text is sent; your progress never leaves this device.
           </p>
           <p>
             For movies (and extra TV results) you can add your own free{' '}
             <a className="text-accent-text underline" href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer">
               TMDB API key
             </a>
-            . It's stored only in this browser and sent only to TMDB. Without it, search anime movies via Kitsu or add movies manually.
+            . It's stored only in this browser and sent only to TMDB, and search includes TMDB automatically once it's set. Without it, anime movies still come
+            from Kitsu; add other movies manually.
           </p>
         </div>
         <form
