@@ -155,7 +155,7 @@ export function PlanPage() {
           {result.map((t) => (
             <li key={t.id} className="flex items-center gap-3 p-3">
               <Link to={`/title/${t.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                <Poster poster={t.poster} title={t.title} mediaType={t.mediaType} className="w-12 shrink-0 rounded-lg" />
+                <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} className="w-12 shrink-0 rounded-lg" />
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{t.title}</span>
                   <span className="block truncate text-xs text-muted">
@@ -214,7 +214,7 @@ function OnHoldMovie({ id }: { id: string }) {
   const { setStatus } = useWatchActions()
   return (
     <div className="card flex items-center gap-3 p-3">
-      <Poster poster={t.poster} title={t.title} mediaType={t.mediaType} className="w-16 shrink-0" />
+      <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} className="w-16 shrink-0" />
       <div className="min-w-0 flex-1">
         <Link to={`/title/${t.id}`} className="font-semibold hover:text-accent-text">
           {t.title}

@@ -53,7 +53,7 @@ export function TitleCard({ t, showStatus = true }: { t: Title; showStatus?: boo
     <motion.div layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
       <Link to={`/title/${t.id}`} className="group block rounded-xl focus-visible:outline-offset-4">
         <div className="relative">
-          <Poster poster={t.poster} title={t.title} mediaType={t.mediaType} className="transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:shadow-lg" />
+          <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} className="transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:shadow-lg" />
           {t.progress && <div className="absolute inset-x-2 bottom-2"><ProgressBar value={progressFraction(t.progress)} /></div>}
         </div>
         <div className="mt-2 space-y-1 px-0.5">
@@ -74,7 +74,7 @@ export function TitleCard({ t, showStatus = true }: { t: Title; showStatus?: boo
 export function TitleRow({ t }: { t: Title }) {
   return (
     <Link to={`/title/${t.id}`} className="flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-surface-2">
-      <Poster poster={t.poster} title={t.title} mediaType={t.mediaType} className="w-10 shrink-0 rounded-lg" />
+      <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} className="w-10 shrink-0 rounded-lg" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{t.title}</p>
         <p className="truncate text-xs text-muted">
@@ -106,7 +106,7 @@ export function ContinueCard({ t, extra }: { t: Title; extra?: ReactNode }) {
       className="card flex min-w-0 gap-3 p-3 sm:gap-4"
     >
       <Link to={`/title/${t.id}`} className="w-20 shrink-0 sm:w-24" tabIndex={-1} aria-hidden>
-        <Poster poster={t.poster} title={t.title} mediaType={t.mediaType} />
+        <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} />
       </Link>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-start justify-between gap-2">

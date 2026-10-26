@@ -108,7 +108,7 @@ function SharedCard({ t }: { t: Title }) {
   return (
     <motion.li initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
       <div className="relative">
-        <Poster poster={t.poster} title={t.title} mediaType={t.mediaType} />
+        <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} />
         {t.progress && (
           <div className="absolute inset-x-2 bottom-2">
             <ProgressBar value={progressFraction(t.progress)} />

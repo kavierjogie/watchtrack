@@ -1,6 +1,7 @@
 import { Check, Copy, Share2, TriangleAlert } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { withPublicPosters } from '../lib/posters'
 import { encodeShare, shareUrl } from '../lib/share'
 import { STATUS } from '../lib/backup'
 import { MEDIA_LABEL, STATUS_LABEL, type Title, type WatchStatus } from '../lib/types'
@@ -22,7 +23,7 @@ async function copyText(text: string, field: HTMLInputElement | null): Promise<b
 }
 
 export function ShareDialog({ onClose }: { onClose: () => void }) {
-  const { titles } = useLibrary()
+  const { titles, save } = useLibrary()
   const [selected, setSelected] = useState(() => new Set(titles.map((t) => t.id)))
   // Keyed by the selection it was built for, so a stale link is never shown or copied.
   const [built, setBuilt] = useState<{ for: Title[]; link: Link } | null>(null)
@@ -35,14 +36,20 @@ export function ShareDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (!chosen.length) return
     let alive = true
-    encodeShare(chosen).then(
-      (payload) => alive && setBuilt({ for: chosen, link: { url: shareUrl(payload) } }),
-      (err: unknown) => alive && setBuilt({ for: chosen, link: { error: err instanceof Error ? err.message : 'Could not create the link.' } }),
-    )
+    withPublicPosters(chosen)
+      .then((ready) => {
+        // Remember recovered poster URLs so the lookup happens once, not on every share. The saves re-run this effect.
+        ready.forEach((t, i) => t !== chosen[i] && void save(t).catch(() => {}))
+        return encodeShare(ready)
+      })
+      .then(
+        (payload) => alive && setBuilt({ for: chosen, link: { url: shareUrl(payload) } }),
+        (err: unknown) => alive && setBuilt({ for: chosen, link: { error: err instanceof Error ? err.message : 'Could not create the link.' } }),
+      )
     return () => {
       alive = false
     }
-  }, [chosen])
+  }, [chosen, save])
 
   const url = link && 'url' in link ? link.url : null
 

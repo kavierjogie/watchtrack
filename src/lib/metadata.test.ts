@@ -44,11 +44,11 @@ describe('metadata providers (mocked network)', () => {
     const fetchMock = vi.fn((url: string) =>
       url.includes('/seasons')
         ? json([{ number: 1, episodeOrder: 8 }, { number: 2, episodeOrder: 8 }])
-        : json([{ show: { id: 1, name: 'Helluva Boss', url: 'https://www.tvmaze.com/shows/1', premiered: '2020-10-31', genres: ['Comedy'], summary: '<p>Imps</p>', status: 'Running', type: 'Animation', image: { medium: 'm.jpg', original: 'o.jpg' } } }]),
+        : json([{ show: { id: 1, name: 'Helluva Boss', url: 'https://www.tvmaze.com/shows/1', premiered: '2020-10-31', genres: ['Comedy'], summary: '<p>Imps</p>', status: 'Running', type: 'Animation', image: { medium: 'https://static.tvmaze.com/m.jpg', original: 'https://static.tvmaze.com/o.jpg' } } }]),
     )
     vi.stubGlobal('fetch', fetchMock)
     const [r] = await searchTitles('helluva', 'tvmaze')
-    expect(r).toMatchObject({ title: 'Helluva Boss', mediaType: 'tv', year: 2020, posterUrl: 'o.jpg', thumbUrl: 'm.jpg', synopsis: 'Imps', ongoing: true })
+    expect(r).toMatchObject({ title: 'Helluva Boss', mediaType: 'tv', year: 2020, posterUrl: 'https://static.tvmaze.com/o.jpg', thumbUrl: 'https://static.tvmaze.com/m.jpg', synopsis: 'Imps', ongoing: true })
     const e = await enrich(r)
     expect(e.seasonEpisodeCounts).toEqual({ 1: 8, 2: 8 })
     expect(e.totalSeasons).toBeNull() // still running: never assume the last known season is the end

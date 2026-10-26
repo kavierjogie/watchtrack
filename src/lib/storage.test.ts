@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { applyImport, createBackup, parseBackup, planImport, resolveImport } from './backup'
 import { clearAll, deleteTitle, getImage, getTitle, listHistory, listTitles, putImage, saveTitle, undoHistory } from './db'
 import { setLastWatched } from './progress'
+import { toSharedItem } from './share'
 import { applyMarkWatched, applyMovieWatched, applyProgress, createTitle } from './titles'
 
 const png = () => new Blob([new Uint8Array([137, 80, 78, 71, 1, 2, 3])], { type: 'image/png' })
@@ -95,6 +96,18 @@ describe('backup export / import', () => {
     const img = await getImage(imageId)
     expect(img?.type).toBe('image/png')
     expect(new Uint8Array(await img!.blob.arrayBuffer())).toEqual(new Uint8Array([137, 80, 78, 71, 1, 2, 3]))
+  })
+
+  it("keeps a downloaded poster's source URL through backup and restore, so it can still be shared", async () => {
+    const url = 'https://static.tvmaze.com/uploads/images/original_untouched/595/1489169.jpg'
+    const t = createTitle({ title: 'Stranger Things', mediaType: 'tv', poster: { kind: 'local', imageId: await putImage(png()), url } })
+    await saveTitle(t)
+    const json = JSON.stringify(await createBackup())
+    await clearAll()
+    await applyImport(planImport(parseBackup(json), []), 'replace', 'skip')
+    const back = await getTitle(t.id)
+    expect(back?.poster).toEqual(t.poster)
+    expect(toSharedItem(back!).poster).toBe(url)
   })
 
   it('detects duplicates by id and by title', async () => {

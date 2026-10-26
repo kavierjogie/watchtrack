@@ -36,7 +36,8 @@ export interface Progress {
 }
 
 export type Poster =
-  | { kind: 'local'; imageId: string }
+  /** url: where a downloaded copy came from, so it can still be shared or re-fetched. Absent for uploaded files. */
+  | { kind: 'local'; imageId: string; url?: string }
   | { kind: 'remote'; url: string }
 
 export interface MetadataSource {

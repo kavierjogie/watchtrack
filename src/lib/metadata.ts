@@ -67,6 +67,38 @@ async function request<T>(url: string, init: RequestInit = {}, provider: Provide
   }
 }
 
+// ---------- Poster normalisation ----------
+
+const TMDB_IMG = 'https://image.tmdb.org/t/p/'
+
+export const isHttpUrl = (v: unknown): v is string => {
+  if (typeof v !== 'string' || !v) return false
+  try {
+    return ['http:', 'https:'].includes(new URL(v).protocol)
+  } catch {
+    return false
+  }
+}
+
+/** First usable http(s) URL among an image object's sizes, in preference order. Providers omit sizes or send nulls. */
+const pickImage = (img: unknown, sizes: string[]): string | null => {
+  if (!img || typeof img !== 'object') return null
+  for (const k of sizes) {
+    const v = (img as Record<string, unknown>)[k]
+    if (isHttpUrl(v)) return v
+  }
+  return null
+}
+
+type PosterPair = Pick<MetaResult, 'posterUrl' | 'thumbUrl'>
+const kitsuPoster = (img: unknown): PosterPair => ({
+  posterUrl: pickImage(img, ['original', 'large', 'medium', 'small']),
+  thumbUrl: pickImage(img, ['small', 'medium', 'large', 'original']),
+})
+const mazePoster = (img: unknown): PosterPair => ({ posterUrl: pickImage(img, ['original', 'medium']), thumbUrl: pickImage(img, ['medium', 'original']) })
+const tmdbPoster = (path: unknown): PosterPair =>
+  typeof path === 'string' && /^\/[\w.-]+$/.test(path) ? { posterUrl: `${TMDB_IMG}w500${path}`, thumbUrl: `${TMDB_IMG}w92${path}` } : { posterUrl: null, thumbUrl: null }
+
 // ---------- Kitsu ----------
 
 interface KitsuAnime {
@@ -81,7 +113,7 @@ interface KitsuAnime {
     subtype: string | null
     status: string | null
     episodeCount: number | null
-    posterImage: { small?: string; large?: string; original?: string } | null
+    posterImage: Record<string, unknown> | null
     coverImage: { original?: string; large?: string } | null
   }
   relationships: { categories: { data: { id: string }[] } }
@@ -107,8 +139,7 @@ async function searchKitsu(q: string, signal?: AbortSignal): Promise<MetaResult[
       date: a.startDate,
       synopsis: stripHtml(a.synopsis),
       genres: relationships.categories.data.map((c) => category.get(c.id)).filter((g): g is string => !!g),
-      posterUrl: a.posterImage?.original ?? a.posterImage?.large ?? null,
-      thumbUrl: a.posterImage?.small ?? a.posterImage?.large ?? a.posterImage?.original ?? null,
+      ...kitsuPoster(a.posterImage),
       backdropUrl: a.coverImage?.original ?? a.coverImage?.large ?? null,
       totalEpisodes: a.episodeCount,
       totalSeasons: null,
@@ -130,7 +161,7 @@ interface MazeShow {
   status: string
   type: string
   language: string | null
-  image: { medium: string; original: string } | null
+  image: { medium?: string | null; original?: string | null } | null
 }
 
 async function searchTvMaze(q: string, signal?: AbortSignal): Promise<MetaResult[]> {
@@ -144,8 +175,7 @@ async function searchTvMaze(q: string, signal?: AbortSignal): Promise<MetaResult
     date: show.premiered,
     synopsis: stripHtml(show.summary),
     genres: show.genres,
-    posterUrl: show.image?.original ?? show.image?.medium ?? null,
-    thumbUrl: show.image?.medium ?? show.image?.original ?? null,
+    ...mazePoster(show.image),
     backdropUrl: null,
     totalEpisodes: null,
     totalSeasons: null,
@@ -166,8 +196,6 @@ async function tvMazeSeasons(r: MetaResult): Promise<MetaResult> {
 }
 
 // ---------- TMDB (user key) ----------
-
-const TMDB_IMG = 'https://image.tmdb.org/t/p/'
 
 function tmdbInit(key: string): { query: string; init: RequestInit } {
   // Long JWT-style tokens are "API Read Access Tokens" (Bearer); short ones are v3 API keys.
@@ -215,8 +243,7 @@ async function searchTmdb(q: string, key: string, signal?: AbortSignal): Promise
         date: date || null,
         synopsis: r.overview,
         genres: [],
-        posterUrl: r.poster_path ? `${TMDB_IMG}w500${r.poster_path}` : null,
-        thumbUrl: r.poster_path ? `${TMDB_IMG}w92${r.poster_path}` : null,
+        ...tmdbPoster(r.poster_path),
         backdropUrl: r.backdrop_path ? `${TMDB_IMG}w1280${r.backdrop_path}` : null,
         totalEpisodes: null,
         totalSeasons: null,
@@ -393,6 +420,32 @@ export async function enrich(r: MetaResult): Promise<MetaResult> {
     // Details are a bonus; the search result is still usable.
   }
   return r
+}
+
+/** Provider ids we'll look up. Ids can come from shared links, so anything else is ignored rather than put in a URL. */
+const SOURCE_ID: Partial<Record<Provider, RegExp>> = { kitsu: /^\d{1,10}$/, tvmaze: /^\d{1,10}$/, tmdb: /^(movie|tv)\/\d{1,10}$/ }
+
+/**
+ * Poster for a title that's already identified, looked up by its provider id — never by name, so a remake, season or
+ * namesake can't swap in. Null when the provider has no artwork or can't be asked (AniList is retired; TMDB needs a key).
+ * Throws MetadataError when the provider can't be reached.
+ */
+export async function fetchPosterUrl(source: Pick<MetadataSource, 'provider' | 'id'>): Promise<string | null> {
+  const { provider, id } = source
+  if (!SOURCE_ID[provider]?.test(id)) return null
+  if (provider === 'tvmaze') return mazePoster((await request<MazeShow>(`https://api.tvmaze.com/shows/${id}`, {}, 'tvmaze')).image).posterUrl
+  if (provider === 'kitsu') {
+    const res = await request<{ data: KitsuAnime }>(
+      `https://kitsu.app/api/edge/anime/${id}?fields[anime]=posterImage`,
+      { headers: { Accept: 'application/vnd.api+json' } },
+      'kitsu',
+    )
+    return kitsuPoster(res.data?.attributes?.posterImage).posterUrl
+  }
+  const key = getPrefs().tmdbKey
+  if (!key) return null
+  const { query, init } = tmdbInit(key)
+  return tmdbPoster((await request<{ poster_path?: string | null }>(`https://api.themoviedb.org/3/${id}?${query.slice(1)}`, init, 'tmdb')).poster_path).posterUrl
 }
 
 /** Try to download a poster so it works offline. Returns null if the host blocks it (CORS) or it fails. */

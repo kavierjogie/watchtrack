@@ -1,14 +1,18 @@
 import { isObj, isStr, MEDIA, STATUS } from './backup'
+import { isHttpUrl } from './metadata'
+import { MAX_POSTER_URL, publicPosterUrl } from './posters'
 import { createTitle } from './titles'
-import type { MediaType, Numbering, Title, WatchStatus } from './types'
+import type { MediaType, MetadataSource, Numbering, Title, WatchStatus } from './types'
 
 /**
  * Share links carry the whole list in the URL fragment: /shared#<payload>.
  * payload = base64url(deflate-raw(JSON)). The fragment never reaches a server, so nothing is uploaded.
  * Fragments are not encryption: anyone with the link can read it. Only display fields go in — no notes,
- * history, ids, timestamps, settings or keys.
+ * history, internal ids, timestamps, settings or keys. The public catalogue id (src) is there so the recipient can
+ * look a poster up when its URL is missing or dead.
  *
- * JSON (version 1): { "v": 1, "items": SharedItem[] }
+ * JSON (version 1): { "v": 1, "items": SharedItem[] }. Fields added later are optional, so older links still open
+ * and older versions of the app ignore what they don't know.
  */
 export const SHARE_VERSION = 1
 export const SHARE_PATH = '/shared'
@@ -18,7 +22,7 @@ export const MAX_PAYLOAD_CHARS = 30_000
 const MAX_JSON_BYTES = 512 * 1024
 const MAX_ITEMS = 2000
 const MAX_TITLE = 500
-const MAX_URL = 2000
+const SRC = /^(kitsu|tvmaze|tmdb):[a-z0-9/]{1,24}$/
 const MAX_COUNT = 100_000
 
 export interface SharedProgress {
@@ -38,20 +42,14 @@ export interface SharedItem {
   year?: number
   rating?: number
   poster?: string
+  /** "provider:id" of the catalogue entry, e.g. "tvmaze:2993". Only sent for titles that have artwork. */
+  src?: string
   progress?: SharedProgress
 }
 
 export class ShareError extends Error {}
 
 // ---------- Encode ----------
-
-const httpUrl = (s: string) => {
-  try {
-    return ['http:', 'https:'].includes(new URL(s).protocol)
-  } catch {
-    return false
-  }
-}
 
 export function toSharedItem(t: Title): SharedItem {
   const p = t.progress
@@ -61,8 +59,10 @@ export function toSharedItem(t: Title): SharedItem {
     status: t.status,
     year: t.year ?? undefined,
     rating: t.rating ?? undefined,
-    // Uploaded posters live in this browser's IndexedDB and can't travel in a link.
-    poster: t.poster?.kind === 'remote' && t.poster.url.length <= MAX_URL && httpUrl(t.poster.url) ? t.poster.url : undefined,
+    // Downloaded copies travel as the URL they came from; uploaded files have none and can't travel in a link.
+    poster: publicPosterUrl(t.poster) ?? undefined,
+    // No src for titles without artwork: the user may have removed it on purpose.
+    src: t.poster && t.source && t.source.provider !== 'anilist' ? `${t.source.provider}:${t.source.id}` : undefined,
     progress:
       t.mediaType === 'movie' || !p
         ? undefined
@@ -141,7 +141,8 @@ function checkItem(it: unknown, i: number) {
   if (!STATUS.includes(it.status as WatchStatus)) throw bad('an invalid status')
   if (!optInt(it.year, 1800, 3000)) throw bad('an invalid year')
   if (it.rating !== undefined && !(typeof it.rating === 'number' && it.rating >= 0 && it.rating <= 10)) throw bad('an invalid rating')
-  if (it.poster !== undefined && !(isStr(it.poster) && it.poster.length <= MAX_URL && httpUrl(it.poster))) throw bad('an invalid poster URL')
+  if (it.poster !== undefined && !(isStr(it.poster) && it.poster.length <= MAX_POSTER_URL && isHttpUrl(it.poster))) throw bad('an invalid poster URL')
+  if (it.src !== undefined && !(isStr(it.src) && SRC.test(it.src))) throw bad('an invalid source')
   if (it.progress !== undefined) {
     const p = it.progress
     if (!isObj(p) || (p.numbering !== 'seasonal' && p.numbering !== 'absolute')) throw bad('invalid progress')
@@ -196,16 +197,31 @@ export async function decodeShare(fragment: string): Promise<SharedItem[]> {
   return validatePayload(raw)
 }
 
+const SOURCE_PAGE: Record<Exclude<MetadataSource['provider'], 'anilist'>, (id: string) => string> = {
+  kitsu: (id) => `https://kitsu.app/anime/${id}`,
+  tvmaze: (id) => `https://www.tvmaze.com/shows/${id}`,
+  tmdb: (id) => `https://www.themoviedb.org/${id}`,
+}
+
+function sourceOf(src: string | undefined): MetadataSource | null {
+  if (!src) return null
+  const [provider, id] = src.split(/:(.*)/) as [keyof typeof SOURCE_PAGE, string]
+  return { provider, id, url: SOURCE_PAGE[provider](id) }
+}
+
 /** A display-only Title, so the shared view can reuse the app's progress helpers and components. Never saved. */
 export function sharedToTitle(it: SharedItem): Title {
   const p = it.progress
+  const source = sourceOf(it.src)
   return createTitle({
     title: it.title,
     mediaType: it.type,
     status: it.status,
     year: it.year ?? null,
     rating: it.rating ?? null,
-    poster: it.poster ? { kind: 'remote', url: it.poster } : null,
+    // src without a URL means the creator had artwork we couldn't link to: an empty URL lets <Poster> look it up by source.
+    poster: it.poster || source ? { kind: 'remote', url: it.poster ?? '' } : null,
+    source,
     progress: p && {
       numbering: p.numbering,
       season: p.numbering === 'seasonal' ? (p.season ?? null) : null,

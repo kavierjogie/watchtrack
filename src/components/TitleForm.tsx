@@ -137,9 +137,9 @@ export function TitleForm({
     if (poster.kind === 'keep') return existing?.poster ?? null
     if (poster.kind === 'none') return null
     if (poster.kind === 'file') return { kind: 'local', imageId: await putImage(poster.file) }
-    // Remote artwork: keep a local copy for offline use when the host allows it.
+    // Remote artwork: keep a local copy for offline use when the host allows it, plus the URL so it can still be shared.
     const blob = await downloadPoster(poster.url)
-    if (blob && !validateImage(blob)) return { kind: 'local', imageId: await putImage(blob) }
+    if (blob && !validateImage(blob)) return { kind: 'local', imageId: await putImage(blob), url: poster.url }
     return { kind: 'remote', url: poster.url }
   }
 

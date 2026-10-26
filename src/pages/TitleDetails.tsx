@@ -101,7 +101,7 @@ function Details({ t }: { t: Title }) {
           </div>
         )}
         <div className="relative flex flex-col gap-5 p-5 sm:flex-row sm:p-8">
-          <Poster poster={t.poster} title={t.title} mediaType={t.mediaType} className="w-36 shrink-0 shadow-2xl sm:w-48" />
+          <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} className="w-36 shrink-0 shadow-2xl sm:w-48" />
           <div className="min-w-0 flex-1 space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
               <StatusBadge status={t.status} />
