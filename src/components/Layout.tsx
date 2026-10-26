@@ -75,7 +75,7 @@ export function Layout() {
         <p className="mt-auto px-3 text-[11px] leading-relaxed text-muted">Your data is stored only in this browser on this device.</p>
       </aside>
 
-      <main id="main" className="mx-auto w-full min-w-0 max-w-6xl px-4 pb-28 pt-6 sm:px-6 lg:px-10 lg:pb-12 lg:pt-10">
+      <main id="main" className="mx-auto w-full min-w-0 max-w-6xl overflow-x-clip px-4 pb-28 pt-6 sm:px-6 lg:px-10 lg:pb-12 lg:pt-10">
         {error && (
           <div className="mb-6 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger" role="alert">
             {error}

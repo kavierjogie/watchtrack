@@ -100,7 +100,7 @@ export function ContinuePage() {
       {loading ? (
         <PosterGridSkeleton count={6} />
       ) : list.length ? (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {list.map((t) => (
             <ContinueCard key={t.id} t={t} extra={<TitleMenu t={t} />} />
           ))}
@@ -183,7 +183,7 @@ export function OnHoldPage() {
       {loading ? (
         <PosterGridSkeleton count={6} />
       ) : list.length ? (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {list.map((t) =>
             t.progress ? (
               <div key={t.id} className="space-y-0">

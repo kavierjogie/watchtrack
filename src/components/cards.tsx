@@ -18,7 +18,7 @@ const STATUS_TONE: Record<WatchStatus, string> = {
 }
 
 export function StatusBadge({ status }: { status: WatchStatus }) {
-  return <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_TONE[status]}`}>{STATUS_LABEL[status]}</span>
+  return <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_TONE[status]}`}>{STATUS_LABEL[status]}</span>
 }
 
 export function Rating({ value }: { value: number | null }) {

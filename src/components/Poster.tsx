@@ -65,7 +65,7 @@ export function Poster({
         // No artwork: a neutral placeholder with the title, never an unrelated image.
         <div className="flex size-full flex-col items-center justify-center gap-2 p-3 text-center text-muted">
           <Icon className="size-7 opacity-60" aria-hidden />
-          <span className="line-clamp-3 text-xs font-medium">{title}</span>
+          <span className="line-clamp-3 max-w-full text-xs font-medium wrap-anywhere">{title}</span>
         </div>
       )}
     </div>
