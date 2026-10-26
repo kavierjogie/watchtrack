@@ -113,7 +113,8 @@ export function ShareDialog({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <fieldset>
+        {/* min-w-0: fieldsets default to min-width: min-content, so a long title would widen the sheet and scroll sideways. */}
+        <fieldset className="min-w-0">
           <legend className="label">
             {chosen.length} of {titles.length} selected
           </legend>
