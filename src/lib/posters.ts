@@ -1,4 +1,5 @@
-import { fetchPosterUrl, isHttpUrl } from './metadata'
+import { putImage, validateImage } from './db'
+import { downloadPoster, fetchPosterUrl, isHttpUrl } from './metadata'
 import type { MetadataSource, Poster, Title } from './types'
 
 export const MAX_POSTER_URL = 2000
@@ -10,6 +11,13 @@ export const MAX_POSTER_URL = 2000
 export function publicPosterUrl(p: Poster | null): string | null {
   const url = p?.kind === 'remote' ? p.url : p?.url
   return isHttpUrl(url) && url.length <= MAX_POSTER_URL ? url : null
+}
+
+/** Remote artwork for a new title: a local copy for offline use when the host allows it, plus the URL so it can still be shared. */
+export async function savePoster(url: string): Promise<Poster> {
+  const blob = await downloadPoster(url)
+  if (blob && !validateImage(blob)) return { kind: 'local', imageId: await putImage(blob), url }
+  return { kind: 'remote', url }
 }
 
 // One lookup per title per session, however many cards show it or how often they render.

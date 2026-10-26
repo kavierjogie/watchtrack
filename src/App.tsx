@@ -6,6 +6,7 @@ import { Layout } from './components/Layout'
 import { ConfirmProvider } from './components/Modal'
 import { applyTheme, usePrefs } from './lib/prefs'
 import { Dashboard } from './pages/Dashboard'
+import { DiscoverPage } from './pages/Discover'
 import { ImportNotesPage } from './pages/ImportNotes'
 import { CompletedPage, ContinuePage, LibraryPage, OnHoldPage, PlanPage } from './pages/Lists'
 import { SettingsPage } from './pages/Settings'
@@ -36,6 +37,7 @@ export default function App() {
                 <Route index element={<Dashboard />} />
                 <Route path="continue" element={<ContinuePage />} />
                 <Route path="library" element={<LibraryPage />} />
+                <Route path="discover" element={<DiscoverPage />} />
                 <Route path="plan" element={<PlanPage />} />
                 <Route path="on-hold" element={<OnHoldPage />} />
                 <Route path="completed" element={<CompletedPage />} />

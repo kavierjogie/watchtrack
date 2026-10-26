@@ -1,5 +1,5 @@
 import { AnimatePresence } from 'framer-motion'
-import { CircleCheck, CirclePause, House, Library, ListPlus, Play, Plus, Settings, type LucideIcon } from 'lucide-react'
+import { CircleCheck, CirclePause, Compass, House, Library, ListPlus, Play, Plus, Settings, type LucideIcon } from 'lucide-react'
 import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation, useSearchParams } from 'react-router-dom'
 import type { WatchStatus } from '../lib/types'
@@ -11,6 +11,7 @@ const NAV: { to: string; label: string; icon: LucideIcon; mobile?: boolean }[] =
   { to: '/', label: 'Home', icon: House, mobile: true },
   { to: '/continue', label: 'Continue', icon: Play, mobile: true },
   { to: '/library', label: 'Library', icon: Library, mobile: true },
+  { to: '/discover', label: 'Discover', icon: Compass, mobile: true },
   { to: '/plan', label: 'Plan to Watch', icon: ListPlus },
   { to: '/on-hold', label: 'On Hold', icon: CirclePause },
   { to: '/completed', label: 'Completed', icon: CircleCheck },
@@ -96,7 +97,7 @@ export function Layout() {
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/75 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 lg:hidden reduce-transparency:bg-surface reduce-transparency:backdrop-blur-none"
       >
-        <ul className="mx-auto grid max-w-md grid-cols-5">
+        <ul className="mx-auto grid max-w-md grid-cols-6">
           {NAV.filter((n) => n.mobile)
             .slice(0, 3)
             .map((n) => (
@@ -107,7 +108,11 @@ export function Layout() {
               <Plus className="size-6" aria-hidden />
             </button>
           </li>
-          <MobileItem {...NAV[NAV.length - 1]} />
+          {NAV.filter((n) => n.mobile)
+            .slice(3)
+            .map((n) => (
+              <MobileItem key={n.to} {...n} />
+            ))}
         </ul>
       </nav>
 

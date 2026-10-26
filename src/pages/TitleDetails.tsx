@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Clapperboard, ExternalLink, History, Pencil, Sparkles, Star, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Check, Clapperboard, Compass, ExternalLink, History, Pencil, Sparkles, Star, Trash2, Undo2 } from 'lucide-react'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -189,6 +189,9 @@ function Details({ t }: { t: Title }) {
                   <Sparkles className="size-4" aria-hidden /> Log special
                 </button>
               )}
+              <Link to={`/discover?like=${t.id}`} className="btn-ghost">
+                <Compass className="size-4" aria-hidden /> More like this
+              </Link>
               {history[0]?.before && (
                 <button type="button" className="btn-ghost" onClick={() => void actions.undo(t.id)}>
                   <Undo2 className="size-4" aria-hidden /> Undo last

@@ -46,7 +46,7 @@ const stripHtml = (s: string | null | undefined) =>
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 
-async function request<T>(url: string, init: RequestInit = {}, provider: Provider): Promise<T> {
+export async function request<T>(url: string, init: RequestInit = {}, provider: Provider): Promise<T> {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new MetadataError("You're offline. Add the title manually.")
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 10000)
@@ -101,7 +101,7 @@ const tmdbPoster = (path: unknown): PosterPair =>
 
 // ---------- Kitsu ----------
 
-interface KitsuAnime {
+export interface KitsuAnime {
   id: string
   attributes: {
     slug: string
@@ -113,10 +113,15 @@ interface KitsuAnime {
     subtype: string | null
     status: string | null
     episodeCount: number | null
+    /** 0–100 as a string, e.g. "82.35". Only present when requested. */
+    averageRating?: string | null
+    /** 1 = most popular. Only present when requested. */
+    popularityRank?: number | null
     posterImage: Record<string, unknown> | null
     coverImage: { original?: string; large?: string } | null
   }
-  relationships: { categories: { data: { id: string }[] } }
+  /** Absent when categories weren't included in the request. */
+  relationships?: { categories?: { data?: { id: string }[] } }
 }
 
 async function searchKitsu(q: string, signal?: AbortSignal): Promise<MetaResult[]> {
@@ -127,31 +132,34 @@ async function searchKitsu(q: string, signal?: AbortSignal): Promise<MetaResult[
     'kitsu',
   )
   const category = new Map(res.included?.map((c) => [c.id, c.attributes.title]))
-  return res.data.map(({ id, attributes: a, relationships }) => {
-    const title = a.titles.en || a.canonicalTitle || a.titles.en_jp || 'Untitled'
-    const alts = [a.canonicalTitle, a.titles.en_jp, a.titles.ja_jp, ...(a.abbreviatedTitles ?? [])].filter((s): s is string => !!s && s !== title)
-    return {
-      source: { provider: 'kitsu', id, url: `https://kitsu.app/anime/${a.slug}` },
-      title,
-      altTitles: [...new Set(alts)].slice(0, 4),
-      mediaType: a.subtype === 'movie' ? 'movie' : 'anime',
-      year: a.startDate ? Number(a.startDate.slice(0, 4)) : null,
-      date: a.startDate,
-      synopsis: stripHtml(a.synopsis),
-      genres: relationships.categories.data.map((c) => category.get(c.id)).filter((g): g is string => !!g),
-      ...kitsuPoster(a.posterImage),
-      backdropUrl: a.coverImage?.original ?? a.coverImage?.large ?? null,
-      totalEpisodes: a.episodeCount,
-      totalSeasons: null,
-      seasonEpisodeCounts: {},
-      ongoing: a.status === 'current' || a.status === 'upcoming' || a.status === 'unreleased' || a.status === 'tba',
-    }
-  })
+  return res.data.map((a) => kitsuToResult(a, category))
+}
+
+/** One Kitsu anime → MetaResult. `category` maps category ids to names (from `include=categories`). */
+export function kitsuToResult({ id, attributes: a, relationships }: KitsuAnime, category: Map<string, string> = new Map()): MetaResult {
+  const title = a.titles?.en || a.canonicalTitle || a.titles?.en_jp || 'Untitled'
+  const alts = [a.canonicalTitle, a.titles?.en_jp, a.titles?.ja_jp, ...(a.abbreviatedTitles ?? [])].filter((s): s is string => !!s && s !== title)
+  return {
+    source: { provider: 'kitsu', id, url: `https://kitsu.app/anime/${a.slug}` },
+    title,
+    altTitles: [...new Set(alts)].slice(0, 4),
+    mediaType: a.subtype === 'movie' ? 'movie' : 'anime',
+    year: a.startDate ? Number(a.startDate.slice(0, 4)) : null,
+    date: a.startDate,
+    synopsis: stripHtml(a.synopsis),
+    genres: (relationships?.categories?.data ?? []).map((c) => category.get(c.id)).filter((g): g is string => !!g),
+    ...kitsuPoster(a.posterImage),
+    backdropUrl: a.coverImage?.original ?? a.coverImage?.large ?? null,
+    totalEpisodes: a.episodeCount,
+    totalSeasons: null,
+    seasonEpisodeCounts: {},
+    ongoing: a.status === 'current' || a.status === 'upcoming' || a.status === 'unreleased' || a.status === 'tba',
+  }
 }
 
 // ---------- TVmaze ----------
 
-interface MazeShow {
+export interface MazeShow {
   id: number
   name: string
   url: string
@@ -162,26 +170,35 @@ interface MazeShow {
   type: string
   language: string | null
   image: { medium?: string | null; original?: string | null } | null
+  /** Present on show records (not always on search results). */
+  rating?: { average: number | null } | null
+  /** TVmaze's 0–100 popularity. */
+  weight?: number | null
 }
 
 async function searchTvMaze(q: string, signal?: AbortSignal): Promise<MetaResult[]> {
   const rows = await request<{ show: MazeShow }[]>(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(q)}`, { signal }, 'tvmaze')
-  return rows.map(({ show }) => ({
+  return rows.map(({ show }) => mazeToResult(show))
+}
+
+export function mazeToResult(show: MazeShow): MetaResult {
+  const genres = show.genres ?? []
+  return {
     source: { provider: 'tvmaze', id: String(show.id), url: show.url },
     title: show.name,
     altTitles: [],
-    mediaType: show.type === 'Animation' && (show.genres.includes('Anime') || show.language === 'Japanese') ? 'anime' : 'tv',
+    mediaType: show.type === 'Animation' && (genres.includes('Anime') || show.language === 'Japanese') ? 'anime' : 'tv',
     year: show.premiered ? Number(show.premiered.slice(0, 4)) : null,
     date: show.premiered,
     synopsis: stripHtml(show.summary),
-    genres: show.genres,
+    genres,
     ...mazePoster(show.image),
     backdropUrl: null,
     totalEpisodes: null,
     totalSeasons: null,
     seasonEpisodeCounts: {},
     ongoing: show.status !== 'Ended',
-  }))
+  }
 }
 
 async function tvMazeSeasons(r: MetaResult): Promise<MetaResult> {
@@ -197,14 +214,14 @@ async function tvMazeSeasons(r: MetaResult): Promise<MetaResult> {
 
 // ---------- TMDB (user key) ----------
 
-function tmdbInit(key: string): { query: string; init: RequestInit } {
+export function tmdbInit(key: string): { query: string; init: RequestInit } {
   // Long JWT-style tokens are "API Read Access Tokens" (Bearer); short ones are v3 API keys.
   return key.length > 40
     ? { query: '', init: { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' } } }
     : { query: `&api_key=${encodeURIComponent(key)}`, init: {} }
 }
 
-interface TmdbItem {
+export interface TmdbItem {
   id: number
   media_type: string
   title?: string
@@ -218,6 +235,8 @@ interface TmdbItem {
   backdrop_path: string | null
   original_language?: string
   genre_ids?: number[]
+  vote_average?: number
+  vote_count?: number
 }
 
 async function searchTmdb(q: string, key: string, signal?: AbortSignal): Promise<MetaResult[]> {
@@ -229,28 +248,30 @@ async function searchTmdb(q: string, key: string, signal?: AbortSignal): Promise
   )
   return data.results
     .filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
-    .map((r) => {
-      const title = r.title ?? r.name ?? 'Untitled'
-      const original = r.original_title ?? r.original_name
-      const date = r.release_date || r.first_air_date
-      const kind = r.media_type === 'movie' ? 'movie' : 'tv'
-      return {
-        source: { provider: 'tmdb' as const, id: `${kind}/${r.id}`, url: `https://www.themoviedb.org/${kind}/${r.id}` },
-        title,
-        altTitles: original && original !== title ? [original] : [],
-        mediaType: kind === 'movie' ? 'movie' : r.original_language === 'ja' && r.genre_ids?.includes(16) ? 'anime' : 'tv',
-        year: date ? Number(date.slice(0, 4)) : null,
-        date: date || null,
-        synopsis: r.overview,
-        genres: [],
-        ...tmdbPoster(r.poster_path),
-        backdropUrl: r.backdrop_path ? `${TMDB_IMG}w1280${r.backdrop_path}` : null,
-        totalEpisodes: null,
-        totalSeasons: null,
-        seasonEpisodeCounts: {},
-        ongoing: true,
-      }
-    })
+    .map((r) => tmdbToResult(r))
+}
+
+/** `kind` is needed for endpoints that don't send media_type (recommendations, discover). */
+export function tmdbToResult(r: TmdbItem, kind: 'movie' | 'tv' = r.media_type === 'movie' ? 'movie' : 'tv', genres: string[] = []): MetaResult {
+  const title = r.title ?? r.name ?? 'Untitled'
+  const original = r.original_title ?? r.original_name
+  const date = r.release_date || r.first_air_date
+  return {
+    source: { provider: 'tmdb' as const, id: `${kind}/${r.id}`, url: `https://www.themoviedb.org/${kind}/${r.id}` },
+    title,
+    altTitles: original && original !== title ? [original] : [],
+    mediaType: kind === 'movie' ? 'movie' : r.original_language === 'ja' && r.genre_ids?.includes(16) ? 'anime' : 'tv',
+    year: date ? Number(date.slice(0, 4)) : null,
+    date: date || null,
+    synopsis: r.overview,
+    genres,
+    ...tmdbPoster(r.poster_path),
+    backdropUrl: r.backdrop_path ? `${TMDB_IMG}w1280${r.backdrop_path}` : null,
+    totalEpisodes: null,
+    totalSeasons: null,
+    seasonEpisodeCounts: {},
+    ongoing: true,
+  }
 }
 
 async function tmdbDetails(r: MetaResult, key: string): Promise<MetaResult> {

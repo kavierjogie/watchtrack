@@ -7,6 +7,7 @@ import { PageHeader } from '../components/cards'
 import { Modal, useConfirm } from '../components/Modal'
 import { applyImport, createBackup, downloadJson, parseBackup, planImport, type DuplicateStrategy, type ImportMode, type ImportPlan } from '../lib/backup'
 import { clearAll } from '../lib/db'
+import { resetDiscover } from '../lib/discover'
 import { formatBytes, today } from '../lib/format'
 import { setPrefs, usePrefs, type Prefs } from '../lib/prefs'
 import { MEDIA_LABEL, STATUS_LABEL, type MediaType, type WatchStatus } from '../lib/types'
@@ -95,6 +96,7 @@ export function SettingsPage() {
     })
     if (!yes) return
     await clearAll()
+    resetDiscover()
     await lib.reload()
     toast.success('All data cleared')
   }

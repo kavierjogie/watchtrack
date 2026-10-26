@@ -4,7 +4,8 @@ import { toast } from 'sonner'
 import { titleKey } from '../lib/backup'
 import { deleteImage, putImage, validateImage } from '../lib/db'
 import { today } from '../lib/format'
-import { downloadPoster, enrich, PROVIDER_LABEL, searchAll, type MetaResult, type SearchState } from '../lib/metadata'
+import { enrich, PROVIDER_LABEL, searchAll, type MetaResult, type SearchState } from '../lib/metadata'
+import { savePoster } from '../lib/posters'
 import { getPrefs } from '../lib/prefs'
 import { describePosition, emptyProgress } from '../lib/progress'
 import { createTitle } from '../lib/titles'
@@ -137,10 +138,7 @@ export function TitleForm({
     if (poster.kind === 'keep') return existing?.poster ?? null
     if (poster.kind === 'none') return null
     if (poster.kind === 'file') return { kind: 'local', imageId: await putImage(poster.file) }
-    // Remote artwork: keep a local copy for offline use when the host allows it, plus the URL so it can still be shared.
-    const blob = await downloadPoster(poster.url)
-    if (blob && !validateImage(blob)) return { kind: 'local', imageId: await putImage(blob), url: poster.url }
-    return { kind: 'remote', url: poster.url }
+    return savePoster(poster.url)
   }
 
   async function submit(e: FormEvent) {
