@@ -1,6 +1,7 @@
-import { CircleCheck, CirclePause, Clapperboard, FileUp, ListPlus, Play, Plus, Share2, Tv } from 'lucide-react'
+import { CircleCheck, CirclePause, Clapperboard, Compass, FileUp, Library, ListPlus, Play, Plus, Share2, Sparkles, Tv } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ContinueCard, EmptyState, PageHeader, PosterGridSkeleton, Section, StatCard, TitleCard } from '../components/cards'
+import { ContinueCard, EmptyState, PosterGridSkeleton, Section, SeeAll, StatCard, TitleCard } from '../components/cards'
 import { TitleMenu } from '../components/TitleMenu'
 import { daysSince } from '../lib/format'
 import { byContinue, lastActivity } from '../lib/titles'
@@ -8,70 +9,86 @@ import { useLibrary } from '../state/library'
 
 const byActivity = <T extends Parameters<typeof lastActivity>[0]>(a: T, b: T) => lastActivity(b).localeCompare(lastActivity(a))
 
+function greeting(now = new Date()) {
+  const h = now.getHours()
+  return h < 5 ? 'Late night watching?' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
+}
+
 export function Dashboard() {
   const { titles, loading, episodesLogged } = useLibrary()
 
-  if (loading) return <PosterGridSkeleton />
+  if (loading)
+    return (
+      <div className="space-y-8">
+        <div className="skeleton h-40 rounded-3xl" />
+        <PosterGridSkeleton count={6} />
+      </div>
+    )
 
   const watching = titles.filter((t) => t.status === 'watching' && t.progress).sort(byContinue)
   const onHold = titles.filter((t) => t.status === 'on_hold').sort(byActivity)
   const count = (s: string) => titles.filter((t) => t.status === s).length
-  const recent = [...titles].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12)
+  const recent = [...titles].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12)
   const stale = watching.filter((t) => daysSince(lastActivity(t)) >= 30)
 
   if (titles.length === 0) {
     return (
-      <>
-        <PageHeader title="Welcome" subtitle="Track what you're watching and always know the next episode." />
-        <EmptyState
-          icon={Tv}
-          title="Your library is empty"
-          body="Add your first anime, show or movie — or import the list you keep in your Notes app."
-          action={
-            <>
-              <Link to="?add=1" className="btn-primary">
-                <Plus className="size-4" aria-hidden /> Add title
-              </Link>
-              <Link to="/import" className="btn-secondary">
-                <FileUp className="size-4" aria-hidden /> Import my notes
-              </Link>
-            </>
-          }
-        />
-      </>
+      <div className="space-y-8">
+        <Hero title="Welcome to WatchTrack" subtitle="Track every anime, series and movie you watch — and always know the next episode. Everything stays private, in this browser.">
+          <Link to="?add=1" className="btn-primary">
+            <Plus className="size-4" aria-hidden /> Add your first title
+          </Link>
+          <Link to="/import" className="btn-secondary">
+            <FileUp className="size-4" aria-hidden /> Import my notes
+          </Link>
+        </Hero>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[
+            { icon: Plus, title: 'Add titles', body: 'Search Kitsu and TVmaze for artwork and episode counts, or enter them by hand.' },
+            { icon: Play, title: 'Log episodes', body: 'One tap marks the next episode watched. Undo is always one tap away.' },
+            { icon: Share2, title: 'Share & back up', body: 'Send a read-only watchlist link, or export everything as JSON from Settings.' },
+          ].map(({ icon: Icon, title, body }) => (
+            <div key={title} className="card p-4">
+              <Icon className="size-5 text-accent-text" aria-hidden />
+              <h2 className="mt-3 text-sm font-semibold">{title}</h2>
+              <p className="mt-1 text-sm text-muted">{body}</p>
+            </div>
+          ))}
+        </div>
+        <EmptyState icon={Tv} title="Your library is empty" body="Titles you add show up here with your progress, stats and what to watch next." />
+      </div>
     )
   }
 
   return (
     <div className="space-y-10">
-      <PageHeader
-        title="Home"
-        subtitle={watching.length ? `${watching.length} in progress` : 'Nothing in progress right now'}
-        action={
-          <Link to="?share=1" className="btn-secondary">
-            <Share2 className="size-4" aria-hidden /> Share watchlist
-          </Link>
-        }
-      />
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <StatCard label="Watching" value={count('watching')} icon={Play} to="/continue" />
-        <StatCard label="On hold" value={count('on_hold')} icon={CirclePause} to="/on-hold" />
-        <StatCard label="Completed" value={count('completed')} icon={CircleCheck} to="/completed" />
-        <StatCard label="Plan to watch" value={count('plan')} icon={ListPlus} to="/plan" />
-        <StatCard label="Episodes logged" value={episodesLogged} icon={Clapperboard} />
-      </div>
-
-      <Section
-        title="Continue watching"
-        action={
-          watching.length > 4 && (
-            <Link to="/continue" className="text-sm text-accent-text hover:underline">
-              See all
-            </Link>
-          )
+      <Hero
+        title={greeting()}
+        subtitle={
+          watching.length
+            ? `${watching.length} title${watching.length === 1 ? '' : 's'} in progress${episodesLogged ? ` · ${episodesLogged.toLocaleString()} episode${episodesLogged === 1 ? '' : 's'} logged` : ''}`
+            : 'Nothing in progress right now — pick something from your list.'
         }
       >
+        <Link to="?add=1" className="btn-primary">
+          <Plus className="size-4" aria-hidden /> Add title
+        </Link>
+        <Link to="/library" className="btn-secondary">
+          <Library className="size-4" aria-hidden /> Browse library
+        </Link>
+        <Link to="?share=1" className="btn-ghost max-sm:hidden">
+          <Share2 className="size-4" aria-hidden /> Share watchlist
+        </Link>
+      </Hero>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Watching" value={count('watching')} icon={Play} to="/continue" />
+        <StatCard label="Completed" value={count('completed')} icon={CircleCheck} to="/completed" tone="bg-success/15 text-success" />
+        <StatCard label="Plan to watch" value={count('plan')} icon={ListPlus} to="/plan" tone="bg-surface-2 text-fg" />
+        <StatCard label="On hold" value={count('on_hold')} icon={CirclePause} to="/on-hold" tone="bg-warn/15 text-warn" />
+      </div>
+
+      <Section title="Continue watching" action={watching.length > 4 && <SeeAll to="/continue" label={`See all ${watching.length}`} />}>
         {watching.length ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {watching.slice(0, 4).map((t) => (
@@ -79,18 +96,49 @@ export function Dashboard() {
             ))}
           </div>
         ) : (
-          <EmptyState icon={Play} title="Nothing in progress" body="Start something from your plan-to-watch list or add a new title." />
+          <EmptyState
+            icon={Play}
+            title="Nothing in progress"
+            body="Start something from your plan-to-watch list or add a show you're watching."
+            action={
+              <Link to="/plan" className="btn-secondary">
+                <ListPlus className="size-4" aria-hidden /> Open plan to watch
+              </Link>
+            }
+          />
         )}
       </Section>
 
+      <Section title="Recently added" action={<SeeAll to="/library" />}>
+        {/* A deliberate carousel: scrolls sideways inside its own track, never the page. */}
+        <div className="scrollbar-none -mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:scroll-px-6 sm:px-6 lg:mx-0 lg:scroll-px-0 lg:px-0">
+          {recent.map((t) => (
+            <div key={t.id} className="w-32 shrink-0 snap-start sm:w-36">
+              <TitleCard t={t} />
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Link to="/discover" className="card-link group flex items-center gap-4 overflow-hidden bg-[radial-gradient(70%_120%_at_0%_0%,var(--glow),transparent_70%)] p-4 sm:p-5">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent-text ring-1 ring-accent/20">
+          <Sparkles className="size-5" aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">Find something new</span>
+          <span className="block text-sm text-muted">Recommendations based on the genres and ratings in your library.</span>
+        </span>
+        <Compass className="size-5 shrink-0 text-muted transition-colors group-hover:text-accent-text" aria-hidden />
+      </Link>
+
       {stale.length > 0 && (
         <Section title="Haven't watched in a while">
-          <ul className="card divide-y divide-line">
+          <ul className="card divide-y divide-line overflow-hidden">
             {stale.slice(0, 5).map((t) => (
               <li key={t.id}>
-                <Link to={`/title/${t.id}`} className="flex items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-surface-2">
+                <Link to={`/title/${t.id}`} className="flex min-h-12 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-surface-2">
                   <span className="truncate font-medium">{t.title}</span>
-                  <span className="shrink-0 text-xs text-muted">{daysSince(lastActivity(t))} days</span>
+                  <span className="shrink-0 text-xs text-warn">{daysSince(lastActivity(t))} days idle</span>
                 </Link>
               </li>
             ))}
@@ -98,32 +146,35 @@ export function Dashboard() {
         </Section>
       )}
 
-      <Section title="Recently updated">
-        <div className="scrollbar-none -mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
-          {recent.map((t) => (
-            <div key={t.id} className="w-28 shrink-0 snap-start sm:w-32">
-              <TitleCard t={t} />
-            </div>
-          ))}
-        </div>
-      </Section>
-
       {onHold.length > 0 && (
-        <Section
-          title="On hold"
-          action={
-            <Link to="/on-hold" className="text-sm text-accent-text hover:underline">
-              See all
-            </Link>
-          }
-        >
-          <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
+        <Section title="On hold" action={<SeeAll to="/on-hold" />}>
+          <div className="poster-grid">
             {onHold.slice(0, 6).map((t) => (
               <TitleCard key={t.id} t={t} showStatus={false} />
             ))}
           </div>
         </Section>
       )}
+
+      {episodesLogged > 0 && (
+        <p className="flex items-center justify-center gap-2 text-xs text-muted">
+          <Clapperboard className="size-3.5" aria-hidden /> {episodesLogged.toLocaleString()} episode{episodesLogged === 1 ? '' : 's'} logged with WatchTrack
+        </p>
+      )}
     </div>
+  )
+}
+
+function Hero({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+  return (
+    <header className="relative overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-card sm:p-8">
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_90%_at_100%_0%,var(--glow),transparent_70%),radial-gradient(40%_60%_at_0%_100%,var(--glow),transparent_70%)]" />
+      <div className="relative">
+        <p className="eyebrow text-accent-text">WatchTrack</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
+        <p className="mt-2 max-w-xl text-sm text-muted sm:text-base">{subtitle}</p>
+        <div className="mt-5 flex flex-wrap gap-2">{children}</div>
+      </div>
+    </header>
   )
 }

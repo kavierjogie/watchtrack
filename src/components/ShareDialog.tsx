@@ -22,9 +22,10 @@ async function copyText(text: string, field: HTMLInputElement | null): Promise<b
   }
 }
 
-export function ShareDialog({ onClose }: { onClose: () => void }) {
+/** `only`: start with just this title selected (sharing from its page) instead of the whole library. */
+export function ShareDialog({ onClose, only }: { onClose: () => void; only?: string }) {
   const { titles, save } = useLibrary()
-  const [selected, setSelected] = useState(() => new Set(titles.map((t) => t.id)))
+  const [selected, setSelected] = useState(() => new Set(only && titles.some((t) => t.id === only) ? [only] : titles.map((t) => t.id)))
   // Keyed by the selection it was built for, so a stale link is never shown or copied.
   const [built, setBuilt] = useState<{ for: Title[]; link: Link } | null>(null)
   const [copied, setCopied] = useState<string | null>(null)

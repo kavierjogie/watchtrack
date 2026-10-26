@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Clapperboard, Compass, ExternalLink, History, Pencil, Sparkles, Star, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Check, Clapperboard, Compass, ExternalLink, History, Pencil, Share2, Sparkles, Star, Trash2, Undo2 } from 'lucide-react'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -88,20 +88,40 @@ function Details({ t }: { t: Title }) {
 
   return (
     <article className="space-y-8">
-      <button type="button" onClick={() => (history.length || window.history.length > 1 ? navigate(-1) : navigate('/library'))} className="btn-ghost -ml-3 px-3">
-        <ArrowLeft className="size-4" aria-hidden /> Back
-      </button>
+      <div className="-mb-2 flex items-center justify-between gap-2">
+        <button type="button" onClick={() => (history.length || window.history.length > 1 ? navigate(-1) : navigate('/library'))} className="btn-ghost -ml-3 px-3">
+          <ArrowLeft className="size-4" aria-hidden /> Back
+        </button>
+        {/* Secondary actions: always in reach, never competing with progress. */}
+        <div className="flex items-center gap-1">
+          <button type="button" className="btn-ghost px-3" onClick={() => setEditDetails(true)}>
+            <Pencil className="size-4" aria-hidden /> <span className="max-[400px]:sr-only">Edit</span>
+          </button>
+          <Link to={`?share=${t.id}`} className="icon-btn" aria-label="Share this title" title="Share">
+            <Share2 className="size-4" aria-hidden />
+          </Link>
+          <button
+            type="button"
+            className="icon-btn hover:bg-danger/10 hover:text-danger"
+            aria-label="Delete title"
+            title="Delete"
+            onClick={() => void actions.remove(t).then((ok) => ok && navigate('/library'))}
+          >
+            <Trash2 className="size-4" aria-hidden />
+          </button>
+        </div>
+      </div>
 
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-3xl border border-line bg-surface">
+      <div className="relative overflow-hidden rounded-3xl border border-line bg-surface shadow-card">
         {backdrop && (
           <div aria-hidden className="absolute inset-0">
-            <img src={backdrop} alt="" className={`size-full object-cover ${t.backdropUrl ? 'opacity-30' : 'scale-110 opacity-25 blur-2xl'}`} />
-            <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/80 to-surface/40" />
+            <img src={backdrop} alt="" className={`size-full object-cover ${t.backdropUrl ? 'opacity-35' : 'scale-110 opacity-30 blur-2xl'}`} />
+            <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/85 to-surface/30 sm:bg-gradient-to-r" />
           </div>
         )}
         <div className="relative flex flex-col gap-5 p-5 sm:flex-row sm:p-8">
-          <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} className="w-36 shrink-0 shadow-2xl sm:w-48" />
+          <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} className="w-32 shrink-0 shadow-pop sm:w-48" />
           <div className="min-w-0 flex-1 space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
               <StatusBadge status={t.status} />
@@ -109,7 +129,7 @@ function Details({ t }: { t: Title }) {
               {t.year && <span>· {t.year}</span>}
               {p?.rewatching && <span className="rounded-full bg-surface-2 px-2 py-0.5">Rewatching</span>}
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t.title}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight wrap-anywhere sm:text-4xl">{t.title}</h1>
             {t.altTitles.length > 0 && <p className="text-sm text-muted">{t.altTitles.join(' · ')}</p>}
             {t.genres.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
@@ -122,8 +142,8 @@ function Details({ t }: { t: Title }) {
             )}
 
             {p && pos && (
-              <div className="max-w-md space-y-2 rounded-2xl bg-surface-2/80 p-4">
-                <p className="text-xs uppercase tracking-wide text-muted">{pos.state === 'next' ? 'Up next' : 'Progress'}</p>
+              <div className="max-w-md space-y-2 rounded-2xl border border-line bg-surface-2/80 p-4">
+                <p className="eyebrow">{pos.state === 'next' ? 'Up next' : 'Progress'}</p>
                 <p className="text-xl font-semibold text-accent-text">{describePosition(p)}</p>
                 <p className="text-xs text-muted">
                   Last watched: {last ? formatEp(last, p.numbering) : '—'}
@@ -133,7 +153,7 @@ function Details({ t }: { t: Title }) {
               </div>
             )}
             {!p && (
-              <div className="max-w-md rounded-2xl bg-surface-2/80 p-4 text-sm">
+              <div className="max-w-md rounded-2xl border border-line bg-surface-2/80 p-4 text-sm">
                 {t.status === 'completed' ? (
                   <p>
                     Watched{t.watchedDate ? ` on ${formatDate(t.watchedDate)}` : ''}
@@ -311,7 +331,7 @@ function Details({ t }: { t: Title }) {
                     aria-checked={t.rating === n}
                     aria-label={`${n} out of 10`}
                     onClick={() => void setRating(t.rating === n ? null : n)}
-                    className={`flex size-7 items-center justify-center rounded-lg text-xs font-medium transition-colors ${
+                    className={`flex size-9 items-center justify-center rounded-lg text-xs sm:size-8 font-medium transition-colors ${
                       t.rating != null && n <= t.rating ? 'bg-warn/20 text-warn' : 'bg-surface-2 text-muted hover:text-fg'
                     }`}
                   >
@@ -363,7 +383,7 @@ function Details({ t }: { t: Title }) {
             <button type="button" className="btn-secondary" onClick={() => setEditDetails(true)}>
               <Pencil className="size-4" aria-hidden /> Edit details
             </button>
-            <button type="button" className="btn-ghost text-danger hover:text-danger" onClick={() => void actions.remove(t).then((ok) => ok && navigate('/library'))}>
+            <button type="button" className="btn-ghost text-danger hover:bg-danger/10 hover:text-danger" onClick={() => void actions.remove(t).then((ok) => ok && navigate('/library'))}>
               <Trash2 className="size-4" aria-hidden /> Delete title
             </button>
           </div>

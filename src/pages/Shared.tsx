@@ -85,7 +85,7 @@ export function SharedPage() {
               return (
                 group.length > 0 && (
                   <Section key={status} title={`${STATUS_LABEL[status]} (${group.length})`}>
-                    <ul className="grid grid-cols-2 gap-x-4 gap-y-6 min-[420px]:grid-cols-3 sm:grid-cols-4 lg:grid-cols-6">
+                    <ul className="poster-grid">
                       {group.map((t, i) => (
                         <SharedCard key={i} t={t} />
                       ))}

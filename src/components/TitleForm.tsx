@@ -229,8 +229,9 @@ export function TitleForm({
       {!editing && <MetadataSearch onPick={applyMeta} picked={meta} />}
 
       <form id="title-form" onSubmit={(e) => void submit(e)} className="space-y-5">
-        <div className="flex gap-4">
-          <div className="w-28 shrink-0 space-y-2 sm:w-36">
+        {/* Side by side once there's room for both; on the narrowest phones the fields get the full width. */}
+        <div className="flex flex-col gap-4 min-[420px]:flex-row">
+          <div className="w-28 shrink-0 space-y-2 max-[419px]:mx-auto sm:w-36">
             <Poster poster={previewPoster} title={form.title || 'Poster'} mediaType={form.mediaType} />
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" hidden onChange={(e) => onFile(e.target.files?.[0])} />
             <button type="button" className="btn-secondary w-full min-h-9 px-2 text-xs" onClick={() => fileRef.current?.click()}>

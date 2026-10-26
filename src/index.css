@@ -16,21 +16,28 @@
   --danger: #d63a4a;
   --success: #188a5a;
   --warn: #b7791f;
+  --shadow-card: 0 1px 2px rgb(16 18 30 / 0.06), 0 4px 16px -6px rgb(16 18 30 / 0.08);
+  --shadow-pop: 0 12px 40px -12px rgb(16 18 30 / 0.3);
+  --glow: rgb(91 79 224 / 0.12);
 }
 
+/* Charcoal layers (bg → surface → surface-2) with a single restrained violet accent. */
 .dark {
   --bg: #0f1013;
-  --surface: #17181d;
+  --surface: #16171c;
   --surface-2: #1f2027;
-  --border: #2a2c35;
-  --text: #ecedf1;
-  --muted: #9a9daa;
-  --accent: #7c6ff5;
-  --accent-soft: #24213f;
-  --accent-text: #a99ffb;
-  --danger: #ef5b6a;
-  --success: #3fbf86;
-  --warn: #e0a84a;
+  --border: #272932;
+  --text: #ededf2;
+  --muted: #a0a3b1;
+  --accent: #8576f7;
+  --accent-soft: #252046;
+  --accent-text: #b3a9ff;
+  --danger: #f06272;
+  --success: #45c48c;
+  --warn: #e6ae52;
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 6px 20px -10px rgb(0 0 0 / 0.6);
+  --shadow-pop: 0 18px 50px -12px rgb(0 0 0 / 0.75);
+  --glow: rgb(133 118 247 / 0.16);
 }
 
 @theme inline {
@@ -46,6 +53,8 @@
   --color-danger: var(--danger);
   --color-success: var(--success);
   --color-warn: var(--warn);
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
   /* The platform's own UI font: same look everywhere it's installed, with its optical sizing and tracking tuned in. */
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
@@ -74,10 +83,10 @@ body {
   @apply transition-[color,background-color,border-color,filter,scale] duration-100 ease-out not-disabled:active:scale-[0.97];
 }
 @utility btn {
-  @apply press inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50;
+  @apply press inline-flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50;
 }
 @utility btn-primary {
-  @apply btn bg-accent text-white hover:brightness-110;
+  @apply btn bg-accent text-white shadow-[0_6px_18px_-8px_var(--accent)] hover:brightness-110;
 }
 @utility btn-secondary {
   @apply btn border border-line bg-surface text-fg hover:bg-surface-2;
@@ -99,7 +108,24 @@ body {
   @apply mb-1.5 block text-xs font-medium text-muted;
 }
 @utility card {
-  @apply rounded-2xl border border-line bg-surface;
+  @apply rounded-2xl border border-line bg-surface shadow-card;
+}
+/* Clickable cards lift their border toward the accent on hover. */
+@utility card-link {
+  @apply card transition-[border-color,background-color] duration-150 hover:border-accent/40 hover:bg-surface-2/60;
+}
+@utility eyebrow {
+  @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-muted;
+}
+/*
+ * Poster grids size columns from the space they actually get (sidebar or not), never from the viewport:
+ * auto-fill adds a column only when another min-width card fits, so cards keep a predictable size.
+ * min(…, 100%) lets a single card shrink on the narrowest screens instead of overflowing.
+ */
+@utility poster-grid {
+  display: grid;
+  gap: 1.5rem 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--card-min, 8.25rem), 100%), 1fr));
 }
 @utility chip {
   @apply press inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line px-3 text-xs font-medium text-muted hover:text-fg aria-pressed:border-accent aria-pressed:bg-accent-soft aria-pressed:text-accent-text;
@@ -121,6 +147,9 @@ body {
     animation: none;
   }
 }
+
+/* Touch screens have no hover: show hover-only affordances (quick actions on cards) all the time. */
+@custom-variant can-hover (@media (hover: hover) and (pointer: fine));
 
 /* Modal backdrop fades in (@starting-style) and out (data-closing while the panel's exit animation runs). */
 dialog::backdrop {

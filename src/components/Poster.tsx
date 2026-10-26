@@ -91,7 +91,7 @@ export function Poster({
   const waiting = local === undefined || recover || (!!url && loaded !== url)
 
   return (
-    <div className={`relative aspect-[2/3] overflow-hidden rounded-xl bg-surface-2 ${waiting ? 'animate-pulse' : ''} ${className}`}>
+    <div className={`relative aspect-[2/3] overflow-hidden rounded-xl bg-surface-2 ring-1 ring-inset ring-white/5 ${waiting ? 'animate-pulse' : ''} ${className}`}>
       {url ? (
         <img
           key={url}
@@ -105,14 +105,14 @@ export function Poster({
             logPosterIssue(title, source?.provider, url, 'image failed to load (404/403, blocked, invalid or host unreachable)')
             rerender()
           }}
-          className={`size-full object-cover transition-opacity duration-200 ${loaded === url ? 'opacity-100' : 'opacity-0'}`}
+          className={`size-full object-cover transition-[opacity,scale] duration-300 ${loaded === url ? 'opacity-100' : 'opacity-0'}`}
         />
       ) : (
         !waiting && (
           // No artwork: a neutral placeholder with the title, never an unrelated image.
-          <div className="flex size-full flex-col items-center justify-center gap-2 p-3 text-center text-muted">
-            <Icon className="size-7 opacity-60" aria-hidden />
-            <span className="line-clamp-3 max-w-full text-xs font-medium wrap-anywhere">{title}</span>
+          <div className="flex size-full flex-col items-center justify-center gap-2 bg-[radial-gradient(130%_70%_at_50%_0%,var(--glow),transparent_70%)] p-3 text-center text-muted">
+            <Icon className="size-6 text-accent-text/70" aria-hidden />
+            <span className="line-clamp-3 max-w-full text-xs font-semibold text-fg/75 wrap-anywhere">{title}</span>
           </div>
         )
       )}

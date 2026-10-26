@@ -101,7 +101,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
         <div onPointerDown={(e) => sheet && drag.start(e)} className={sheet ? 'touch-none select-none' : undefined}>
           {sheet && <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-line" aria-hidden />}
           <header className={`flex items-center justify-between gap-4 border-b border-line px-5 ${sheet ? 'pb-3 pt-1' : 'py-3'}`}>
-            <h2 className="text-base font-semibold">{title}</h2>
+            <h2 className="line-clamp-2 min-w-0 text-base font-semibold wrap-anywhere">{title}</h2>
             <button type="button" className="icon-btn -mr-2" onClick={onClose} aria-label="Close">
               <X className="size-5" />
             </button>

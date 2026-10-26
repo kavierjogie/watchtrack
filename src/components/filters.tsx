@@ -1,5 +1,5 @@
 import { LayoutGrid, List, Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { usePrefs, setPrefs } from '../lib/prefs'
 import { lastActivity } from '../lib/titles'
 import { MEDIA_LABEL, STATUS_LABEL, type MediaType, type Title, type WatchStatus } from '../lib/types'
@@ -80,13 +80,13 @@ export function FilterBar({
   return (
     <div className="mb-5 space-y-3">
       <div className="flex flex-wrap gap-2">
-        <label className="relative min-w-48 flex-1">
+        <label className="relative w-full xl:w-auto xl:min-w-56 xl:flex-1">
           <span className="sr-only">Search titles</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
           <input className="input pl-9" type="search" value={f.q} onChange={(e) => set('q', e.target.value)} placeholder="Search titles, tags…" />
         </label>
         {genres.length > 0 && (
-          <select className="input w-auto" value={f.genre} onChange={(e) => set('genre', e.target.value)} aria-label="Genre">
+          <select className="input w-auto max-sm:min-w-32 max-sm:flex-1" value={f.genre} onChange={(e) => set('genre', e.target.value)} aria-label="Genre">
             <option value="">All genres</option>
             {genres.map((g) => (
               <option key={g}>{g}</option>
@@ -94,7 +94,7 @@ export function FilterBar({
           </select>
         )}
         {showRating && (
-          <select className="input w-auto" value={f.minRating} onChange={(e) => set('minRating', Number(e.target.value))} aria-label="Minimum rating">
+          <select className="input w-auto max-sm:min-w-32 max-sm:flex-1" value={f.minRating} onChange={(e) => set('minRating', Number(e.target.value))} aria-label="Minimum rating">
             <option value={0}>Any rating</option>
             {[9, 8, 7, 6, 5].map((n) => (
               <option key={n} value={n}>
@@ -103,14 +103,14 @@ export function FilterBar({
             ))}
           </select>
         )}
-        <select className="input w-auto" value={f.sort} onChange={(e) => set('sort', e.target.value as SortKey)} aria-label="Sort by">
+        <select className="input w-auto max-sm:min-w-32 max-sm:flex-1" value={f.sort} onChange={(e) => set('sort', e.target.value as SortKey)} aria-label="Sort by">
           {sorts.map((s) => (
             <option key={s} value={s}>
               {SORT_LABEL[s]}
             </option>
           ))}
         </select>
-        <div className="flex rounded-xl border border-line" role="group" aria-label="Layout">
+        <div className="ml-auto flex shrink-0 rounded-xl border border-line bg-surface" role="group" aria-label="Layout">
           <button type="button" className="icon-btn" aria-pressed={prefs.libraryView === 'grid'} aria-label="Grid view" onClick={() => setPrefs({ libraryView: 'grid' })}>
             <LayoutGrid className={`size-4 ${prefs.libraryView === 'grid' ? 'text-accent-text' : ''}`} />
           </button>
@@ -137,11 +137,8 @@ export function FilterBar({
   )
 }
 
-const GRID: Record<'sm' | 'md' | 'lg', string> = {
-  sm: 'grid-cols-3 sm:grid-cols-5 lg:grid-cols-7',
-  md: 'grid-cols-2 min-[420px]:grid-cols-3 sm:grid-cols-4 lg:grid-cols-6',
-  lg: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4',
-}
+/** Minimum card width per grid-size preference; the grid fits as many columns as the space allows (see .poster-grid). */
+const CARD_MIN: Record<'sm' | 'md' | 'lg', string> = { sm: '6.25rem', md: '8.25rem', lg: '11rem' }
 
 const PAGE = 48
 
@@ -154,13 +151,13 @@ export function TitleCollection({ titles }: { titles: Title[] }) {
   return (
     <>
       {prefs.libraryView === 'grid' ? (
-        <div className={`grid gap-x-4 gap-y-6 ${GRID[prefs.gridSize]}`}>
+        <div className="poster-grid" style={{ '--card-min': CARD_MIN[prefs.gridSize] } as CSSProperties}>
           {shown.map((t) => (
             <TitleCard key={t.id} t={t} />
           ))}
         </div>
       ) : (
-        <div className="card divide-y divide-line p-1">
+        <div className="card divide-y divide-line p-1.5">
           {shown.map((t) => (
             <TitleRow key={t.id} t={t} />
           ))}

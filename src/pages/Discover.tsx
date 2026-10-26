@@ -15,7 +15,7 @@ import { useLibrary } from '../state/library'
 
 const SORT_LABEL: Record<SortKey, string> = { match: 'Best match', popular: 'Most popular', rating: 'Highest rated', newest: 'Newest' }
 // Wider cards than the library grid: each one carries a reason and three actions.
-const GRID = 'grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 xl:grid-cols-6'
+const GRID = 'poster-grid [--card-min:clamp(8.5rem,22vw,11rem)]'
 const PREVIEW = 6
 
 const errMsg = (err: unknown) => (err instanceof Error ? err.message : 'Something went wrong.')
