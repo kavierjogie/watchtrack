@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation, useSearchParams } from 'react-router-dom'
 import type { WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
+import { ShareDialog } from './ShareDialog'
 import { TitleForm } from './TitleForm'
 
 const NAV: { to: string; label: string; icon: LucideIcon; mobile?: boolean }[] = [
@@ -21,7 +22,7 @@ const ADD_STATUS: Record<string, WatchStatus> = { plan: 'plan', watching: 'watch
 export function Layout() {
   const [params, setParams] = useSearchParams()
   const { pathname } = useLocation()
-  const { error } = useLibrary()
+  const { error, titles } = useLibrary()
   const add = params.get('add')
 
   useEffect(() => {
@@ -36,6 +37,12 @@ export function Layout() {
   const closeAdd = () =>
     setParams((p) => {
       p.delete('add')
+      return p
+    })
+  const share = params.has('share') && titles.length > 0
+  const closeShare = () =>
+    setParams((p) => {
+      p.delete('share')
       return p
     })
 
@@ -105,6 +112,7 @@ export function Layout() {
       </nav>
 
       <AnimatePresence>{add && <TitleForm open onClose={closeAdd} defaultStatus={ADD_STATUS[add]} />}</AnimatePresence>
+      <AnimatePresence>{share && <ShareDialog onClose={closeShare} />}</AnimatePresence>
     </div>
   )
 }

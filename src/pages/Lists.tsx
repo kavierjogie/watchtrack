@@ -1,4 +1,4 @@
-import { CircleCheck, CirclePause, Library as LibraryIcon, ListPlus, Play, Plus, SearchX } from 'lucide-react'
+import { CircleCheck, CirclePause, Library as LibraryIcon, ListPlus, Play, Plus, SearchX, Share2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ContinueCard, EmptyState, PageHeader, PosterGridSkeleton } from '../components/cards'
@@ -31,9 +31,16 @@ export function LibraryPage() {
         title="My Library"
         subtitle={`${titles.length} title${titles.length === 1 ? '' : 's'}`}
         action={
-          <Link to="?add=1" className="btn-primary">
-            <Plus className="size-4" aria-hidden /> Add
-          </Link>
+          <div className="flex gap-2">
+            {titles.length > 0 && (
+              <Link to="?share=1" className="btn-secondary">
+                <Share2 className="size-4" aria-hidden /> Share
+              </Link>
+            )}
+            <Link to="?add=1" className="btn-primary">
+              <Plus className="size-4" aria-hidden /> Add
+            </Link>
+          </div>
         }
       />
       {/* Quick links to the status lists (handy on mobile where the sidebar is hidden) */}

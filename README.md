@@ -55,6 +55,14 @@ Requires Node 20+.
 - **Specials / OVAs**: "Log special" adds them to history without moving your position.
 - **Undo**: every progress or status change stores the previous state; undo from the toast, the title page, or the card menu.
 
+### Sharing your watchlist
+**Home → Share watchlist** (or **Library → Share**). Pick titles, then **Copy link** or **Share** (the phone's share sheet, falling back to copy). The friend opens `/shared#…` in any browser and sees a read-only list, with no account, app or import needed. Their own library is never touched.
+
+- The list lives in the link itself (JSON → deflate-raw via the browser's `CompressionStream` → base64url, after the `#`), so nothing is uploaded and links never expire. Code: `src/lib/share.ts`.
+- Included: title, type, status, season/episode progress, year, rating, online poster URL. Left out: notes, history, ids, dates, settings, keys, uploaded posters.
+- Anyone with the link can read it. Fragments aren't encryption.
+- Links are capped at 30,000 characters. If a selection is bigger, you're told to pick fewer titles. Nothing is silently dropped.
+
 ## Episode tracking rules
 
 Position is stored once, as `season` + `nextEpisode`. "Last watched" is always derived from it, so the two can't drift apart.

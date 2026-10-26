@@ -75,10 +75,10 @@ export function downloadJson(data: unknown, filename: string) {
 
 // ---------- Validation ----------
 
-const MEDIA: MediaType[] = ['anime', 'tv', 'movie']
-const STATUS: WatchStatus[] = ['watching', 'on_hold', 'plan', 'completed', 'dropped']
-const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
-const isStr = (v: unknown): v is string => typeof v === 'string'
+export const MEDIA: MediaType[] = ['anime', 'tv', 'movie']
+export const STATUS: WatchStatus[] = ['watching', 'on_hold', 'plan', 'completed', 'dropped']
+export const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+export const isStr = (v: unknown): v is string => typeof v === 'string'
 const isNumOrNull = (v: unknown) => v === null || (typeof v === 'number' && Number.isFinite(v))
 
 function checkTitle(t: unknown, i: number): string | null {

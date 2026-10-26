@@ -9,6 +9,7 @@ import { Dashboard } from './pages/Dashboard'
 import { ImportNotesPage } from './pages/ImportNotes'
 import { CompletedPage, ContinuePage, LibraryPage, OnHoldPage, PlanPage } from './pages/Lists'
 import { SettingsPage } from './pages/Settings'
+import { SharedPage } from './pages/Shared'
 import { TitleDetails } from './pages/TitleDetails'
 import { LibraryProvider } from './state/library'
 
@@ -43,6 +44,8 @@ export default function App() {
                 <Route path="import" element={<ImportNotesPage />} />
                 <Route path="*" element={<Dashboard />} />
               </Route>
+              {/* Outside Layout: a friend opening a link sees just the shared list, not an empty app. */}
+              <Route path="shared" element={<SharedPage />} />
             </Routes>
             <Toaster
               position="top-center"

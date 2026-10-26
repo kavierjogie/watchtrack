@@ -1,4 +1,4 @@
-import { CircleCheck, CirclePause, Clapperboard, FileUp, ListPlus, Play, Plus, Tv } from 'lucide-react'
+import { CircleCheck, CirclePause, Clapperboard, FileUp, ListPlus, Play, Plus, Share2, Tv } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ContinueCard, EmptyState, PageHeader, PosterGridSkeleton, Section, StatCard, TitleCard } from '../components/cards'
 import { TitleMenu } from '../components/TitleMenu'
@@ -44,7 +44,15 @@ export function Dashboard() {
 
   return (
     <div className="space-y-10">
-      <PageHeader title="Home" subtitle={watching.length ? `${watching.length} in progress` : 'Nothing in progress right now'} />
+      <PageHeader
+        title="Home"
+        subtitle={watching.length ? `${watching.length} in progress` : 'Nothing in progress right now'}
+        action={
+          <Link to="?share=1" className="btn-secondary">
+            <Share2 className="size-4" aria-hidden /> Share watchlist
+          </Link>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard label="Watching" value={count('watching')} icon={Play} to="/continue" />
