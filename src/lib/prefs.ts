@@ -12,6 +12,13 @@ export interface Prefs {
   progressMode: 'last' | 'next'
   /** Optional user-supplied TMDB key. Stays in this browser. */
   tmdbKey: string
+  /** WatchTrack Alerts (alerts.ts): master switch and categories. */
+  alertsOn: boolean
+  alertSeasons: boolean
+  alertEpisodes: boolean
+  alertDates: boolean
+  /** System notifications while the app is in the background. Off until the user turns it on and grants permission. */
+  browserNotify: boolean
 }
 
 const KEY = 'watchtrack:prefs'
@@ -23,6 +30,11 @@ const DEFAULTS: Prefs = {
   defaultStatus: 'all',
   progressMode: 'last',
   tmdbKey: '',
+  alertsOn: true,
+  alertSeasons: true,
+  alertEpisodes: true,
+  alertDates: true,
+  browserNotify: false,
 }
 
 let cache: Prefs | null = null

@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarClock, Check, Clapperboard, Compass, ExternalLink, History, Pencil, Plus, RefreshCw, Share2, Sparkles, Star, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Bell, BellOff, CalendarClock, Check, Clapperboard, Compass, ExternalLink, History, Pencil, Plus, RefreshCw, Share2, Sparkles, Star, Trash2, Undo2 } from 'lucide-react'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -8,7 +8,9 @@ import { Modal } from '../components/Modal'
 import { Poster, usePosterUrl } from '../components/Poster'
 import { ProgressEditor } from '../components/ProgressEditor'
 import { TitleForm } from '../components/TitleForm'
+import { alertsOn } from '../lib/alerts'
 import { normTitle } from '../lib/backup'
+import { usePrefs } from '../lib/prefs'
 import { listHistory } from '../lib/db'
 import { formatDate, isPast, timeAgo, today } from '../lib/format'
 import { PROVIDER_LABEL } from '../lib/metadata'
@@ -409,6 +411,7 @@ function Details({ t }: { t: Title }) {
             </p>
           )}
           {t.sync?.sequel && <SequelCard sequel={t.sync.sequel} />}
+          {canRefresh(t) && <AlertToggle t={t} />}
           {canRefresh(t) && (
             <div className="flex items-center justify-between gap-2 text-xs text-muted">
               <span aria-live="polite">{refreshing ? 'Checking for new episodes…' : `Episodes checked ${timeAgo(t.sync?.checkedAt ?? null)}`}</span>
@@ -427,7 +430,49 @@ function Details({ t }: { t: Title }) {
   )
 }
 
-const SEQUEL_STATUS: Record<string, string> = { RELEASING: 'Airing now', FINISHED: 'Out now', HIATUS: 'On hiatus' }
+/** Per-show release alerts, plus what this title's provider can actually tell us. */
+function AlertToggle({ t }: { t: Title }) {
+  const lib = useLibrary()
+  const { alertsOn: global } = usePrefs()
+  const on = alertsOn(t)
+  const p = t.source?.provider
+  const limit =
+    p === 'kitsu' && t.sync?.anilistId === null
+      ? "Kitsu only gives this anime's next release date, so new-season alerts aren't available for it."
+      : p === 'kitsu' || p === 'anilist'
+        ? 'Anime seasons are separate entries: you’ll hear when the next one is announced, dated or out.'
+        : null
+  return (
+    <div className="card space-y-2 p-4 text-sm">
+      <label className="flex cursor-pointer items-start gap-3">
+        <input
+          type="checkbox"
+          className="mt-0.5 size-4 shrink-0 accent-accent"
+          checked={on}
+          onChange={(e) => void lib.patch(t.id, (cur) => ({ ...cur, alerts: e.target.checked })).catch(() => toast.error("Couldn't save that change."))}
+        />
+        <span>
+          <span className="flex items-center gap-1.5 font-medium">
+            {on ? <Bell className="size-4 text-accent-text" aria-hidden /> : <BellOff className="size-4 text-muted" aria-hidden />} Notify me about new seasons
+          </span>
+          <span className="block text-xs text-muted">Also new episodes and release dates.{t.status === 'dropped' && t.alerts === undefined ? ' Off because this show is dropped.' : ''}</span>
+        </span>
+      </label>
+      {on && !global && (
+        <p className="text-xs text-warn">
+          Release alerts are off in{' '}
+          <Link to="/settings#alerts" className="underline">
+            Settings
+          </Link>
+          .
+        </p>
+      )}
+      {limit && <p className="text-xs text-muted">{limit}</p>}
+    </div>
+  )
+}
+
+const SEQUEL_STATUS: Record<string, string> ={ RELEASING: 'Airing now', FINISHED: 'Out now', HIATUS: 'On hiatus' }
 
 /** The next season as its own entry (anime sites list seasons separately), offered to add rather than merged in. */
 function SequelCard({ sequel }: { sequel: Sequel }) {

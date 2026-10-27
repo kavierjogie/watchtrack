@@ -7,7 +7,7 @@
  */
 import { normTitle } from './backup'
 import { getPrefs } from './prefs'
-import type { MediaType, MetadataSource } from './types'
+import type { MediaType, MetadataSource, Release } from './types'
 
 export type Provider = MetadataSource['provider']
 
@@ -225,26 +225,54 @@ export interface MazeEpisode {
   /** YYYY-MM-DD, '' when not scheduled yet */
   airdate: string | null
   airstamp: string | null
+  name?: string | null
 }
 
+export interface MazeSeason {
+  number: number
+  /** YYYY-MM-DD; null while the season is announced without a date. */
+  premiereDate: string | null
+}
+
+/** Future episodes kept per title (enough for the Upcoming page; a whole scheduled season is rarely more). */
+const MAX_UPCOMING = 12
+
 /**
- * Episodes per season from TVmaze's full episode list (one request: show + embedded episodes).
+ * Episodes per season from TVmaze's full episode list (one request: show + embedded episodes and seasons).
  * Only episodes that have aired are counted; the earliest dated future episode is the next airing.
- * Undated episodes are announcements, not confirmed releases, so they're ignored.
+ * Undated episodes are announcements, not confirmed releases, so they're never given a date. TVmaze only lists a
+ * season once it's been ordered/renewed, so a listed season with nothing aired yet is an announced season.
+ * `upcoming` is undefined when the episode list is missing, so a bad answer can't wipe the stored one.
  */
 export async function fetchMazeEpisodes(id: string, signal?: AbortSignal, now = Date.now()) {
-  const show = await request<MazeShow & { _embedded?: { episodes?: MazeEpisode[] } }>(`https://api.tvmaze.com/shows/${id}?embed=episodes`, { signal }, 'tvmaze')
-  const episodes = Array.isArray(show?._embedded?.episodes) ? show._embedded.episodes : []
+  const show = await request<MazeShow & { _embedded?: { episodes?: MazeEpisode[]; seasons?: MazeSeason[] } }>(
+    `https://api.tvmaze.com/shows/${id}?embed[]=episodes&embed[]=seasons`,
+    { signal },
+    'tvmaze',
+  )
+  const list = show?._embedded?.episodes
+  const episodes = Array.isArray(list) ? list : []
   const aired: Record<number, number> = {}
   let next: { season: number; episode: number; airdate: string; at: number } | null = null
+  const future: { at: number; r: Release }[] = []
   for (const e of episodes) {
     if (!Number.isInteger(e?.season) || !Number.isInteger(e.number) || e.number! < 1 || e.season < 1 || e.type?.includes('special')) continue
     const at = Date.parse(e.airstamp || e.airdate || '')
     if (Number.isNaN(at)) continue
     if (at <= now) aired[e.season] = Math.max(aired[e.season] ?? 0, e.number!)
-    else if (!next || at < next.at) next = { season: e.season, episode: e.number!, airdate: (e.airstamp || e.airdate)!, at }
+    else {
+      future.push({ at, r: { kind: 'episode', season: e.season, episode: e.number!, name: e.name || null, airdate: (e.airstamp || e.airdate)! } })
+      if (!next || at < next.at) next = { season: e.season, episode: e.number!, airdate: (e.airstamp || e.airdate)!, at }
+    }
   }
-  return { ongoing: show?.status !== 'Ended', aired, next: next && { season: next.season, episode: next.episode, airdate: next.airdate } }
+  const lastAired = Math.max(0, ...Object.keys(aired).map(Number))
+  const seasons: Release[] = (Array.isArray(show?._embedded?.seasons) ? show._embedded.seasons : [])
+    .filter((s) => Number.isInteger(s?.number) && s.number > lastAired && (!s.premiereDate || !(Date.parse(s.premiereDate) <= now)))
+    .map((s) => ({ kind: 'season' as const, season: s.number, episode: null, name: null, airdate: /^\d{4}-\d{2}-\d{2}$/.test(s.premiereDate ?? '') ? s.premiereDate : null }))
+  const upcoming = Array.isArray(list)
+    ? [...seasons, ...future.sort((a, b) => a.at - b.at).slice(0, MAX_UPCOMING).map((f) => f.r)]
+    : undefined
+  return { ongoing: show?.status !== 'Ended', aired, next: next && { season: next.season, episode: next.episode, airdate: next.airdate }, upcoming }
 }
 
 async function tvMazeSeasons(r: MetaResult): Promise<MetaResult> {

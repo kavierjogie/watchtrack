@@ -1,10 +1,12 @@
 import { AnimatePresence } from 'framer-motion'
-import { CircleCheck, CirclePause, Compass, House, Library, ListPlus, Play, Plus, Settings, Share2, type LucideIcon } from 'lucide-react'
+import { CalendarClock, CircleCheck, CirclePause, Compass, House, Library, ListPlus, Play, Plus, Settings, Share2, type LucideIcon } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
-import { Link, NavLink, Outlet, useLocation, useSearchParams } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { OPEN_EVENT } from '../lib/alerts'
 import type { WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
 import { useAutoSync } from '../state/useSync'
+import { AlertBell } from './Alerts'
 import { ShareDialog } from './ShareDialog'
 import { TitleForm } from './TitleForm'
 
@@ -23,6 +25,27 @@ const NAV: NavItem[] = [
 const BROWSE = NAV.slice(0, 4)
 const LISTS = NAV.slice(4, 7)
 const SETTINGS = NAV[7]
+/** Desktop sidebar only; phones reach it from the top bar. */
+const UPCOMING: NavItem = { to: '/upcoming', label: 'Upcoming', icon: CalendarClock }
+
+/** Paths a notification click may open (it arrives from the service worker or a plain Notification). */
+const OPENABLE = /^\/(title\/[^/?#]+|notifications|upcoming)$/
+
+/** Notification clicks: the service worker (or a fallback Notification) asks the open app to show a page. */
+function useNotificationClicks() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    const go = (url: unknown) => typeof url === 'string' && OPENABLE.test(url) && navigate(url)
+    const onEvent = (e: Event) => go((e as CustomEvent).detail)
+    const onMessage = (e: MessageEvent) => e.data?.type === OPEN_EVENT && go(e.data.url)
+    window.addEventListener(OPEN_EVENT, onEvent)
+    navigator.serviceWorker?.addEventListener('message', onMessage)
+    return () => {
+      window.removeEventListener(OPEN_EVENT, onEvent)
+      navigator.serviceWorker?.removeEventListener('message', onMessage)
+    }
+  }, [navigate])
+}
 
 const ADD_STATUS: Record<string, WatchStatus> = { plan: 'plan', watching: 'watching', on_hold: 'on_hold', completed: 'completed' }
 
@@ -32,6 +55,7 @@ export function Layout() {
   const { error, titles } = useLibrary()
   const add = params.get('add')
   useAutoSync()
+  useNotificationClicks()
   const counts = useMemo(() => {
     const c: Partial<Record<WatchStatus, number>> = {}
     for (const t of titles) c[t.status] = (c[t.status] ?? 0) + 1
@@ -69,10 +93,13 @@ export function Layout() {
 
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh flex-col overflow-y-auto border-r border-divider bg-bg-2 px-3 py-5 lg:flex">
-        <Link to="/" className="mb-6 flex items-center gap-2.5 rounded-xl px-3">
-          <img src="/icon.svg" alt="" className="size-8" />
-          <span className="text-[15px] font-semibold tracking-tight">WatchTrack</span>
-        </Link>
+        <div className="mb-6 flex items-center justify-between gap-2">
+          <Link to="/" className="flex items-center gap-2.5 rounded-xl px-3">
+            <img src="/icon.svg" alt="" className="size-8" />
+            <span className="text-[15px] font-semibold tracking-tight">WatchTrack</span>
+          </Link>
+          <AlertBell />
+        </div>
         <button type="button" onClick={openAdd} className="btn-primary mb-6 w-full">
           <Plus className="size-4" aria-hidden /> Add title
         </button>
@@ -81,6 +108,7 @@ export function Layout() {
             {BROWSE.map((n) => (
               <SideItem key={n.to} {...n} count={n.status ? counts[n.status] : undefined} />
             ))}
+            <SideItem {...UPCOMING} />
           </ul>
           <div>
             <p className="eyebrow mb-1.5 px-3">Lists</p>
@@ -106,6 +134,10 @@ export function Layout() {
           <span className="truncate font-semibold tracking-tight">WatchTrack</span>
         </Link>
         <div className="flex items-center">
+          <NavLink to="/upcoming" className={({ isActive }) => `icon-btn ${isActive ? 'text-accent-text' : ''}`} aria-label="Upcoming releases">
+            <CalendarClock className="size-5" aria-hidden />
+          </NavLink>
+          <AlertBell />
           {titles.length > 0 && (
             <Link to="?share=1" className="icon-btn" aria-label="Share watchlist">
               <Share2 className="size-5" aria-hidden />

@@ -42,7 +42,7 @@ describe('metadata providers (mocked network)', () => {
 
   it('maps TVmaze search and fills season episode counts on enrich', async () => {
     const fetchMock = vi.fn((url: string) =>
-      url.includes('embed=episodes')
+      url.includes('embed[]=episodes')
         ? json({
             id: 1,
             status: 'Running',

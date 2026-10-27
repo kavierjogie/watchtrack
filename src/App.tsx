@@ -9,7 +9,9 @@ import { Dashboard } from './pages/Dashboard'
 import { DiscoverPage } from './pages/Discover'
 import { ImportNotesPage } from './pages/ImportNotes'
 import { CompletedPage, ContinuePage, LibraryPage, OnHoldPage, PlanPage } from './pages/Lists'
+import { NotificationsPage } from './pages/Notifications'
 import { SettingsPage } from './pages/Settings'
+import { UpcomingPage } from './pages/Upcoming'
 import { SharedPage } from './pages/Shared'
 import { TitleDetails } from './pages/TitleDetails'
 import { LibraryProvider } from './state/library'
@@ -41,6 +43,8 @@ export default function App() {
                 <Route path="plan" element={<PlanPage />} />
                 <Route path="on-hold" element={<OnHoldPage />} />
                 <Route path="completed" element={<CompletedPage />} />
+                <Route path="upcoming" element={<UpcomingPage />} />
+                <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="title/:id" element={<TitleDetails />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="import" element={<ImportNotesPage />} />

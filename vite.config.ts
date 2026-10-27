@@ -30,6 +30,8 @@ export default defineConfig({
         // App shell only. Personal data stays in IndexedDB, never in the SW cache.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
         navigateFallback: '/index.html',
+        // Opens the right title when a WatchTrack alert notification is clicked.
+        importScripts: ['sw-notifications.js'],
         runtimeCaching: [
           {
             // Public poster artwork from metadata providers, so saved titles show posters offline.

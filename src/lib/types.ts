@@ -76,6 +76,19 @@ export interface Title {
   lastWatchedAt: string | null
   /** Provider refresh state (see sync.ts). Absent on titles never refreshed, including older backups. */
   sync?: SyncInfo
+  /** User's release-alert choice for this title. Absent = default (on unless dropped); see alertsOn() in alerts.ts. */
+  alerts?: boolean
+}
+
+/** A future release the provider lists. Only ever shown as-is: dates are never guessed. */
+export interface Release {
+  kind: 'episode' | 'season'
+  season: number | null
+  episode: number | null
+  /** Episode name when the provider has one. */
+  name: string | null
+  /** Confirmed date (YYYY-MM-DD) or timestamp. null = date TBA. */
+  airdate: string | null
 }
 
 /** Provider-owned, overwritten by each successful refresh. Never holds user data. */
@@ -93,6 +106,8 @@ export interface SyncInfo {
   anilistId?: number | null
   /** Next season, as its own AniList entry. Anime sites list seasons separately, so it's offered, never merged in. */
   sequel?: Sequel | null
+  /** Upcoming episodes and announced seasons (dated or TBA). Absent = not looked up yet, so the next refresh only learns them. */
+  upcoming?: Release[]
 }
 
 export interface Sequel {

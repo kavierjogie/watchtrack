@@ -1,5 +1,5 @@
 import { bulkWrite, listAllHistory, listImages, listTitles, newId } from './db'
-import type { HistoryEntry, MediaType, Sequel, StoredImage, SyncInfo, Title, WatchStatus } from './types'
+import type { HistoryEntry, MediaType, Release, Sequel, StoredImage, SyncInfo, Title, WatchStatus } from './types'
 
 /**
  * Backup file format (JSON):
@@ -118,8 +118,12 @@ function normalizeTitle(t: Title): Title {
     completedAt: t.completedAt ?? null,
     lastWatchedAt: t.lastWatchedAt ?? null,
     sync: normalizeSync(t.sync),
+    alerts: typeof t.alerts === 'boolean' ? t.alerts : undefined,
   }
 }
+
+const isRelease = (r: unknown): r is Release =>
+  isObj(r) && (r.kind === 'episode' || r.kind === 'season') && isNumOrNull(r.season) && isNumOrNull(r.episode) && (r.airdate === null || isStr(r.airdate)) && (r.name == null || isStr(r.name))
 
 /** Optional refresh state: dropped if malformed, so the title simply gets refreshed again. */
 function normalizeSync(s: unknown): Title['sync'] {
@@ -127,7 +131,9 @@ function normalizeSync(s: unknown): Title['sync'] {
   const q = s.sequel
   const sequel = isObj(q) && Number.isInteger(q.anilistId) && isStr(q.title) && isStr(q.status) && isStr(q.url) ? (q as unknown as Sequel) : null
   const next = isObj(s.nextAiring) && isStr(s.nextAiring.airdate) ? (s.nextAiring as unknown as SyncInfo['nextAiring']) : null
-  return { ...(s as unknown as SyncInfo), nextAiring: next, sequel }
+  // A malformed list is dropped as a whole: the next refresh just re-learns it without alerting.
+  const upcoming = Array.isArray(s.upcoming) && s.upcoming.every(isRelease) ? s.upcoming : undefined
+  return { ...(s as unknown as SyncInfo), nextAiring: next, sequel, upcoming }
 }
 
 export function parseBackup(text: string): Backup {

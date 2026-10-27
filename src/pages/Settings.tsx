@@ -1,4 +1,5 @@
-import { Download, FileUp, HardDrive, RefreshCw, Smartphone, Trash2, Upload } from 'lucide-react'
+import { Bell, BellRing, Download, FileUp, HardDrive, RefreshCw, Smartphone, Trash2, Upload } from 'lucide-react'
+import { alertsOn, notifySupported, showSystemNotification } from '../lib/alerts'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
@@ -10,7 +11,7 @@ import { clearAll } from '../lib/db'
 import { resetDiscover } from '../lib/discover'
 import { formatBytes, today } from '../lib/format'
 import { setPrefs, usePrefs, type Prefs } from '../lib/prefs'
-import { useSyncState } from '../lib/sync'
+import { canRefresh, useSyncState } from '../lib/sync'
 import { MEDIA_LABEL, STATUS_LABEL, type MediaType, type WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
 import { useRefreshEpisodes } from '../state/useSync'
@@ -32,9 +33,114 @@ function NewEpisodes() {
   )
 }
 
-function Card({ title, children, icon }: { title: string; children: ReactNode; icon?: ReactNode }) {
+function Toggle({ label, hint, checked, disabled, onChange }: { label: string; hint?: string; checked: boolean; disabled?: boolean; onChange: (v: boolean) => void }) {
   return (
-    <section className="card space-y-4 p-5">
+    <label className={`flex items-start gap-3 ${disabled ? 'opacity-50' : 'cursor-pointer'}`}>
+      <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-accent" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+      <span className="text-sm">
+        <span className="font-medium">{label}</span>
+        {hint && <span className="block text-muted">{hint}</span>}
+      </span>
+    </label>
+  )
+}
+
+function AlertSettings() {
+  const prefs = usePrefs()
+  const lib = useLibrary()
+  const supported = notifySupported()
+  const [permission, setPermission] = useState(() => (supported ? Notification.permission : 'denied'))
+  const shows = lib.titles.filter(canRefresh).sort((a, b) => a.title.localeCompare(b.title))
+
+  useEffect(() => {
+    // Linked from the alerts page; after Layout's scroll-to-top on navigation.
+    if (window.location.hash === '#alerts') setTimeout(() => document.getElementById('alerts')?.scrollIntoView({ block: 'start' }))
+  }, [])
+
+  const enableBrowser = async (on: boolean) => {
+    if (!on) return setPrefs({ browserNotify: false })
+    // Asked only here, after the user switched it on — never on page load.
+    const result = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission
+    setPermission(result)
+    if (result === 'granted') {
+      setPrefs({ browserNotify: true })
+      toast.success('Browser notifications on')
+    } else toast.error('Notifications are blocked', { description: 'Allow notifications for this site in your browser settings, then try again. Alerts still appear in the app.' })
+  }
+
+  const test = async () => {
+    const ok = await showSystemNotification('WatchTrack test notification', 'This is how new seasons and episodes will appear.', '/notifications', 'watchtrack-test')
+    if (!ok) toast.error("Couldn't show a notification", { description: 'Check that notifications are allowed for this site.' })
+  }
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-muted">
+        Hear about newly announced seasons, confirmed or changed release dates and new episodes for shows in your library. Alerts appear under the bell. Dropped shows
+        are left out unless you turn them on below.
+      </p>
+      <Toggle label="Release alerts" checked={prefs.alertsOn} onChange={(alertsOn) => setPrefs({ alertsOn })} />
+      <div className="space-y-3 border-l-2 border-line pl-4">
+        <Toggle label="New seasons" hint="Announced seasons and seasons now available" checked={prefs.alertSeasons} disabled={!prefs.alertsOn} onChange={(alertSeasons) => setPrefs({ alertSeasons })} />
+        <Toggle label="Release dates" hint="When a date is confirmed or changes" checked={prefs.alertDates} disabled={!prefs.alertsOn} onChange={(alertDates) => setPrefs({ alertDates })} />
+        <Toggle label="Episodes" hint="New episodes out, and premieres with a confirmed air date" checked={prefs.alertEpisodes} disabled={!prefs.alertsOn} onChange={(alertEpisodes) => setPrefs({ alertEpisodes })} />
+      </div>
+
+      <div className="space-y-3 border-t border-line pt-4">
+        <p className="text-sm font-medium">Browser notifications</p>
+        {!supported ? (
+          <p className="text-sm text-muted">This browser doesn't support notifications. On iPhone and iPad, add WatchTrack to your Home Screen first. Alerts still appear in the app.</p>
+        ) : (
+          <>
+            <Toggle
+              label="Notify me when WatchTrack is in the background"
+              hint={
+                permission === 'denied'
+                  ? 'Blocked by your browser. Allow notifications for this site in its settings to use this.'
+                  : 'Your browser will ask for permission. Used only for these alerts.'
+              }
+              checked={prefs.browserNotify && permission === 'granted'}
+              disabled={!prefs.alertsOn || permission === 'denied'}
+              onChange={(on) => void enableBrowser(on)}
+            />
+            {prefs.browserNotify && permission === 'granted' && (
+              <button type="button" className="btn-secondary" onClick={() => void test()}>
+                <BellRing className="size-4" aria-hidden /> Send a test notification
+              </button>
+            )}
+          </>
+        )}
+        <p className="text-xs text-muted">
+          Checks run only while WatchTrack is open (including in a background tab or installed app window) — each show at most once a day, and again soon after a known
+          release date passes. Browsers can't check while it's closed: that would need a server sending push messages, which WatchTrack doesn't have because your data
+          never leaves this device.
+        </p>
+      </div>
+
+      {shows.length > 0 && (
+        <details className="rounded-xl bg-surface-2 p-3">
+          <summary className="cursor-pointer text-sm font-medium">Choose shows ({shows.filter(alertsOn).length} of {shows.length} on)</summary>
+          <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto">
+            {shows.map((t) => (
+              <li key={t.id}>
+                <Toggle
+                  label={t.title}
+                  hint={STATUS_LABEL[t.status]}
+                  checked={alertsOn(t)}
+                  onChange={(on) => void lib.patch(t.id, (cur) => ({ ...cur, alerts: on })).catch(() => toast.error("Couldn't save that change."))}
+                />
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  )
+}
+
+function Card({ id, title, children, icon }: { id?: string; title: string; children: ReactNode; icon?: ReactNode }) {
+  return (
+    <section id={id} className="card scroll-mt-6 space-y-4 p-5">
       <h2 className="flex items-center gap-2 font-semibold">
         {icon}
         {title}
@@ -151,6 +257,10 @@ export function SettingsPage() {
             <FileUp className="size-4" aria-hidden /> Import from notes
           </Link>
         </div>
+      </Card>
+
+      <Card id="alerts" title="WatchTrack Alerts" icon={<Bell className="size-5 text-accent-text" aria-hidden />}>
+        <AlertSettings />
       </Card>
 
       <Card title="Appearance">
