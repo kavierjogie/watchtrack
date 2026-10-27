@@ -20,7 +20,7 @@ function NewEpisodes() {
   const { refreshAll } = useRefreshEpisodes()
   const { cycle } = useSyncState()
   return (
-    <div className="space-y-2 border-t border-line pt-4 text-sm text-muted">
+    <div className="space-y-2 text-sm text-muted">
       <p>
         New seasons and episodes are checked automatically when you open the app (each show at most once a day; ended shows weekly). Your progress is never
         changed. The browser can't check while the app is closed.
@@ -171,7 +171,6 @@ export function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [usage, setUsage] = useState<{ used: number; quota: number; persisted: boolean } | null>(null)
   const [plan, setPlan] = useState<ImportPlan | null>(null)
-  const [key, setKey] = useState(prefs.tmdbKey)
 
   useEffect(() => {
     void (async () => {
@@ -286,37 +285,7 @@ export function SettingsPage() {
         />
       </Card>
 
-      <Card title="Artwork & metadata (optional)">
-        <div className="space-y-2 text-sm text-muted">
-          <p>
-            Search checks <strong className="text-fg">Kitsu</strong> (anime) and <strong className="text-fg">TVmaze</strong> (TV) together — both free, no key needed. Only
-            your search text is sent; your progress never leaves this device.
-          </p>
-          <p>
-            For movies (and extra TV results) you can add your own free{' '}
-            <a className="text-accent-text underline" href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer">
-              TMDB API key
-            </a>
-            . It's stored only in this browser and sent only to TMDB, and search includes TMDB automatically once it's set. Without it, anime movies still come
-            from Kitsu; add other movies manually.
-          </p>
-        </div>
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            setPrefs({ tmdbKey: key.trim() })
-            toast.success(key.trim() ? 'TMDB key saved' : 'TMDB key removed')
-          }}
-        >
-          <label className="flex-1">
-            <span className="sr-only">TMDB API key or read access token</span>
-            <input className="input" type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="TMDB API key or read access token" autoComplete="off" />
-          </label>
-          <button type="submit" className="btn-secondary">
-            Save
-          </button>
-        </form>
+      <Card title="New episodes">
         <NewEpisodes />
       </Card>
 

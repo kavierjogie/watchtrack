@@ -8,7 +8,6 @@ import { Modal } from '../components/Modal'
 import { Poster } from '../components/Poster'
 import { candidateToTitle, dismiss, likeCandidate, loadPool, restoreDismissed, setFilters, undismiss, useDiscover, withInferred, type PoolState } from '../lib/discover'
 import { PROVIDER_LABEL } from '../lib/metadata'
-import { usePrefs } from '../lib/prefs'
 import { buildDiscover, buildProfile, findTracked, indexLibrary, isTasteGenre, normGenre, topGenres, type Candidate, type Rec, type SortKey } from '../lib/recommend'
 import { MEDIA_LABEL, STATUS_LABEL } from '../lib/types'
 import { useLibrary } from '../state/library'
@@ -28,7 +27,6 @@ const cardPoster = (c: Candidate) => {
 
 export function DiscoverPage() {
   const lib = useLibrary()
-  const prefs = usePrefs()
   const { feedback, filters } = useDiscover()
   const [params, setParams] = useSearchParams()
   const focus = params.get('like')
@@ -50,7 +48,7 @@ export function DiscoverPage() {
     latest.current = { titles: lib.titles, feedback }
   })
 
-  const requestKey = JSON.stringify([round, attempt, focus, askKey, prefs.tmdbKey])
+  const requestKey = JSON.stringify([round, attempt, focus, askKey])
   const loading = doneFor !== requestKey
   useEffect(() => {
     if (lib.loading) return
@@ -293,17 +291,6 @@ export function DiscoverPage() {
               actions={actions}
               expanded={s.id === 'focus'}
               onClear={s.id === 'focus' ? () => setFocus(null) : undefined}
-              note={
-                s.id === 'movie' && !prefs.tmdbKey ? (
-                  <>
-                    These are anime films from Kitsu. For live-action movies,{' '}
-                    <Link to="/settings" className="text-accent-text underline">
-                      add a free TMDB key in Settings
-                    </Link>
-                    .
-                  </>
-                ) : undefined
-              }
             />
           ))}
         </div>
@@ -318,7 +305,7 @@ export function DiscoverPage() {
             </button>
           </p>
         )}
-        <p>Recommendations are worked out on this device from your library and these public catalogues: Kitsu, TVmaze (CC BY-SA){prefs.tmdbKey ? ' and TMDB' : ''}.</p>
+        <p>Recommendations are worked out on this device from your library and these public catalogues: Kitsu, TVmaze (CC BY-SA) and TMDB.</p>
       </footer>
 
       <AnimatePresence>{details && <RecDetails r={details} onClose={() => setDetails(null)} actions={actions} />}</AnimatePresence>

@@ -138,7 +138,7 @@ describe('unified search', () => {
   const mazeRow = { show: { id: 169, name: 'Breaking Bad', url: 'https://www.tvmaze.com/shows/169', premiered: '2008-01-20', genres: ['Drama'], summary: null, status: 'Ended', type: 'Scripted', language: 'English', image: null } }
 
   it('shows results from the providers that answered when another fails', async () => {
-    vi.stubGlobal('fetch', vi.fn((url: string) => (url.includes('kitsu') ? Promise.reject(new TypeError('Failed to fetch')) : json([mazeRow]))))
+    vi.stubGlobal('fetch', vi.fn((url: string) => (url.includes('kitsu') ? Promise.reject(new TypeError('Failed to fetch')) : url.startsWith('/api/tmdb') ? json({ results: [] }) : json([mazeRow]))))
     const updates: SearchState[] = []
     await searchAll('breaking bad', new AbortController().signal, (s) => updates.push(s))
     const last = updates.at(-1)!

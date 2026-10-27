@@ -9,8 +9,7 @@
  * Browsers can't run this while the app is closed; it catches up the next time it's opened.
  */
 import { useSyncExternalStore } from 'react'
-import { fetchMazeEpisodes, kitsuOngoing, MetadataError, request, SOURCE_ID, tmdbInit, type KitsuAnime } from './metadata'
-import { getPrefs } from './prefs'
+import { fetchMazeEpisodes, kitsuOngoing, MetadataError, request, SOURCE_ID, tmdb, type KitsuAnime } from './metadata'
 import { detectEvents, type AlertEvent } from './alerts'
 import { position } from './progress'
 import type { MetadataSource, Release, Sequel, SyncInfo, Title } from './types'
@@ -58,7 +57,7 @@ export function canRefresh(t: Title): t is Title & { source: MetadataSource } {
   // AniList isn't in SOURCE_ID (its posters aren't looked up any more), but its ids still refresh.
   if (s?.provider === 'anilist') return !!t.progress && NUMERIC_ID.test(s.id)
   if (!t.progress || !s || !SOURCE_ID[s.provider]?.test(s.id)) return false
-  if (s.provider === 'tmdb') return s.id.startsWith('tv/') && !!getPrefs().tmdbKey
+  if (s.provider === 'tmdb') return s.id.startsWith('tv/')
   return s.provider === 'tvmaze' || s.provider === 'kitsu'
 }
 
@@ -93,17 +92,12 @@ interface TmdbEp {
 }
 
 async function fetchTmdb(id: string, signal?: AbortSignal): Promise<EpisodeInfo> {
-  const { query, init } = tmdbInit(getPrefs().tmdbKey)
-  const d = await request<{
+  const d = await tmdb<{
     status?: string
     seasons?: { season_number: number; episode_count: number; air_date?: string | null }[]
     last_episode_to_air?: TmdbEp | null
     next_episode_to_air?: TmdbEp | null
-  }>(
-    `https://api.themoviedb.org/3/${id}?${query.slice(1)}`,
-    { ...init, signal },
-    'tmdb',
-  )
+  }>(id, { signal })
   const last = d?.last_episode_to_air
   const seasons: Record<number, number> = {}
   // TMDB's episode_count includes announced episodes, so the current season stops at the last one that aired.

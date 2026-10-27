@@ -10,8 +10,6 @@ export interface Prefs {
   defaultStatus: WatchStatus | 'all'
   /** How progress is entered by default: "last episode watched" or "next episode to watch". */
   progressMode: 'last' | 'next'
-  /** Optional user-supplied TMDB key. Stays in this browser. */
-  tmdbKey: string
   /** WatchTrack Alerts (alerts.ts): master switch and categories. */
   alertsOn: boolean
   alertSeasons: boolean
@@ -29,7 +27,6 @@ const DEFAULTS: Prefs = {
   defaultType: 'all',
   defaultStatus: 'all',
   progressMode: 'last',
-  tmdbKey: '',
   alertsOn: true,
   alertSeasons: true,
   alertEpisodes: true,

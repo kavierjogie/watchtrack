@@ -141,7 +141,7 @@ describe('loadPool', () => {
   it('keeps going when one provider is rate-limited, and reports which one', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn((url: string) => (url.includes('kitsu') ? json({}, 429) : json([mazeShow(1, 'Broadchurch', ['Drama', 'Crime']), mazeShow(2, 'Luther', ['Crime'])]))),
+      vi.fn((url: string) => (url.includes('kitsu') ? json({}, 429) : url.startsWith('/api/tmdb') ? json({ results: [] }) : json([mazeShow(1, 'Broadchurch', ['Drama', 'Crime']), mazeShow(2, 'Luther', ['Crime'])]))),
     )
     const s = await run()
     expect(s.pending).toBe(0)
@@ -154,12 +154,12 @@ describe('loadPool', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
     const s = await run([])
     expect(s.pool).toEqual([])
-    expect(s.failed.map((f) => f.provider).sort()).toEqual(['kitsu', 'tvmaze'])
+    expect(s.failed.map((f) => f.provider).sort()).toEqual(['kitsu', 'tmdb', 'tvmaze'])
   })
 
   it("doesn't refetch what it already has", async () => {
     const fetchMock = vi.fn((url: string) =>
-      url.includes('kitsu') ? json({ data: [] }) : url.includes('/search/') ? json([]) : json([mazeShow(1, 'Broadchurch', ['Drama'])]),
+      url.includes('kitsu') ? json({ data: [] }) : url.startsWith('/api/tmdb') ? json({ results: [] }) : url.includes('/search/') ? json([]) : json([mazeShow(1, 'Broadchurch', ['Drama'])]),
     )
     vi.stubGlobal('fetch', fetchMock)
     await run()

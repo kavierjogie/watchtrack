@@ -110,9 +110,14 @@ describe('fetchPosterUrl normalises every provider', () => {
     expect(await fetchPosterUrl({ provider: 'tvmaze', id: '5' })).toBeNull()
   })
 
-  it('TMDB without a key, retired AniList and malformed ids make no request', async () => {
+  it('TMDB goes through the /api/tmdb proxy', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => json({ poster_path: '/p.jpg' })))
+    expect(await fetchPosterUrl({ provider: 'tmdb', id: 'tv/1399' })).toBe('https://image.tmdb.org/t/p/w500/p.jpg')
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/tmdb?path=tv%2F1399')
+  })
+
+  it('retired AniList and malformed ids make no request', async () => {
     vi.stubGlobal('fetch', vi.fn())
-    expect(await fetchPosterUrl({ provider: 'tmdb', id: 'tv/1399' })).toBeNull()
     expect(await fetchPosterUrl({ provider: 'anilist', id: '1' })).toBeNull()
     expect(await fetchPosterUrl({ provider: 'tvmaze', id: '../search?q=x' })).toBeNull()
     expect(fetch).not.toHaveBeenCalled()

@@ -11,9 +11,8 @@
  */
 import { useSyncExternalStore } from 'react'
 import { isObj, normTitle } from './backup'
-import { enrich, kitsuToResult, mazeToResult, request, searchTitles, tmdbInit, tmdbToResult, type KitsuAnime, type MazeShow, type Provider, type TmdbItem } from './metadata'
+import { enrich, kitsuToResult, mazeToResult, request, searchTitles, tmdb, tmdbToResult, type KitsuAnime, type MazeShow, type Provider, type TmdbItem } from './metadata'
 import { savePoster } from './posters'
-import { getPrefs } from './prefs'
 import { emptyProgress } from './progress'
 import { buildProfile, candidateKey, emptyFeedback, ROLE_STRENGTH, titleWeight, type Candidate, type Feedback, type FeedbackItem, type Link, type SortKey } from './recommend'
 import { createTitle, lastActivity } from './titles'
@@ -173,9 +172,8 @@ function tmdbCandidate(r: TmdbItem, kind: 'movie' | 'tv'): Candidate {
   }
 }
 
-async function tmdbList(path: string, kind: 'movie' | 'tv', key: string): Promise<Candidate[]> {
-  const { query, init } = tmdbInit(key)
-  const data = await request<{ results: TmdbItem[] }>(`https://api.themoviedb.org/3/${path}${path.includes('?') ? '' : '?'}${query}`, init, 'tmdb')
+async function tmdbList(path: string, kind: 'movie' | 'tv'): Promise<Candidate[]> {
+  const data = await tmdb<{ results: TmdbItem[] }>(path)
   return data.results.filter((r) => !r.media_type || r.media_type === kind).map((r) => tmdbCandidate(r, kind))
 }
 
@@ -196,7 +194,7 @@ export async function inferMetadata(library: Title[]): Promise<Inferred> {
   const jobs = library
     .filter((t) => (!t.genres.length || !t.source) && titleWeight(t) > 0)
     .sort((a, b) => titleWeight(b) - titleWeight(a) || lastActivity(b).localeCompare(lastActivity(a)))
-    .map((t) => ({ t, provider: LOOKUP_PROVIDER[t.mediaType] ?? (getPrefs().tmdbKey ? 'tmdb' : 'kitsu') }))
+    .map((t) => ({ t, provider: LOOKUP_PROVIDER[t.mediaType] ?? 'tmdb' }))
     .slice(0, MAX_LOOKUPS)
   const out: Inferred = {}
   await runQueued(
@@ -275,7 +273,6 @@ async function runQueued<T>(tasks: Task<T>[], onError: (provider: Provider, err:
 export async function loadPool(library: Title[], feedback: Feedback, round: number, focus: string | null, onUpdate: (s: PoolState) => void): Promise<void> {
   pruneCache()
   const page = round % 5
-  const key = getPrefs().tmdbKey
   const results: { cands: Candidate[]; links?: Link[] }[] = []
   const failed: PoolState['failed'] = []
   let inferred: Inferred = {}
@@ -305,8 +302,7 @@ export async function loadPool(library: Title[], feedback: Feedback, round: numb
   list(general, 'kitsu', `kitsu:rated:${page}`, 24 * HOUR, () => kitsuList(`filter[subtype]=TV&sort=ratingRank&page[offset]=${40 + page * 20}`))
   // TVmaze: two fixed index pages of long-running favourites plus one that rotates with Refresh.
   for (const n of [0, 1, 2 + (round % 8)]) list(general, 'tvmaze', `tvmaze:page:${n}`, 3 * 24 * HOUR, () => mazePage(n))
-  // TMDB, only with the user's own key (kept in this browser, never in the app's code).
-  if (key) list(general, 'tmdb', 'tmdb:trending:movie', 12 * HOUR, () => tmdbList('trending/movie/week', 'movie', key))
+  list(general, 'tmdb', 'tmdb:trending:movie', 12 * HOUR, () => tmdbList('trending/movie/week', 'movie'))
   pending++ // the lookups below
   const generalDone = run(general)
   inferred = await inferMetadata(library)
@@ -339,22 +335,20 @@ export async function loadPool(library: Title[], feedback: Feedback, round: numb
       },
     })
   }
-  if (key) {
-    const movieGenre = [...profile.genres].filter(([g, v]) => v > 0.2 && TMDB_MOVIE_GENRE_ID.has(g)).sort((a, b) => b[1] - a[1])[0]?.[0]
-    if (movieGenre)
-      list(personal, 'tmdb', `tmdb:genre:${movieGenre}:${page}`, 24 * HOUR, () =>
-        tmdbList(`discover/movie?sort_by=vote_count.desc&with_genres=${TMDB_MOVIE_GENRE_ID.get(movieGenre)}&page=${page + 1}`, 'movie', key),
-      )
-    for (const s of seeds.filter((s) => s.source?.provider === 'tmdb' && TMDB_ID.test(s.source.id)).slice(0, 4)) {
-      const id = s.source!.id
-      personal.push({
-        provider: 'tmdb',
-        run: async () => {
-          const cands = await cached(`tmdb:rec:${id}`, 7 * 24 * HOUR, () => tmdbList(`${id}/recommendations`, id.startsWith('movie') ? 'movie' : 'tv', key))
-          return { cands, links: cands.map((c) => ({ key: candidateKey(c), seedId: s.id, role: 'tmdb-recommended' })) }
-        },
-      })
-    }
+  const movieGenre = [...profile.genres].filter(([g, v]) => v > 0.2 && TMDB_MOVIE_GENRE_ID.has(g)).sort((a, b) => b[1] - a[1])[0]?.[0]
+  if (movieGenre)
+    list(personal, 'tmdb', `tmdb:genre:${movieGenre}:${page}`, 24 * HOUR, () =>
+      tmdbList(`discover/movie?sort_by=vote_count.desc&with_genres=${TMDB_MOVIE_GENRE_ID.get(movieGenre)}&page=${page + 1}`, 'movie'),
+    )
+  for (const s of seeds.filter((s) => s.source?.provider === 'tmdb' && TMDB_ID.test(s.source.id)).slice(0, 4)) {
+    const id = s.source!.id
+    personal.push({
+      provider: 'tmdb',
+      run: async () => {
+        const cands = await cached(`tmdb:rec:${id}`, 7 * 24 * HOUR, () => tmdbList(`${id}/recommendations`, id.startsWith('movie') ? 'movie' : 'tv'))
+        return { cands, links: cands.map((c) => ({ key: candidateKey(c), seedId: s.id, role: 'tmdb-recommended' })) }
+      },
+    })
   }
   report() // lookups done: the page can already re-rank with the filled-in library
   await Promise.all([generalDone, run(personal)])

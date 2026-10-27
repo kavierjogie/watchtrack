@@ -2,11 +2,10 @@
  * Optional title discovery + artwork. Nothing personal is ever sent — only the search text.
  *  - Kitsu (anime): public JSON:API, no key, CORS enabled. https://kitsu.docs.apiary.io
  *  - TVmaze (TV): public REST, no key, CORS enabled, CC BY-SA (attribution required). https://www.tvmaze.com/api
- *  - TMDB (movies + TV): needs the user's own API key, stored only in this browser. https://developer.themoviedb.org
+ *  - TMDB (movies + TV): through this app's /api/tmdb proxy, which holds the key server-side. https://developer.themoviedb.org
  * The app works fully without any of these.
  */
 import { normTitle } from './backup'
-import { getPrefs } from './prefs'
 import type { MediaType, MetadataSource, Release } from './types'
 
 export type Provider = MetadataSource['provider']
@@ -68,7 +67,7 @@ export async function request<T>(url: string, init: RequestInit = {}, provider: 
       const after = Number(res.headers.get('Retry-After'))
       throw new MetadataError(`${PROVIDER_LABEL[provider]} is rate-limiting requests. Wait a minute and try again.`, true, after > 0 ? after : null)
     }
-    if (res.status === 401) throw new MetadataError(`${PROVIDER_LABEL[provider]} rejected the API key. Check it in Settings.`)
+    if (res.status === 401) throw new MetadataError(`${PROVIDER_LABEL[provider]} rejected the API key.`)
     if (!res.ok) throw new MetadataError(`${PROVIDER_LABEL[provider]} returned an error (${res.status}).`, res.status >= 500)
     return (await res.json()) as T
   } catch (err) {
@@ -281,14 +280,10 @@ async function tvMazeSeasons(r: MetaResult): Promise<MetaResult> {
   return { ...r, seasonEpisodeCounts: aired, ongoing, totalSeasons: ongoing || !seasons.length ? null : Math.max(...seasons) }
 }
 
-// ---------- TMDB (user key) ----------
+// ---------- TMDB (via the /api/tmdb proxy) ----------
 
-export function tmdbInit(key: string): { query: string; init: RequestInit } {
-  // Long JWT-style tokens are "API Read Access Tokens" (Bearer); short ones are v3 API keys.
-  return key.length > 40
-    ? { query: '', init: { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' } } }
-    : { query: `&api_key=${encodeURIComponent(key)}`, init: {} }
-}
+/** GET a TMDB v3 path (with its query string) through the app's proxy, which adds the key (api/tmdb.ts). */
+export const tmdb = <T>(path: string, init: RequestInit = {}) => request<T>(`/api/tmdb?path=${encodeURIComponent(path)}`, init, 'tmdb')
 
 export interface TmdbItem {
   id: number
@@ -308,13 +303,8 @@ export interface TmdbItem {
   vote_count?: number
 }
 
-async function searchTmdb(q: string, key: string, signal?: AbortSignal): Promise<MetaResult[]> {
-  const { query, init } = tmdbInit(key)
-  const data = await request<{ results: TmdbItem[] }>(
-    `https://api.themoviedb.org/3/search/multi?include_adult=false&query=${encodeURIComponent(q)}${query}`,
-    { ...init, signal },
-    'tmdb',
-  )
+async function searchTmdb(q: string, signal?: AbortSignal): Promise<MetaResult[]> {
+  const data = await tmdb<{ results: TmdbItem[] }>(`search/multi?include_adult=false&query=${encodeURIComponent(q)}`, { signal })
   return data.results
     .filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
     .map((r) => tmdbToResult(r))
@@ -343,15 +333,14 @@ export function tmdbToResult(r: TmdbItem, kind: 'movie' | 'tv' = r.media_type ==
   }
 }
 
-async function tmdbDetails(r: MetaResult, key: string): Promise<MetaResult> {
-  const { query, init } = tmdbInit(key)
-  const d = await request<{
+async function tmdbDetails(r: MetaResult): Promise<MetaResult> {
+  const d = await tmdb<{
     genres: { name: string }[]
     status?: string
     number_of_seasons?: number
     number_of_episodes?: number
     seasons?: { season_number: number; episode_count: number }[]
-  }>(`https://api.themoviedb.org/3/${r.source.id}?${query.slice(1)}`, init, 'tmdb')
+  }>(r.source.id)
   const counts: Record<number, number> = {}
   for (const s of d.seasons ?? []) if (s.season_number > 0 && s.episode_count) counts[s.season_number] = s.episode_count
   const ended = d.status === 'Ended' || d.status === 'Canceled'
@@ -366,9 +355,9 @@ async function tmdbDetails(r: MetaResult, key: string): Promise<MetaResult> {
 
 // ---------- Public API ----------
 
-/** Every source the unified search asks. TMDB only joins when the user has added their own key. */
+/** Every source the unified search asks. */
 export function searchProviders(): Provider[] {
-  return getPrefs().tmdbKey ? ['kitsu', 'tvmaze', 'tmdb'] : ['kitsu', 'tvmaze']
+  return ['kitsu', 'tvmaze', 'tmdb']
 }
 
 export async function searchTitles(q: string, provider: Provider, signal?: AbortSignal): Promise<MetaResult[]> {
@@ -376,9 +365,7 @@ export async function searchTitles(q: string, provider: Provider, signal?: Abort
   if (!query) return []
   if (provider === 'kitsu') return searchKitsu(query, signal)
   if (provider === 'tvmaze') return searchTvMaze(query, signal)
-  const key = getPrefs().tmdbKey
-  if (!key) throw new MetadataError('Add your TMDB API key in Settings to search TMDB.')
-  return searchTmdb(query, key, signal)
+  return searchTmdb(query, signal)
 }
 
 // ---------- Unified search ----------
@@ -506,8 +493,7 @@ export async function searchAll(query: string, signal: AbortSignal, onUpdate: (s
 export async function enrich(r: MetaResult): Promise<MetaResult> {
   try {
     if (r.source.provider === 'tvmaze') return await tvMazeSeasons(r)
-    const key = getPrefs().tmdbKey
-    if (r.source.provider === 'tmdb' && key) return await tmdbDetails(r, key)
+    if (r.source.provider === 'tmdb') return await tmdbDetails(r)
   } catch {
     // Details are a bonus; the search result is still usable.
   }
@@ -519,7 +505,7 @@ export const SOURCE_ID: Partial<Record<Provider, RegExp>> = { kitsu: /^\d{1,10}$
 
 /**
  * Poster for a title that's already identified, looked up by its provider id — never by name, so a remake, season or
- * namesake can't swap in. Null when the provider has no artwork or can't be asked (AniList is retired; TMDB needs a key).
+ * namesake can't swap in. Null when the provider has no artwork or can't be asked (AniList is retired).
  * Throws MetadataError when the provider can't be reached.
  */
 export async function fetchPosterUrl(source: Pick<MetadataSource, 'provider' | 'id'>): Promise<string | null> {
@@ -534,10 +520,7 @@ export async function fetchPosterUrl(source: Pick<MetadataSource, 'provider' | '
     )
     return kitsuPoster(res.data?.attributes?.posterImage).posterUrl
   }
-  const key = getPrefs().tmdbKey
-  if (!key) return null
-  const { query, init } = tmdbInit(key)
-  return tmdbPoster((await request<{ poster_path?: string | null }>(`https://api.themoviedb.org/3/${id}?${query.slice(1)}`, init, 'tmdb')).poster_path).posterUrl
+  return tmdbPoster((await tmdb<{ poster_path?: string | null }>(id)).poster_path).posterUrl
 }
 
 /** Try to download a poster so it works offline. Returns null if the host blocks it (CORS) or it fails. */
