@@ -32,7 +32,17 @@ export interface MetaResult {
   ongoing: boolean
 }
 
-export class MetadataError extends Error {}
+export class MetadataError extends Error {
+  /** Worth trying again later: rate limit, server error, timeout or network failure. */
+  readonly retryable: boolean
+  /** Seconds the provider asked us to wait (Retry-After), when it said. */
+  readonly retryAfter: number | null
+  constructor(message: string, retryable = false, retryAfter: number | null = null) {
+    super(message)
+    this.retryable = retryable
+    this.retryAfter = retryAfter
+  }
+}
 
 export const PROVIDER_LABEL: Record<Provider, string> = { kitsu: 'Kitsu', anilist: 'AniList', tvmaze: 'TVmaze', tmdb: 'TMDB' }
 
@@ -54,14 +64,17 @@ export async function request<T>(url: string, init: RequestInit = {}, provider: 
   init.signal?.addEventListener('abort', () => ctrl.abort())
   try {
     const res = await fetch(url, { ...init, signal: ctrl.signal })
-    if (res.status === 429) throw new MetadataError(`${PROVIDER_LABEL[provider]} is rate-limiting requests. Wait a minute and try again.`)
+    if (res.status === 429) {
+      const after = Number(res.headers.get('Retry-After'))
+      throw new MetadataError(`${PROVIDER_LABEL[provider]} is rate-limiting requests. Wait a minute and try again.`, true, after > 0 ? after : null)
+    }
     if (res.status === 401) throw new MetadataError(`${PROVIDER_LABEL[provider]} rejected the API key. Check it in Settings.`)
-    if (!res.ok) throw new MetadataError(`${PROVIDER_LABEL[provider]} returned an error (${res.status}).`)
+    if (!res.ok) throw new MetadataError(`${PROVIDER_LABEL[provider]} returned an error (${res.status}).`, res.status >= 500)
     return (await res.json()) as T
   } catch (err) {
     if (err instanceof MetadataError) throw err
     // A blocked/CORS-less error response also lands here, so it isn't always the user's connection.
-    throw new MetadataError(`Couldn't reach ${PROVIDER_LABEL[provider]} — it may be down. Try another source or add the title manually.`)
+    throw new MetadataError(`Couldn't reach ${PROVIDER_LABEL[provider]} — it may be down. Try another source or add the title manually.`, true)
   } finally {
     clearTimeout(timer)
   }
@@ -135,6 +148,8 @@ async function searchKitsu(q: string, signal?: AbortSignal): Promise<MetaResult[
   return res.data.map((a) => kitsuToResult(a, category))
 }
 
+export const kitsuOngoing = (status: string | null | undefined) => status === 'current' || status === 'upcoming' || status === 'unreleased' || status === 'tba'
+
 /** One Kitsu anime → MetaResult. `category` maps category ids to names (from `include=categories`). */
 export function kitsuToResult({ id, attributes: a, relationships }: KitsuAnime, category: Map<string, string> = new Map()): MetaResult {
   const title = a.titles?.en || a.canonicalTitle || a.titles?.en_jp || 'Untitled'
@@ -153,7 +168,7 @@ export function kitsuToResult({ id, attributes: a, relationships }: KitsuAnime, 
     totalEpisodes: a.episodeCount,
     totalSeasons: null,
     seasonEpisodeCounts: {},
-    ongoing: a.status === 'current' || a.status === 'upcoming' || a.status === 'unreleased' || a.status === 'tba',
+    ongoing: kitsuOngoing(a.status),
   }
 }
 
@@ -201,15 +216,41 @@ export function mazeToResult(show: MazeShow): MetaResult {
   }
 }
 
+export interface MazeEpisode {
+  id: number
+  season: number
+  /** null for specials */
+  number: number | null
+  type?: string
+  /** YYYY-MM-DD, '' when not scheduled yet */
+  airdate: string | null
+  airstamp: string | null
+}
+
+/**
+ * Episodes per season from TVmaze's full episode list (one request: show + embedded episodes).
+ * Only episodes that have aired are counted; the earliest dated future episode is the next airing.
+ * Undated episodes are announcements, not confirmed releases, so they're ignored.
+ */
+export async function fetchMazeEpisodes(id: string, signal?: AbortSignal, now = Date.now()) {
+  const show = await request<MazeShow & { _embedded?: { episodes?: MazeEpisode[] } }>(`https://api.tvmaze.com/shows/${id}?embed=episodes`, { signal }, 'tvmaze')
+  const episodes = Array.isArray(show?._embedded?.episodes) ? show._embedded.episodes : []
+  const aired: Record<number, number> = {}
+  let next: { season: number; episode: number; airdate: string; at: number } | null = null
+  for (const e of episodes) {
+    if (!Number.isInteger(e?.season) || !Number.isInteger(e.number) || e.number! < 1 || e.season < 1 || e.type?.includes('special')) continue
+    const at = Date.parse(e.airstamp || e.airdate || '')
+    if (Number.isNaN(at)) continue
+    if (at <= now) aired[e.season] = Math.max(aired[e.season] ?? 0, e.number!)
+    else if (!next || at < next.at) next = { season: e.season, episode: e.number!, airdate: (e.airstamp || e.airdate)!, at }
+  }
+  return { ongoing: show?.status !== 'Ended', aired, next: next && { season: next.season, episode: next.episode, airdate: next.airdate } }
+}
+
 async function tvMazeSeasons(r: MetaResult): Promise<MetaResult> {
-  const seasons = await request<{ number: number; episodeOrder: number | null }[]>(
-    `https://api.tvmaze.com/shows/${r.source.id}/seasons`,
-    {},
-    'tvmaze',
-  )
-  const counts: Record<number, number> = {}
-  for (const s of seasons) if (s.episodeOrder) counts[s.number] = s.episodeOrder
-  return { ...r, seasonEpisodeCounts: counts, totalSeasons: r.ongoing ? null : seasons.length || null }
+  const { aired, ongoing } = await fetchMazeEpisodes(r.source.id)
+  const seasons = Object.keys(aired).map(Number)
+  return { ...r, seasonEpisodeCounts: aired, ongoing, totalSeasons: ongoing || !seasons.length ? null : Math.max(...seasons) }
 }
 
 // ---------- TMDB (user key) ----------
@@ -444,7 +485,7 @@ export async function enrich(r: MetaResult): Promise<MetaResult> {
 }
 
 /** Provider ids we'll look up. Ids can come from shared links, so anything else is ignored rather than put in a URL. */
-const SOURCE_ID: Partial<Record<Provider, RegExp>> = { kitsu: /^\d{1,10}$/, tvmaze: /^\d{1,10}$/, tmdb: /^(movie|tv)\/\d{1,10}$/ }
+export const SOURCE_ID: Partial<Record<Provider, RegExp>> = { kitsu: /^\d{1,10}$/, tvmaze: /^\d{1,10}$/, tmdb: /^(movie|tv)\/\d{1,10}$/ }
 
 /**
  * Poster for a title that's already identified, looked up by its provider id — never by name, so a remake, season or

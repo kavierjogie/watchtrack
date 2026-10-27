@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Clapperboard, Compass, ExternalLink, History, Pencil, Share2, Sparkles, Star, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, CalendarClock, Check, Clapperboard, Compass, ExternalLink, History, Pencil, RefreshCw, Share2, Sparkles, Star, Trash2, Undo2 } from 'lucide-react'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -9,11 +9,13 @@ import { Poster, usePosterUrl } from '../components/Poster'
 import { ProgressEditor } from '../components/ProgressEditor'
 import { TitleForm } from '../components/TitleForm'
 import { listHistory } from '../lib/db'
-import { formatDate, timeAgo, today } from '../lib/format'
+import { formatDate, isPast, timeAgo, today } from '../lib/format'
 import { PROVIDER_LABEL } from '../lib/metadata'
 import { currentEpisodeCount, describePosition, formatEp, formatSkipRanges, lastWatched, position, progressFraction } from '../lib/progress'
-import { MEDIA_LABEL, STATUS_LABEL, type HistoryEntry, type Title, type WatchStatus } from '../lib/types'
+import { canRefresh, useSyncState } from '../lib/sync'
+import { MEDIA_LABEL, STATUS_LABEL, type HistoryEntry, type Numbering, type SyncInfo, type Title, type WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
+import { useRefreshEpisodes } from '../state/useSync'
 import { useWatchActions } from '../state/useWatchActions'
 
 const STATUSES: WatchStatus[] = ['watching', 'on_hold', 'plan', 'completed', 'dropped']
@@ -51,6 +53,8 @@ function Details({ t }: { t: Title }) {
   const notes = draft ?? t.notes
   const editProgress = params.get('edit') === 'progress' && !!t.progress
   const posterUrl = usePosterUrl(t.poster)
+  const { refreshOne } = useRefreshEpisodes()
+  const refreshing = useSyncState().ids.has(t.id)
 
   useEffect(() => {
     let alive = true
@@ -150,6 +154,7 @@ function Details({ t }: { t: Title }) {
                   {t.lastWatchedAt && ` · ${timeAgo(t.lastWatchedAt)}`}
                 </p>
                 <ProgressBar value={progressFraction(p)} />
+                {t.sync?.nextAiring && <NextAiring next={t.sync.nextAiring} numbering={p.numbering} />}
               </div>
             )}
             {!p && (
@@ -255,9 +260,13 @@ function Details({ t }: { t: Title }) {
                   const done = p.season != null && (n < p.season || (n === p.season && pos?.state !== 'next' && pos?.state !== 'unknown'))
                   const current = n === p.season
                   const watched = done ? count : current && p.nextEpisode ? Math.min(count, p.nextEpisode - 1) : 0
+                  const airing = t.sync?.nextAiring?.season === n
                   return (
                     <li key={s} className={`card p-3 ${current ? 'border-accent/60' : ''}`}>
-                      <p className="text-sm font-medium">Season {s}</p>
+                      <p className="text-sm font-medium">
+                        Season {s}
+                        {airing && <span className="ml-1.5 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-normal text-muted">Airing</span>}
+                      </p>
                       <p className="mb-2 text-xs text-muted">
                         {watched} / {count} episodes
                       </p>
@@ -369,6 +378,7 @@ function Details({ t }: { t: Title }) {
                   <Fact label="Total episodes" value={p.totalEpisodes ?? 'Unknown'} />
                 )}
                 {p.numbering === 'seasonal' && <Fact label="Eps this season" value={currentEpisodeCount(p) ?? 'Unknown'} />}
+                {p.numbering === 'absolute' && p.totalEpisodes == null && t.sync?.aired != null && <Fact label="Aired so far" value={t.sync.aired} />}
                 {p.skipped.length > 0 && <Fact label="Skipped" value={formatSkipRanges(p.skipped, p.season) || `${p.skipped.length} range(s)`} />}
               </>
             )}
@@ -397,6 +407,14 @@ function Details({ t }: { t: Title }) {
               {t.source.provider === 'tvmaze' && ' (CC BY-SA)'}
             </p>
           )}
+          {canRefresh(t) && (
+            <div className="flex items-center justify-between gap-2 text-xs text-muted">
+              <span aria-live="polite">{refreshing ? 'Checking for new episodes…' : `Episodes checked ${timeAgo(t.sync?.checkedAt ?? null)}`}</span>
+              <button type="button" className="btn-ghost h-8 px-2 text-xs" disabled={refreshing} onClick={() => void refreshOne(t)}>
+                <RefreshCw className={`size-3.5 ${refreshing ? 'animate-spin' : ''}`} aria-hidden /> Refresh episodes
+              </button>
+            </div>
+          )}
         </aside>
       </div>
 
@@ -404,6 +422,20 @@ function Details({ t }: { t: Title }) {
       <AnimatePresence>{editDetails && <TitleForm open existing={t} onClose={() => setEditDetails(false)} />}</AnimatePresence>
       <AnimatePresence>{special && <SpecialDialog onClose={() => setSpecial(false)} onSave={(label) => void actions.logSpecial(t, label).then(() => setSpecial(false))} />}</AnimatePresence>
     </article>
+  )
+}
+
+/** Confirmed next release from the provider. It hasn't aired, so it never counts toward progress. */
+function NextAiring({ next, numbering }: { next: NonNullable<SyncInfo['nextAiring']>; numbering: Numbering }) {
+  if (isPast(next.airdate)) return null // aired since the last refresh; the next one will count it
+  const ep = next.episode != null ? formatEp({ season: next.season, episode: next.episode }, numbering) : 'Next episode'
+  return (
+    <p className="flex items-center gap-1.5 pt-1 text-xs text-muted">
+      <CalendarClock className="size-3.5 shrink-0" aria-hidden />
+      <span>
+        Upcoming: {ep} airs <time dateTime={next.airdate} title={new Date(next.airdate).toLocaleString()}>{timeAgo(next.airdate)}</time>
+      </span>
+    </p>
   )
 }
 

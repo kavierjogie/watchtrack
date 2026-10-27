@@ -74,6 +74,21 @@ export interface Title {
   completedAt: string | null
   /** Last time an episode/movie was logged as watched */
   lastWatchedAt: string | null
+  /** Provider refresh state (see sync.ts). Absent on titles never refreshed, including older backups. */
+  sync?: SyncInfo
+}
+
+/** Provider-owned, overwritten by each successful refresh. Never holds user data. */
+export interface SyncInfo {
+  /** Last successful provider refresh. */
+  checkedAt: string
+  /** Last refresh that found new seasons or episodes. */
+  changedAt: string | null
+  ongoing: boolean
+  /** Episodes aired so far across all seasons. null = the provider can't say reliably. */
+  aired: number | null
+  /** Next confirmed (dated) release. Episode is null when the provider only gives a date. */
+  nextAiring: { season: number | null; episode: number | null; airdate: string } | null
 }
 
 export type HistoryKind = 'episode' | 'special' | 'movie' | 'correction' | 'status'

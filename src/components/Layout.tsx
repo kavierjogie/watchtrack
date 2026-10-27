@@ -4,6 +4,7 @@ import { useEffect, useMemo } from 'react'
 import { Link, NavLink, Outlet, useLocation, useSearchParams } from 'react-router-dom'
 import type { WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
+import { useAutoSync } from '../state/useSync'
 import { ShareDialog } from './ShareDialog'
 import { TitleForm } from './TitleForm'
 
@@ -30,6 +31,7 @@ export function Layout() {
   const { pathname } = useLocation()
   const { error, titles } = useLibrary()
   const add = params.get('add')
+  useAutoSync()
   const counts = useMemo(() => {
     const c: Partial<Record<WatchStatus, number>> = {}
     for (const t of titles) c[t.status] = (c[t.status] ?? 0) + 1

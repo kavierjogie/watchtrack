@@ -1,4 +1,4 @@
-import { Download, FileUp, HardDrive, Smartphone, Trash2, Upload } from 'lucide-react'
+import { Download, FileUp, HardDrive, RefreshCw, Smartphone, Trash2, Upload } from 'lucide-react'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
@@ -10,8 +10,27 @@ import { clearAll } from '../lib/db'
 import { resetDiscover } from '../lib/discover'
 import { formatBytes, today } from '../lib/format'
 import { setPrefs, usePrefs, type Prefs } from '../lib/prefs'
+import { useSyncState } from '../lib/sync'
 import { MEDIA_LABEL, STATUS_LABEL, type MediaType, type WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
+import { useRefreshEpisodes } from '../state/useSync'
+
+/** Manual library-wide refresh. The same check runs on its own when the app is opened. */
+function NewEpisodes() {
+  const { refreshAll } = useRefreshEpisodes()
+  const { cycle } = useSyncState()
+  return (
+    <div className="space-y-2 border-t border-line pt-4 text-sm text-muted">
+      <p>
+        New seasons and episodes are checked automatically when you open the app (each show at most once a day; ended shows weekly). Your progress is never
+        changed. The browser can't check while the app is closed.
+      </p>
+      <button type="button" className="btn-secondary" disabled={cycle} onClick={() => void refreshAll()}>
+        <RefreshCw className={`size-4 ${cycle ? 'animate-spin' : ''}`} aria-hidden /> {cycle ? 'Checking…' : 'Check for new episodes now'}
+      </button>
+    </div>
+  )
+}
 
 function Card({ title, children, icon }: { title: string; children: ReactNode; icon?: ReactNode }) {
   return (
@@ -192,6 +211,7 @@ export function SettingsPage() {
             Save
           </button>
         </form>
+        <NewEpisodes />
       </Card>
 
       <Card title="Install on your phone" icon={<Smartphone className="size-5 text-accent-text" aria-hidden />}>

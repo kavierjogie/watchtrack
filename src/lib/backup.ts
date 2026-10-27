@@ -117,6 +117,8 @@ function normalizeTitle(t: Title): Title {
     importNote: t.importNote ?? null,
     completedAt: t.completedAt ?? null,
     lastWatchedAt: t.lastWatchedAt ?? null,
+    // Optional refresh state: dropped if malformed, so the title simply gets refreshed again.
+    sync: isObj(t.sync) && isStr(t.sync.checkedAt) ? t.sync : undefined,
   }
 }
 

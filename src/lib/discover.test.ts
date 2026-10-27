@@ -237,7 +237,8 @@ describe('candidateToTitle', () => {
   })
 
   it('plans a TV series from episode 1 with season counts, and a movie without progress', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => json([{ number: 1, episodeOrder: 8 }, { number: 2, episodeOrder: 6 }])))
+    const eps = (season: number, n: number) => Array.from({ length: n }, (_, i) => ({ id: season * 100 + i, season, number: i + 1, airdate: '2020-01-01', airstamp: null }))
+    vi.stubGlobal('fetch', vi.fn(() => json({ id: 7, status: 'Ended', _embedded: { episodes: [...eps(1, 8), ...eps(2, 6)] } })))
     const tv = await d.candidateToTitle(candidate({ mediaType: 'tv', source: { provider: 'tvmaze', id: '7', url: '' } }), 'plan')
     expect(tv.progress).toMatchObject({ numbering: 'seasonal', season: 1, nextEpisode: 1, seasonEpisodeCounts: { 1: 8, 2: 6 }, totalSeasons: 2 })
     const movie = await d.candidateToTitle(candidate({ mediaType: 'movie' }), 'plan')

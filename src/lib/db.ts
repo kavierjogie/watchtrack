@@ -92,6 +92,21 @@ export async function saveTitle(title: Title, history?: HistoryEntry): Promise<v
   })
 }
 
+/**
+ * Read-modify-write in one transaction, so a background refresh can't overwrite progress the user saved meanwhile.
+ * `fn` returns null to leave the title as it is. Resolves to the saved title, or undefined if it was deleted.
+ */
+export async function updateTitle(id: string, fn: (t: Title) => Title | null): Promise<Title | undefined> {
+  return guardWrite(async () => {
+    const tx = (await getDb()).transaction('titles', 'readwrite')
+    const current = await tx.store.get(id)
+    const next = current && fn(current)
+    if (next) await tx.store.put(next)
+    await tx.done
+    return next ?? current
+  })
+}
+
 /** Delete a title with its history and locally stored poster. */
 export async function deleteTitle(id: string): Promise<void> {
   const db = await getDb()

@@ -13,6 +13,8 @@ interface LibraryState {
   historyVersion: number
   byId: (id: string) => Title | undefined
   save: (title: Title) => Promise<void>
+  /** Atomic update of the stored title (no history entry); see db.updateTitle. */
+  patch: (id: string, fn: (t: Title) => Title | null) => Promise<Title | undefined>
   commit: (change: Change) => Promise<void>
   remove: (id: string) => Promise<void>
   undoLast: (titleId: string) => Promise<Title | null>
@@ -62,6 +64,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       save: async (title) => {
         await db.saveTitle(title)
         upsert(title)
+      },
+      patch: async (id, fn) => {
+        const t = await db.updateTitle(id, fn)
+        if (t) upsert(t)
+        return t
       },
       commit: async ({ title, history }) => {
         await db.saveTitle(title, history)

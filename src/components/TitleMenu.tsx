@@ -1,8 +1,10 @@
-import { CircleCheck, CirclePause, Ellipsis, ExternalLink, ListPlus, Pencil, Play, Undo2 } from 'lucide-react'
+import { CircleCheck, CirclePause, Ellipsis, ExternalLink, ListPlus, Pencil, Play, RefreshCw, Undo2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { canRefresh, useSyncState } from '../lib/sync'
 import type { Title } from '../lib/types'
+import { useRefreshEpisodes } from '../state/useSync'
 import { useWatchActions } from '../state/useWatchActions'
 import { ProgressEditor } from './ProgressEditor'
 
@@ -13,6 +15,8 @@ export function TitleMenu({ t }: { t: Title }) {
   const ref = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const { setStatus, undo } = useWatchActions()
+  const { refreshOne } = useRefreshEpisodes()
+  const refreshing = useSyncState().ids.has(t.id)
 
   useEffect(() => {
     if (!open) return
@@ -33,6 +37,7 @@ export function TitleMenu({ t }: { t: Title }) {
     t.status !== 'on_hold' && { label: 'Pause (on hold)', icon: CirclePause, run: () => void setStatus(t, 'on_hold') },
     t.status !== 'plan' && { label: 'Move to plan to watch', icon: ListPlus, run: () => void setStatus(t, 'plan') },
     t.status !== 'completed' && { label: 'Mark completed', icon: CircleCheck, run: () => void setStatus(t, 'completed') },
+    canRefresh(t) && !refreshing && { label: 'Refresh episodes', icon: RefreshCw, run: () => void refreshOne(t) },
     { label: 'Undo last change', icon: Undo2, run: () => void undo(t.id) },
     { label: 'Open details', icon: ExternalLink, run: () => navigate(`/title/${t.id}`) },
   ].filter((x): x is { label: string; icon: typeof Pencil; run: () => void } => !!x)

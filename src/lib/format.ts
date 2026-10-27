@@ -17,6 +17,8 @@ export const formatDate = (iso: string | null) =>
 
 export const daysSince = (iso: string | null, now = Date.now()) => (iso ? Math.floor((now - new Date(iso).getTime()) / 86400000) : Infinity)
 
+export const isPast = (iso: string, now = Date.now()) => Date.parse(iso) < now
+
 export const today = () => new Date().toISOString().slice(0, 10)
 
 export function formatBytes(n: number): string {
