@@ -1,4 +1,5 @@
 import { newId } from './db'
+import type { MetaResult } from './metadata'
 import { emptyProgress, formatEpLong, markWatched, type MarkOutcome } from './progress'
 import type { HistoryEntry, HistoryKind, Progress, Snapshot, Title, WatchStatus } from './types'
 
@@ -28,6 +29,26 @@ export function createTitle(input: NewTitleInput, now = new Date().toISOString()
     id: newId(),
     createdAt: now,
     updatedAt: now,
+  }
+}
+
+/**
+ * Point a title at another provider entry (e.g. a single-season anime entry → the whole show). Only provider-owned
+ * fields change: the old source's episode counts, totals and sync state (AniList id, sequel, dates) don't apply to the new one.
+ */
+export function relinkTitle(t: Title, meta: MetaResult): Title {
+  const p = t.progress
+  return {
+    ...t,
+    source: meta.source,
+    backdropUrl: meta.backdropUrl ?? t.backdropUrl,
+    sync: undefined,
+    progress: p && {
+      ...p,
+      seasonEpisodeCounts: { ...meta.seasonEpisodeCounts },
+      totalSeasons: meta.totalSeasons,
+      totalEpisodes: meta.totalEpisodes && !meta.ongoing ? meta.totalEpisodes : null,
+    },
   }
 }
 

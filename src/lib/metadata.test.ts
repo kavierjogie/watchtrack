@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { combineResults, enrich, MetadataError, sameTitle, searchAll, searchTitles, type MetaResult, type Provider, type SearchState } from './metadata'
+import { combineResults, enrich, MetadataError, sameTitle, searchAll, searchTitles, showName, wholeShowMatch, type MetaResult, type Provider, type SearchState } from './metadata'
+import { createTitle, relinkTitle } from './titles'
 
 const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }))
 
@@ -171,5 +172,44 @@ describe('unified search', () => {
     await oldRun
     expect(seen.length).toBeGreaterThan(0)
     expect(seen.every((q) => q === 'breaking bad')).toBe(true)
+  })
+})
+
+describe('linking a single-season anime entry to the whole show', () => {
+  const s1 = createTitle({
+    title: 'My Hero Academia',
+    altTitles: ['Boku no Hero Academia'],
+    year: 2016,
+    mediaType: 'anime',
+    source: { provider: 'kitsu', id: '11469', url: '' },
+    progress: { numbering: 'seasonal', season: 5, nextEpisode: 3, seasonEpisodeCounts: { 1: 13 }, totalSeasons: 1, totalEpisodes: 13, skipped: [], rewatching: false },
+    sync: { checkedAt: '2026-01-01', changedAt: null, ongoing: false, aired: 13, nextAiring: null, anilistId: 21459, sequel: null },
+  })
+
+  it('matches the show by name and premiere year, never a later season or namesake', () => {
+    const show = result({ provider: 'tvmaze', id: '13615', title: 'My Hero Academia', year: 2016 })
+    const others = [
+      result({ provider: 'tvmaze', id: '1', title: 'My Hero Academia: Vigilantes', year: 2025 }),
+      result({ provider: 'tvmaze', id: '2', title: 'My Hero Academia', year: 2030 }),
+    ]
+    expect(wholeShowMatch(s1, [...others, show])).toBe(show)
+    expect(wholeShowMatch(s1, others)).toBeNull()
+    expect(wholeShowMatch({ ...s1, title: 'MHA' }, [result({ provider: 'tvmaze', id: '3', title: 'Boku no Hero Academia', year: 2016 })])?.source.id).toBe('3')
+  })
+
+  it('strips the season part from a season entry name', () => {
+    expect(showName('My Hero Academia Season 2')).toBe('My Hero Academia')
+    expect(showName('Attack on Titan: Season 3 Part 2')).toBe('Attack on Titan')
+    expect(showName('Mob Psycho 100 II')).toBe('Mob Psycho 100 II')
+    expect(showName('Mob Psycho 100')).toBe('Mob Psycho 100')
+  })
+
+  it("relinks keeping the user's position but dropping the old source's counts and sync state", () => {
+    const show = result({ provider: 'tvmaze', id: '13615', title: 'My Hero Academia', year: 2016, ongoing: true, seasonEpisodeCounts: { 1: 13, 2: 25 } })
+    const t = relinkTitle(s1, show)
+    expect(t.source).toEqual(show.source)
+    expect(t.sync).toBeUndefined()
+    expect(t.progress).toMatchObject({ season: 5, nextEpisode: 3, seasonEpisodeCounts: { 1: 13, 2: 25 }, totalSeasons: null, totalEpisodes: null })
+    expect(t.title).toBe('My Hero Academia')
   })
 })

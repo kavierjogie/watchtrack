@@ -8,7 +8,7 @@ import { enrich, PROVIDER_LABEL, searchAll, type MetaResult, type SearchState } 
 import { savePoster } from '../lib/posters'
 import { getPrefs } from '../lib/prefs'
 import { describePosition, emptyProgress } from '../lib/progress'
-import { createTitle } from '../lib/titles'
+import { createTitle, relinkTitle } from '../lib/titles'
 import { MEDIA_LABEL, STATUS_LABEL, type MediaType, type Poster as PosterRef, type Title, type WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
 import { useRefreshEpisodes } from '../state/useSync'
@@ -165,14 +165,6 @@ export function TitleForm({
       // Changing type: movies have no episode progress, series need one.
       progressValue = form.mediaType === 'movie' ? null : (existing.progress ?? emptyProgress(form.mediaType === 'anime' ? 'absolute' : 'seasonal'))
     }
-    // Re-linked (e.g. from a single-season anime entry to the whole show): the old source's counts and totals don't apply.
-    if (editing && meta && progressValue)
-      progressValue = {
-        ...progressValue,
-        seasonEpisodeCounts: { ...meta.seasonEpisodeCounts },
-        totalSeasons: meta.totalSeasons,
-        totalEpisodes: meta.totalEpisodes && !meta.ongoing ? meta.totalEpisodes : null,
-      }
 
     setSaving(true)
     try {
@@ -198,11 +190,10 @@ export function TitleForm({
         saved = {
           ...existing,
           ...fields,
-          // Provider state belongs to the old source (its AniList id, sequel, airing dates), so it starts over.
-          ...(meta && { source: meta.source, backdropUrl: meta.backdropUrl, sync: undefined }),
           completedAt: form.status === 'completed' ? (existing.completedAt ?? now) : null,
           updatedAt: now,
         }
+        if (meta) saved = relinkTitle(saved, meta)
         await lib.save(saved)
         // Drop the old uploaded poster if it was replaced.
         if (existing.poster?.kind === 'local' && posterRef?.kind !== 'local') await deleteImage(existing.poster.imageId)

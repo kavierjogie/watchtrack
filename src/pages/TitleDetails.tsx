@@ -1,4 +1,4 @@
-import { ArrowLeft, Bell, BellOff, CalendarClock, Check, Clapperboard, Compass, ExternalLink, History, Pencil, Plus, RefreshCw, Share2, Sparkles, Star, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Bell, Layers, Loader2, BellOff, CalendarClock, Check, Clapperboard, Compass, ExternalLink, History, Pencil, Plus, RefreshCw, Share2, Sparkles, Star, Trash2, Undo2 } from 'lucide-react'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -13,10 +13,11 @@ import { normTitle } from '../lib/backup'
 import { usePrefs } from '../lib/prefs'
 import { listHistory } from '../lib/db'
 import { formatDate, isPast, timeAgo, today } from '../lib/format'
-import { PROVIDER_LABEL } from '../lib/metadata'
+import { findWholeShow, PROVIDER_LABEL, showName } from '../lib/metadata'
 import { currentEpisodeCount, describePosition, formatEp, formatSkipRanges, lastWatched, position, progressFraction } from '../lib/progress'
 import { canRefresh, useSyncState } from '../lib/sync'
 import { MEDIA_LABEL, STATUS_LABEL, type HistoryEntry, type Numbering, type Sequel, type SyncInfo, type Title, type WatchStatus } from '../lib/types'
+import { relinkTitle } from '../lib/titles'
 import { useLibrary } from '../state/library'
 import { useRefreshEpisodes } from '../state/useSync'
 import { useWatchActions } from '../state/useWatchActions'
@@ -50,7 +51,8 @@ function Details({ t }: { t: Title }) {
   const [params, setParams] = useSearchParams()
   const actions = useWatchActions()
   const [history, setHistory] = useState<HistoryEntry[]>([])
-  const [editDetails, setEditDetails] = useState(false)
+  /** A string opens the edit dialog with its source search prefilled. */
+  const [editDetails, setEditDetails] = useState<boolean | string>(false)
   const [special, setSpecial] = useState(false)
   const [draft, setDraft] = useState<string | null>(null)
   const notes = draft ?? t.notes
@@ -410,7 +412,7 @@ function Details({ t }: { t: Title }) {
               {t.source.provider === 'tvmaze' && ' (CC BY-SA)'}
             </p>
           )}
-          {t.sync?.sequel && <SequelCard sequel={t.sync.sequel} />}
+          {t.sync?.sequel && <SequelCard t={t} sequel={t.sync.sequel} onPickSource={() => setEditDetails(showName(t.title))} />}
           {canRefresh(t) && <AlertToggle t={t} />}
           {canRefresh(t) && (
             <div className="flex items-center justify-between gap-2 text-xs text-muted">
@@ -424,7 +426,7 @@ function Details({ t }: { t: Title }) {
       </div>
 
       <AnimatePresence>{editProgress && <ProgressEditor title={t} open onClose={closeEditor} />}</AnimatePresence>
-      <AnimatePresence>{editDetails && <TitleForm open existing={t} onClose={() => setEditDetails(false)} />}</AnimatePresence>
+      <AnimatePresence>{editDetails && <TitleForm open existing={t} initialQuery={typeof editDetails === 'string' ? editDetails : undefined} onClose={() => setEditDetails(false)} />}</AnimatePresence>
       <AnimatePresence>{special && <SpecialDialog onClose={() => setSpecial(false)} onSave={(label) => void actions.logSpecial(t, label).then(() => setSpecial(false))} />}</AnimatePresence>
     </article>
   )
@@ -475,14 +477,37 @@ function AlertToggle({ t }: { t: Title }) {
 const SEQUEL_STATUS: Record<string, string> ={ RELEASING: 'Airing now', FINISHED: 'Out now', HIATUS: 'On hiatus' }
 
 /** The next season as its own entry (anime sites list seasons separately), offered to add rather than merged in. */
-function SequelCard({ sequel }: { sequel: Sequel }) {
+function SequelCard({ t, sequel, onPickSource }: { t: Title; sequel: Sequel; onPickSource: () => void }) {
   const lib = useLibrary()
+  const { refreshOne } = useRefreshEpisodes()
+  const [linking, setLinking] = useState(false)
   const key = normTitle(sequel.title)
   const owned = lib.titles.find(
     (x) => x.sync?.anilistId === sequel.anilistId || (x.source?.provider === 'anilist' && x.source.id === String(sequel.anilistId)) || [x.title, ...x.altTitles].some((n) => normTitle(n) === key),
   )
   const announced = sequel.status === 'NOT_YET_RELEASED'
   const status = announced ? `Announced${sequel.startDate ? ` · starts ${sequel.startDate.length === 10 ? formatDate(sequel.startDate) : sequel.startDate}` : ''}` : (SEQUEL_STATUS[sequel.status] ?? sequel.status)
+
+  // Watching later seasons in this one title: link the whole show so new episodes of every season are found.
+  async function trackAllSeasons() {
+    setLinking(true)
+    try {
+      const show = await findWholeShow(t)
+      if (!show) {
+        toast.info("Couldn't match the whole show automatically", { description: 'Pick it from the search instead.' })
+        return onPickSource()
+      }
+      const saved = await lib.patch(t.id, (cur) => relinkTitle(cur, show))
+      if (!saved) return
+      toast.success(`Now tracking every season of ${saved.title}`, { description: `Linked to ${PROVIDER_LABEL[show.source.provider]}.` })
+      void refreshOne(saved)
+    } catch (err) {
+      toast.error("Couldn't link the whole show", { description: err instanceof Error ? err.message : undefined })
+    } finally {
+      setLinking(false)
+    }
+  }
+
   return (
     <div className="card space-y-2 p-4 text-sm">
       <p className="eyebrow">Next season</p>
@@ -501,6 +526,14 @@ function SequelCard({ sequel }: { sequel: Sequel }) {
         <Link to={`?add=${announced ? 'plan' : '1'}&q=${encodeURIComponent(sequel.title)}`} className="btn-secondary w-full">
           <Plus className="size-4" aria-hidden /> {announced ? 'Add to Plan to Watch' : 'Add to library'}
         </Link>
+      )}
+      {!owned && t.progress && (
+        <>
+          <button type="button" className="btn-ghost w-full" disabled={linking} onClick={() => void trackAllSeasons()}>
+            {linking ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Layers className="size-4" aria-hidden />} Track all seasons in this title
+          </button>
+          <p className="text-xs text-muted">Already past this season? Links the whole show so new episodes keep coming.</p>
+        </>
       )}
     </div>
   )

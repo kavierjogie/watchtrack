@@ -489,6 +489,24 @@ export async function searchAll(query: string, signal: AbortSignal, onUpdate: (s
   )
 }
 
+/**
+ * The TVmaze show a single-season anime entry belongs to: same name (title or alt title) and same premiere year.
+ * Kitsu's first-season entry shares both with the show. When unsure, no match: the user picks by hand instead.
+ * ponytail: TVmaze only; add TMDB as a second source if shows turn up that TVmaze doesn't have.
+ */
+export function wholeShowMatch(t: { title: string; altTitles: string[]; year: number | null }, results: MetaResult[]): MetaResult | null {
+  const mine = [t.title, ...t.altTitles].map(normTitle).filter(Boolean)
+  return results.find((r) => r.mediaType !== 'movie' && r.year != null && r.year === t.year && names(r).some((n) => mine.includes(n))) ?? null
+}
+
+/** A season entry's name without its season part: "My Hero Academia Season 2" → "My Hero Academia". */
+export const showName = (title: string) => title.replace(/[\s:,-]+(season|part|cour)\s*\d+.*$/i, '').replace(/\s+\d+(st|nd|rd|th)? season$/i, '') || title
+
+export async function findWholeShow(t: { title: string; altTitles: string[]; year: number | null }): Promise<MetaResult | null> {
+  const match = wholeShowMatch(t, await searchTitles(showName(t.title), 'tvmaze'))
+  return match && enrich(match)
+}
+
 /** Fetch extra details (season/episode counts, genres). Falls back to the search result on failure. */
 export async function enrich(r: MetaResult): Promise<MetaResult> {
   try {
