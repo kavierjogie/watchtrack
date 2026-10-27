@@ -1,4 +1,4 @@
-import { CircleCheck, CirclePause, Clapperboard, Compass, FileUp, Library, ListPlus, Play, Plus, Share2, Sparkles, Tv } from 'lucide-react'
+import { CircleCheck, CirclePause, Clapperboard, Compass, Library, ListPlus, Play, Plus, Share2, Sparkles, Tv } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ContinueCard, EmptyState, PosterGridSkeleton, Section, SeeAll, StatCard, TitleCard } from '../components/cards'
@@ -37,9 +37,6 @@ export function Dashboard() {
         <Hero title="Welcome to WatchTrack" subtitle="Track every anime, series and movie you watch — and always know the next episode. Everything stays private, in this browser.">
           <Link to="?add=1" className="btn-primary">
             <Plus className="size-4" aria-hidden /> Add your first title
-          </Link>
-          <Link to="/import" className="btn-secondary">
-            <FileUp className="size-4" aria-hidden /> Import my notes
           </Link>
         </Hero>
         <div className="grid gap-3 sm:grid-cols-3">

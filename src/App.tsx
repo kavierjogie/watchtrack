@@ -7,7 +7,6 @@ import { ConfirmProvider } from './components/Modal'
 import { applyTheme, usePrefs } from './lib/prefs'
 import { Dashboard } from './pages/Dashboard'
 import { DiscoverPage } from './pages/Discover'
-import { ImportNotesPage } from './pages/ImportNotes'
 import { CompletedPage, ContinuePage, LibraryPage, OnHoldPage, PlanPage } from './pages/Lists'
 import { NotificationsPage } from './pages/Notifications'
 import { SettingsPage } from './pages/Settings'
@@ -47,7 +46,6 @@ export default function App() {
                 <Route path="notifications" element={<NotificationsPage />} />
                 <Route path="title/:id" element={<TitleDetails />} />
                 <Route path="settings" element={<SettingsPage />} />
-                <Route path="import" element={<ImportNotesPage />} />
                 <Route path="*" element={<Dashboard />} />
               </Route>
               {/* Outside Layout: a friend opening a link sees just the shared list, not an empty app. */}

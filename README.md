@@ -38,16 +38,6 @@ Requires Node 20+.
 
 ## Using it
 
-### Moving over from your Notes app
-**Settings → Import from notes** (or `/import`). Paste your list, or tap **Load my starter list** to use the list you shared. Every line becomes an editable row:
-
-- Headings set type and status (`### Anime — Completed`, `### TV Series…`).
-- `Black Clover | 172` → overall episode 172 was the last watched, so **173 is next**. Flagged for a quick check.
-- `Helluva Boss | S2/E8` → last watched S2E8, so **S2E9 is next**.
-- `Demon Slayer | S4` → season 4 with the episode **not set** (flagged). Fill it in now or later.
-- `Family Guy | Watched episodes 10–20; skipped episodes 2–9` → next is 21, skipped range saved.
-- Anything unreadable is kept in the title's notes. The original line is always stored on the title.
-- Titles already in your library are unticked by default. Nothing is written until you confirm.
 
 ### Daily use
 - **Home / Continue Watching**: each card shows the next episode with a one-tap **Watched** button. A toast confirms with **Undo**.
@@ -76,7 +66,7 @@ Position is stored once, as `season` + `nextEpisode`. "Last watched" is always d
 | Season finished, next season **unknown** | Stops at "Finished season N" and offers **Start season N+1** or **Mark completed**. Never assumes another season exists. |
 | Last known episode of the series | Asks whether to mark the title completed. |
 | Skipped ranges | Skipped when advancing and when working out "last watched". Ranges are per season. |
-| Position unknown (imported "S4") | Shows "episode not set" with a **Set episode** button; can't be marked watched until set. |
+| Position unknown | Shows "episode not set" with a **Set episode** button; can't be marked watched until set. |
 | Time passing | Never changes a status automatically. |
 
 The logic lives in `src/lib/progress.ts` (pure functions) and is covered by `src/lib/progress.test.ts`.
@@ -125,24 +115,22 @@ src/
     titles.ts       title factory + changes that produce history entries
     db.ts           IndexedDB (idb): schema, migrations, CRUD, quota errors
     backup.ts       export / validate / plan / apply import
-    notesImport.ts  Notes-list parser for the import wizard
     metadata.ts     Kitsu / TVmaze / TMDB clients
     prefs.ts        small UI preferences (localStorage)
   state/          React context for the library + action hooks (toasts, undo, confirmations)
   components/     UI building blocks (cards, modals, forms, filters)
-  pages/          Dashboard, Library, Continue, Plan, On Hold, Completed, Title, Settings, Import
+  pages/          Dashboard, Library, Continue, Plan, On Hold, Completed, Title, Settings
 ```
 
 IndexedDB stores: `titles`, `watchHistory`, `images` (Blobs), `settings` (reserved). Schema migrations go in the `upgrade()` callback in `db.ts`.
 
 ## Tests
 
-`npm test` runs 44 tests covering next-episode calculation, season advancement, unknown season counts, manual corrections, skipped episodes, completed movies, IndexedDB persistence, undo, export/import round trips (including images), duplicate handling, backup validation, the notes parser against the real starter list, and metadata response mapping.
+`npm test` runs 44 tests covering next-episode calculation, season advancement, unknown season counts, manual corrections, skipped episodes, completed movies, IndexedDB persistence, undo, export/import round trips (including images), duplicate handling, backup validation, and metadata response mapping.
 
 ## Decisions & defaults
 
 - **Anime defaults to overall episode numbering**, TV to season + episode. Change it per title.
-- **Bare numbers in imported notes mean "last watched"** (so `172` → 173 next), and are flagged so you can confirm.
 - **"Episodes logged"** on the dashboard counts episodes marked watched in the app; imported positions aren't counted as history.
 - **Ratings are 1–10.**
 - Status "Dropped" is available in addition to the requested lists.

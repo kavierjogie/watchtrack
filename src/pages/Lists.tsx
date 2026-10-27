@@ -58,14 +58,11 @@ export function LibraryPage() {
         <EmptyState
           icon={LibraryIcon}
           title="Nothing here yet"
-          body="Add titles one by one, or import your existing list."
+          body="Add titles one by one, or restore a backup from Settings."
           action={
             <>
               <Link to="?add=1" className="btn-primary">
                 Add title
-              </Link>
-              <Link to="/import" className="btn-secondary">
-                Import notes
               </Link>
             </>
           }

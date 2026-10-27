@@ -1,8 +1,7 @@
-import { Bell, BellRing, Download, FileUp, HardDrive, RefreshCw, Smartphone, Trash2, Upload } from 'lucide-react'
+import { Bell, BellRing, Download, HardDrive, RefreshCw, Smartphone, Trash2, Upload } from 'lucide-react'
 import { alertsOn, notifySupported, showSystemNotification } from '../lib/alerts'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { PageHeader } from '../components/cards'
 import { Modal, useConfirm } from '../components/Modal'
@@ -253,9 +252,6 @@ export function SettingsPage() {
             <Upload className="size-4" aria-hidden /> Import backup
           </button>
           <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
-          <Link to="/import" className="btn-secondary">
-            <FileUp className="size-4" aria-hidden /> Import from notes
-          </Link>
         </div>
       </Card>
 

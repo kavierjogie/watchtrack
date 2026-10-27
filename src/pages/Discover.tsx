@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, Compass, Eye, ExternalLink, FileUp, Loader2, Plus, RotateCw, Sparkles, Star, WifiOff, X } from 'lucide-react'
+import { Check, Compass, Eye, ExternalLink, Loader2, Plus, RotateCw, Sparkles, Star, WifiOff, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -211,9 +211,6 @@ export function DiscoverPage() {
           <div className="flex flex-wrap gap-2">
             <Link to="?add=1" className="btn-primary">
               <Plus className="size-4" aria-hidden /> Add title
-            </Link>
-            <Link to="/import" className="btn-secondary">
-              <FileUp className="size-4" aria-hidden /> Import notes
             </Link>
           </div>
         </div>
