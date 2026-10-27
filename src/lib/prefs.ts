@@ -70,5 +70,5 @@ export function applyTheme(theme: Prefs['theme']) {
   root.classList.toggle('dark', dark)
   root.style.colorScheme = dark ? 'dark' : 'light'
   // Match the phone's status bar to the page.
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0f1013' : '#f6f6f8')
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0b0b12' : '#f7f6fb')
 }

@@ -13,7 +13,7 @@ import { TitleMenu } from './TitleMenu'
 const STATUS_TONE: Record<WatchStatus, string> = {
   watching: 'bg-accent-soft text-accent-text',
   on_hold: 'bg-warn/15 text-warn',
-  plan: 'bg-surface-2 text-muted',
+  plan: 'bg-info/15 text-info',
   completed: 'bg-success/15 text-success',
   dropped: 'bg-danger/15 text-danger',
 }
@@ -21,7 +21,7 @@ const STATUS_TONE: Record<WatchStatus, string> = {
 const STATUS_DOT: Record<WatchStatus, string> = {
   watching: 'bg-accent',
   on_hold: 'bg-warn',
-  plan: 'bg-white/70',
+  plan: 'bg-info',
   completed: 'bg-success',
   dropped: 'bg-danger',
 }
@@ -62,7 +62,7 @@ export function ProgressBar({ value, className = 'h-1 rounded-full bg-surface-2'
   if (value == null) return null
   return (
     <div className={`overflow-hidden ${className}`} role="progressbar" aria-valuenow={Math.round(value * 100)} aria-valuemin={0} aria-valuemax={100}>
-      <div className="h-full rounded-[inherit] bg-accent" style={{ width: `${Math.max(3, value * 100)}%` }} />
+      <div className="h-full rounded-[inherit] bg-linear-to-r from-accent-strong to-accent" style={{ width: `${Math.max(3, value * 100)}%` }} />
     </div>
   )
 }
@@ -77,7 +77,7 @@ export function TitleCard({ t, showStatus = true }: { t: Title; showStatus?: boo
         {/* Duplicate target for the pointer only; keyboard and screen readers use the title link below. */}
         <Link to={`/title/${t.id}`} tabIndex={-1} aria-hidden className="relative block overflow-hidden rounded-xl shadow-card">
           <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} className="can-hover:group-hover:[&_img]:scale-[1.04]" />
-          <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-transparent transition-colors can-hover:group-hover:ring-accent/60 group-has-focus-visible:ring-accent" />
+          <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-transparent transition-colors can-hover:group-hover:ring-accent/50 group-has-focus-visible:ring-accent" />
           {showStatus && (
             <div className="absolute left-2 top-2 flex max-w-[calc(100%-1rem)]">
               <PosterBadge status={t.status} />
@@ -96,7 +96,7 @@ export function TitleCard({ t, showStatus = true }: { t: Title; showStatus?: boo
             onClick={() => void markWatched(t)}
             aria-label={`Mark ${formatEp(pos.next, p.numbering)} of ${t.title} watched`}
             title={`Mark ${formatEp(pos.next, p.numbering)} watched`}
-            className="press absolute bottom-3 right-2 flex size-9 items-center justify-center rounded-full bg-accent text-white shadow-pop transition-opacity hover:brightness-110 can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:focus-visible:opacity-100"
+            className="press absolute bottom-3 right-2 flex size-9 items-center justify-center rounded-full bg-accent text-on-accent shadow-pop transition-[opacity,background-color] hover:bg-accent-hover can-hover:opacity-0 can-hover:group-hover:opacity-100 can-hover:focus-visible:opacity-100"
           >
             <Check className="size-4" aria-hidden />
           </button>
@@ -245,7 +245,7 @@ export function StatCard({ label, value, icon: Icon, to, tone = 'bg-accent-soft 
 export function EmptyState({ icon: Icon = CirclePause, title, body, action }: { icon?: LucideIcon; title: string; body: ReactNode; action?: ReactNode }) {
   return (
     <div className="card flex flex-col items-center bg-[radial-gradient(80%_60%_at_50%_0%,var(--glow),transparent_70%)] px-6 py-12 text-center">
-      <div className="flex size-12 items-center justify-center rounded-2xl bg-accent-soft text-accent-text ring-1 ring-accent/20">
+      <div className="flex size-12 items-center justify-center rounded-2xl bg-accent-soft text-accent-text ring-1 ring-accent-line">
         <Icon className="size-6" aria-hidden />
       </div>
       <h3 className="mt-4 font-semibold">{title}</h3>

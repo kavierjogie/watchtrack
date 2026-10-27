@@ -84,7 +84,7 @@ export function Dashboard() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Watching" value={count('watching')} icon={Play} to="/continue" />
         <StatCard label="Completed" value={count('completed')} icon={CircleCheck} to="/completed" tone="bg-success/15 text-success" />
-        <StatCard label="Plan to watch" value={count('plan')} icon={ListPlus} to="/plan" tone="bg-surface-2 text-fg" />
+        <StatCard label="Plan to watch" value={count('plan')} icon={ListPlus} to="/plan" tone="bg-info/15 text-info" />
         <StatCard label="On hold" value={count('on_hold')} icon={CirclePause} to="/on-hold" tone="bg-warn/15 text-warn" />
       </div>
 

@@ -65,7 +65,7 @@ export function Layout() {
       </a>
 
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh flex-col overflow-y-auto border-r border-line bg-surface px-3 py-5 lg:flex">
+      <aside className="sticky top-0 hidden h-dvh flex-col overflow-y-auto border-r border-divider bg-bg-2 px-3 py-5 lg:flex">
         <Link to="/" className="mb-6 flex items-center gap-2.5 rounded-xl px-3">
           <img src="/icon.svg" alt="" className="size-8" />
           <span className="text-[15px] font-semibold tracking-tight">WatchTrack</span>
@@ -97,7 +97,7 @@ export function Layout() {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-bg/80 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur-xl lg:hidden reduce-transparency:bg-bg reduce-transparency:backdrop-blur-none">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-divider bg-bg/80 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur-xl lg:hidden reduce-transparency:bg-bg reduce-transparency:backdrop-blur-none">
         <Link to="/" className="flex min-w-0 items-center gap-2 rounded-lg">
           <img src="/icon.svg" alt="" className="size-7" />
           <span className="truncate font-semibold tracking-tight">WatchTrack</span>
@@ -126,7 +126,7 @@ export function Layout() {
       {/* Mobile bottom navigation */}
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/75 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 lg:hidden reduce-transparency:bg-surface reduce-transparency:backdrop-blur-none"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-divider bg-bg-2/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 lg:hidden reduce-transparency:bg-bg-2 reduce-transparency:backdrop-blur-none"
       >
         <ul className="mx-auto grid max-w-md grid-cols-5 px-1">
           {BROWSE.slice(0, 2).map((n) => (
@@ -137,7 +137,7 @@ export function Layout() {
               type="button"
               onClick={openAdd}
               aria-label="Add title"
-              className="press flex size-12 items-center justify-center rounded-2xl bg-accent text-white shadow-[0_8px_24px_-8px_var(--accent)] hover:brightness-110"
+              className="press flex size-12 items-center justify-center rounded-2xl bg-accent text-on-accent shadow-[0_8px_24px_-10px_var(--accent-strong)] hover:bg-accent-hover"
             >
               <Plus className="size-6" aria-hidden />
             </button>
@@ -164,7 +164,7 @@ function SideItem({ to, label, icon: Icon, count }: NavItem & { count?: number }
           `relative flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors ${
             isActive
               ? 'bg-accent-soft text-accent-text before:absolute before:inset-y-2.5 before:-left-3 before:w-1 before:rounded-r-full before:bg-accent'
-              : 'text-muted hover:bg-surface-2 hover:text-fg'
+              : 'text-fg-2 hover:bg-surface-2 hover:text-fg'
           }`
         }
       >
@@ -183,12 +183,12 @@ function MobileItem({ to, label, icon: Icon }: NavItem) {
         to={to}
         end={to === '/'}
         className={({ isActive }) =>
-          `group flex min-h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium ${isActive ? 'text-accent-text' : 'text-muted'}`
+          `group flex min-h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium ${isActive ? 'text-accent-text' : 'text-fg-2 hover:text-fg'}`
         }
       >
         {({ isActive }) => (
           <>
-            <span className={`flex h-7 w-12 items-center justify-center rounded-full transition-colors ${isActive ? 'bg-accent-soft' : ''}`}>
+            <span className={`flex h-7 w-12 items-center justify-center rounded-full transition-colors ${isActive ? 'bg-accent-soft' : 'group-hover:bg-surface-2'}`}>
               <Icon className="size-5" aria-hidden />
             </span>
             {label}

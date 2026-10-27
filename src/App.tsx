@@ -52,7 +52,7 @@ export default function App() {
             <Toaster
               position="top-center"
               theme={theme === 'system' ? 'system' : theme}
-              toastOptions={{ classNames: { toast: '!rounded-2xl !border-line !bg-surface !text-fg', description: '!text-muted', actionButton: '!bg-accent !text-white' } }}
+              toastOptions={{ classNames: { toast: '!rounded-2xl !border-line !bg-overlay !text-fg !shadow-pop', description: '!text-muted', actionButton: '!bg-accent !text-on-accent' } }}
             />
           </ConfirmProvider>
         </LibraryProvider>

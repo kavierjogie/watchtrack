@@ -51,14 +51,14 @@ export function TitleMenu({ t }: { t: Title }) {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ type: 'spring', bounce: 0, duration: 0.2 }}
-            className="absolute bottom-full right-0 z-20 mb-1 w-52 origin-bottom-right overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-xl"
+            className="absolute bottom-full right-0 z-20 mb-1 w-52 origin-bottom-right overflow-hidden rounded-xl border border-line bg-overlay py-1 shadow-pop"
           >
             {items.map(({ label, icon: Icon, run }) => (
               <li key={label} role="none">
                 <button
                   type="button"
                   role="menuitem"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-fg-2 hover:bg-surface-2 hover:text-fg"
                   onClick={() => {
                     setOpen(false)
                     run()

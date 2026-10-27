@@ -96,11 +96,11 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
         dragMomentum={false}
         dragTransition={{ bounceStiffness: 500, bounceDamping: 45 }}
         onDragEnd={onDragEnd}
-        className="flex max-h-[92dvh] flex-col rounded-t-3xl border border-line bg-surface shadow-2xl sm:rounded-3xl"
+        className="flex max-h-[92dvh] flex-col rounded-t-3xl border border-line bg-overlay shadow-pop sm:rounded-3xl"
       >
         <div onPointerDown={(e) => sheet && drag.start(e)} className={sheet ? 'touch-none select-none' : undefined}>
           {sheet && <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-line" aria-hidden />}
-          <header className={`flex items-center justify-between gap-4 border-b border-line px-5 ${sheet ? 'pb-3 pt-1' : 'py-3'}`}>
+          <header className={`flex items-center justify-between gap-4 border-b border-divider px-5 ${sheet ? 'pb-3 pt-1' : 'py-3'}`}>
             <h2 className="line-clamp-2 min-w-0 text-base font-semibold wrap-anywhere">{title}</h2>
             <button type="button" className="icon-btn -mr-2" onClick={onClose} aria-label="Close">
               <X className="size-5" />
@@ -108,7 +108,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
           </header>
         </div>
         <div className="overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <footer className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3">{footer}</footer>}
+        {footer && <footer className="flex flex-wrap justify-end gap-2 border-t border-divider px-5 py-3">{footer}</footer>}
       </motion.div>
     </dialog>
   )
