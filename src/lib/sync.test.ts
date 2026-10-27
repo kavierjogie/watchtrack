@@ -147,7 +147,94 @@ describe('mergeEpisodeInfo', () => {
 
   it('leaves movies alone', () => {
     const m = createTitle({ title: 'Mugen Train', mediaType: 'movie' })
-    expect(mergeEpisodeInfo(m, info({ 1: 1 }), NOW)).toEqual({ title: m, changed: false })
+    expect(mergeEpisodeInfo(m, info({ 1: 1 }), NOW)).toEqual({ title: m, changed: false, newSeason: null })
+  })
+})
+
+describe('AniList refresh for anime (mocked)', () => {
+  const aniMedia = (over: Record<string, unknown> = {}, edges: unknown[] = []) => ({ data: { Media: { status: 'RELEASING', episodes: 28, nextAiringEpisode: { episode: 9, airingAt: 4102444800 }, relations: { edges }, ...over } } })
+  const node = (id: number, format: string, status: string, relationType = 'SEQUEL') => ({
+    relationType,
+    node: { id, type: 'ANIME', format, status, siteUrl: `https://anilist.co/anime/${id}`, title: { english: `Frieren Season ${id}`, romaji: null }, startDate: { year: 2027, month: 1, day: null } },
+  })
+  const kitsuFrieren = () => {
+    const t = createTitle({ title: 'Frieren', mediaType: 'anime', status: 'watching', source: { provider: 'kitsu', id: '46474', url: '' } })
+    t.progress = setLastWatched(t.progress!, null, 6)
+    return t
+  }
+  /** AniList calls are spaced ~2 s apart; fake timers keep the tests fast. */
+  async function run<T>(p: Promise<T>): Promise<T> {
+    await vi.runAllTimersAsync()
+    return p
+  }
+  const routes = (anilist: () => Promise<Response>, mapping: unknown = { data: [{ attributes: { externalSite: 'anilist/anime', externalId: '154587' } }] }) =>
+    vi.fn((url: string) => (url.includes('graphql.anilist.co') ? anilist() : url.includes('/mappings') ? json(mapping) : json({ data: { id: '46474', attributes: { status: 'current', episodeCount: 28, nextRelease: null } } })))
+
+  it('maps Kitsu → AniList by id once, then counts aired episodes from the airing schedule', async () => {
+    vi.useFakeTimers()
+    const t = kitsuFrieren()
+    const store = memoryStore([t])
+    const fetchMock = routes(() => json(aniMedia()))
+    vi.stubGlobal('fetch', fetchMock)
+    await run(refreshTitle(t, store.patch))
+    const saved = store.map.get(t.id)!
+    expect(saved.sync).toMatchObject({ anilistId: 154587, aired: 8, ongoing: true, nextAiring: { season: null, episode: 9, airdate: '2100-01-01T00:00:00.000Z' } })
+    expect(saved.progress).toMatchObject({ nextEpisode: 7, totalEpisodes: null }) // still airing: no end assumed
+    fetchMock.mockClear()
+    await run(refreshTitle(saved, store.patch))
+    expect(fetchMock.mock.calls.map(([u]) => u).filter((u) => u.includes('/mappings'))).toHaveLength(0)
+  })
+
+  it('a next season is offered, announced only once it is actually out, and never merged into this title', async () => {
+    vi.useFakeTimers()
+    const t = kitsuFrieren()
+    const store = memoryStore([t])
+    let sequelStatus = 'NOT_YET_RELEASED'
+    vi.stubGlobal('fetch', routes(() => json(aniMedia({}, [node(1, 'MOVIE', 'FINISHED'), node(2, 'ONA', 'FINISHED', 'SIDE_STORY'), node(3, 'TV', sequelStatus)]))))
+    const first = await run(refreshTitle(t, store.patch))
+    expect(first.status).toBe('unchanged')
+    expect(store.map.get(t.id)!.sync?.sequel).toEqual({ anilistId: 3, title: 'Frieren Season 3', status: 'NOT_YET_RELEASED', startDate: '2027-01', url: 'https://anilist.co/anime/3' })
+    sequelStatus = 'RELEASING'
+    const second = await run(refreshTitle(store.map.get(t.id)!, store.patch))
+    expect(second).toMatchObject({ status: 'updated', newSeason: { anilistId: 3, status: 'RELEASING' } })
+    expect(store.map.get(t.id)!.progress).toEqual(t.progress)
+    const third = await run(refreshTitle(store.map.get(t.id)!, store.patch))
+    expect(third.status).toBe('unchanged') // not announced twice
+  })
+
+  it("a sequel that was already out on the first refresh isn't announced as new", () => {
+    const sequel = { anilistId: 3, title: 'S2', status: 'FINISHED', startDate: null, url: '' }
+    expect(mergeEpisodeInfo(kitsuFrieren(), { ...info({}), sequel }, NOW).newSeason).toBeNull()
+  })
+
+  it('falls back to Kitsu when there is no AniList mapping or AniList rejects the id; keeps data when AniList is down', async () => {
+    vi.useFakeTimers()
+    const noMap = kitsuFrieren()
+    const store = memoryStore([noMap])
+    vi.stubGlobal('fetch', routes(() => json(aniMedia()), { data: [] }))
+    expect((await run(refreshTitle(noMap, store.patch))).status).toBe('unchanged')
+    expect(store.map.get(noMap.id)!.sync).toMatchObject({ anilistId: null, aired: null })
+
+    const gone = kitsuFrieren()
+    store.map.set(gone.id, gone)
+    vi.stubGlobal('fetch', routes(() => json({}, 404)))
+    await run(refreshTitle(gone, store.patch))
+    expect(store.map.get(gone.id)!.sync).toMatchObject({ anilistId: 154587, ongoing: true })
+
+    const down = kitsuFrieren()
+    store.map.set(down.id, down)
+    vi.stubGlobal('fetch', routes(() => json({}, 503)))
+    expect((await run(refreshTitle(down, store.patch))).status).toBe('failed')
+    expect(store.map.get(down.id)).toBe(down)
+  })
+
+  it('titles saved from AniList before Kitsu replaced it refresh again', async () => {
+    vi.useFakeTimers()
+    const t = createTitle({ title: 'Frieren', mediaType: 'anime', status: 'watching', source: { provider: 'anilist', id: '154587', url: '' } })
+    const store = memoryStore([t])
+    vi.stubGlobal('fetch', routes(() => json(aniMedia({ status: 'FINISHED', nextAiringEpisode: null }))))
+    await run(refreshTitle(t, store.patch))
+    expect(store.map.get(t.id)!.progress!.totalEpisodes).toBe(28)
   })
 })
 
@@ -273,6 +360,8 @@ describe('storage and backups', () => {
     void _
     const legacy = parseBackup(JSON.stringify({ format: 'watchtrack-backup', version: 1, exportedAt: NOW, titles: [old, { ...old, id: 'x', title: 'Other', sync: 'bad' }], history: [], images: [] }))
     expect(legacy.titles.map((x) => x.sync)).toEqual([undefined, undefined])
+    const junk = parseBackup(JSON.stringify({ ...JSON.parse(JSON.stringify(backup)), titles: [{ ...stored, sync: { ...stored.sync, sequel: { title: 5 }, nextAiring: { airdate: null } } }] }))
+    expect(junk.titles[0].sync).toMatchObject({ checkedAt: NOW, sequel: null, nextAiring: null })
     const { titles } = resolveImport(planImport(legacy, []), 'merge', 'skip')
     expect(titles[0].progress).toEqual(stored.progress)
     expect(isDue(titles[0])).toBe(true)

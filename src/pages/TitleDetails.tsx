@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarClock, Check, Clapperboard, Compass, ExternalLink, History, Pencil, RefreshCw, Share2, Sparkles, Star, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, CalendarClock, Check, Clapperboard, Compass, ExternalLink, History, Pencil, Plus, RefreshCw, Share2, Sparkles, Star, Trash2, Undo2 } from 'lucide-react'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -8,12 +8,13 @@ import { Modal } from '../components/Modal'
 import { Poster, usePosterUrl } from '../components/Poster'
 import { ProgressEditor } from '../components/ProgressEditor'
 import { TitleForm } from '../components/TitleForm'
+import { normTitle } from '../lib/backup'
 import { listHistory } from '../lib/db'
 import { formatDate, isPast, timeAgo, today } from '../lib/format'
 import { PROVIDER_LABEL } from '../lib/metadata'
 import { currentEpisodeCount, describePosition, formatEp, formatSkipRanges, lastWatched, position, progressFraction } from '../lib/progress'
 import { canRefresh, useSyncState } from '../lib/sync'
-import { MEDIA_LABEL, STATUS_LABEL, type HistoryEntry, type Numbering, type SyncInfo, type Title, type WatchStatus } from '../lib/types'
+import { MEDIA_LABEL, STATUS_LABEL, type HistoryEntry, type Numbering, type Sequel, type SyncInfo, type Title, type WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
 import { useRefreshEpisodes } from '../state/useSync'
 import { useWatchActions } from '../state/useWatchActions'
@@ -407,6 +408,7 @@ function Details({ t }: { t: Title }) {
               {t.source.provider === 'tvmaze' && ' (CC BY-SA)'}
             </p>
           )}
+          {t.sync?.sequel && <SequelCard sequel={t.sync.sequel} />}
           {canRefresh(t) && (
             <div className="flex items-center justify-between gap-2 text-xs text-muted">
               <span aria-live="polite">{refreshing ? 'Checking for new episodes…' : `Episodes checked ${timeAgo(t.sync?.checkedAt ?? null)}`}</span>
@@ -422,6 +424,40 @@ function Details({ t }: { t: Title }) {
       <AnimatePresence>{editDetails && <TitleForm open existing={t} onClose={() => setEditDetails(false)} />}</AnimatePresence>
       <AnimatePresence>{special && <SpecialDialog onClose={() => setSpecial(false)} onSave={(label) => void actions.logSpecial(t, label).then(() => setSpecial(false))} />}</AnimatePresence>
     </article>
+  )
+}
+
+const SEQUEL_STATUS: Record<string, string> = { RELEASING: 'Airing now', FINISHED: 'Out now', HIATUS: 'On hiatus' }
+
+/** The next season as its own entry (anime sites list seasons separately), offered to add rather than merged in. */
+function SequelCard({ sequel }: { sequel: Sequel }) {
+  const lib = useLibrary()
+  const key = normTitle(sequel.title)
+  const owned = lib.titles.find(
+    (x) => x.sync?.anilistId === sequel.anilistId || (x.source?.provider === 'anilist' && x.source.id === String(sequel.anilistId)) || [x.title, ...x.altTitles].some((n) => normTitle(n) === key),
+  )
+  const announced = sequel.status === 'NOT_YET_RELEASED'
+  const status = announced ? `Announced${sequel.startDate ? ` · starts ${sequel.startDate.length === 10 ? formatDate(sequel.startDate) : sequel.startDate}` : ''}` : (SEQUEL_STATUS[sequel.status] ?? sequel.status)
+  return (
+    <div className="card space-y-2 p-4 text-sm">
+      <p className="eyebrow">Next season</p>
+      <p className="font-medium wrap-anywhere">{sequel.title}</p>
+      <p className="text-xs text-muted">
+        {status} ·{' '}
+        <a href={sequel.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-accent-text underline">
+          AniList <ExternalLink className="size-3" aria-hidden />
+        </a>
+      </p>
+      {owned ? (
+        <Link to={`/title/${owned.id}`} className="btn-secondary w-full">
+          <Check className="size-4" aria-hidden /> In your library
+        </Link>
+      ) : (
+        <Link to={`?add=${announced ? 'plan' : '1'}&q=${encodeURIComponent(sequel.title)}`} className="btn-secondary w-full">
+          <Plus className="size-4" aria-hidden /> {announced ? 'Add to Plan to Watch' : 'Add to library'}
+        </Link>
+      )}
+    </div>
   )
 }
 

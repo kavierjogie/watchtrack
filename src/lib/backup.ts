@@ -1,5 +1,5 @@
 import { bulkWrite, listAllHistory, listImages, listTitles, newId } from './db'
-import type { HistoryEntry, MediaType, StoredImage, Title, WatchStatus } from './types'
+import type { HistoryEntry, MediaType, Sequel, StoredImage, SyncInfo, Title, WatchStatus } from './types'
 
 /**
  * Backup file format (JSON):
@@ -117,9 +117,17 @@ function normalizeTitle(t: Title): Title {
     importNote: t.importNote ?? null,
     completedAt: t.completedAt ?? null,
     lastWatchedAt: t.lastWatchedAt ?? null,
-    // Optional refresh state: dropped if malformed, so the title simply gets refreshed again.
-    sync: isObj(t.sync) && isStr(t.sync.checkedAt) ? t.sync : undefined,
+    sync: normalizeSync(t.sync),
   }
+}
+
+/** Optional refresh state: dropped if malformed, so the title simply gets refreshed again. */
+function normalizeSync(s: unknown): Title['sync'] {
+  if (!isObj(s) || !isStr(s.checkedAt)) return undefined
+  const q = s.sequel
+  const sequel = isObj(q) && Number.isInteger(q.anilistId) && isStr(q.title) && isStr(q.status) && isStr(q.url) ? (q as unknown as Sequel) : null
+  const next = isObj(s.nextAiring) && isStr(s.nextAiring.airdate) ? (s.nextAiring as unknown as SyncInfo['nextAiring']) : null
+  return { ...(s as unknown as SyncInfo), nextAiring: next, sequel }
 }
 
 export function parseBackup(text: string): Backup {

@@ -357,7 +357,9 @@ export async function searchTitles(q: string, provider: Provider, signal?: Abort
 
 /** Which provider's record wins when the same title comes from several (richest data for that type first). */
 const PRIORITY: Record<MediaType, Provider[]> = {
-  anime: ['kitsu', 'tvmaze', 'tmdb'],
+  // TVmaze first for anime series: it keeps every season under one show and has dated episodes, so refresh works fully.
+  // Kitsu still fills alt titles and art, and is the source when TVmaze doesn't have the show.
+  anime: ['tvmaze', 'kitsu', 'tmdb'],
   tv: ['tvmaze', 'tmdb', 'kitsu'],
   movie: ['tmdb', 'kitsu', 'tvmaze'],
 }

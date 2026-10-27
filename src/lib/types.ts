@@ -89,6 +89,20 @@ export interface SyncInfo {
   aired: number | null
   /** Next confirmed (dated) release. Episode is null when the provider only gives a date. */
   nextAiring: { season: number | null; episode: number | null; airdate: string } | null
+  /** AniList id for a Kitsu anime (from Kitsu's own mappings). null = Kitsu has none; absent = not looked up yet. */
+  anilistId?: number | null
+  /** Next season, as its own AniList entry. Anime sites list seasons separately, so it's offered, never merged in. */
+  sequel?: Sequel | null
+}
+
+export interface Sequel {
+  anilistId: number
+  title: string
+  /** AniList status: NOT_YET_RELEASED (announced), RELEASING, FINISHED, HIATUS */
+  status: string
+  /** YYYY-MM-DD, YYYY-MM or YYYY; null when not announced */
+  startDate: string | null
+  url: string
 }
 
 export type HistoryKind = 'episode' | 'special' | 'movie' | 'correction' | 'status'

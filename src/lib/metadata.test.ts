@@ -101,11 +101,12 @@ const kitsuDemonSlayer = [
 const mazeDemonSlayer = [result({ provider: 'tvmaze', id: '41469', title: 'Demon Slayer', year: 2019, date: '2019-04-06', synopsis: 'Tanjiro…', posterUrl: 't.jpg' })]
 
 describe('unified search', () => {
-  it('merges the same show from two providers, keeps the richer source, and keeps seasons/films separate', () => {
+  it('merges the same show from two providers, keeps TVmaze for anime series (all seasons, refreshable), and keeps seasons/films separate', () => {
     const out = combineResults('demon slayer', [kitsuDemonSlayer, mazeDemonSlayer])
-    expect(out.map((r) => r.source.id)).toEqual(['41370', '42422', '44081'])
-    expect(out[0]).toMatchObject({ source: { provider: 'kitsu', id: '41370' }, totalEpisodes: 26, posterUrl: 'k.jpg', synopsis: 'Tanjiro…' })
-    expect(out[0].altTitles).toContain('Demon Slayer')
+    expect(out.map((r) => r.source.id)).toEqual(['41469', '42422', '44081'])
+    expect(out[0]).toMatchObject({ source: { provider: 'tvmaze', id: '41469' }, posterUrl: 't.jpg', synopsis: 'Tanjiro…' })
+    // Kitsu's names still help later searches.
+    expect(out[0].altTitles).toEqual(expect.arrayContaining(['Demon Slayer: Kimetsu no Yaiba', 'Kimetsu no Yaiba']))
   })
 
   it('drops unrelated filler (Kitsu answers "Breaking Bad" with random anime)', () => {
@@ -116,7 +117,7 @@ describe('unified search', () => {
 
   it('matches partial, differently-cased queries and puts closer names first', () => {
     const out = combineResults('DEMON sla', [kitsuDemonSlayer, mazeDemonSlayer])
-    expect(out[0].source.id).toBe('41370')
+    expect(out[0].source.id).toBe('41469')
     expect(out.some((r) => r.title === 'Onigiri')).toBe(false)
   })
 

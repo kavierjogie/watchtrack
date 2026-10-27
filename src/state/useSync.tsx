@@ -8,10 +8,14 @@ import { useLibrary } from './library'
 const SAFE = "Couldn't refresh episodes. Your saved progress is safe."
 
 function announceUpdates(results: RefreshResult[], open: (t: Title) => void) {
-  const updated = results.filter((r) => r.status === 'updated').map((r) => r.title)
-  if (updated.length === 1) {
-    const [t] = updated
-    toast.success(`${t.title} has been updated`, { description: 'New episodes are available.', action: { label: 'View', onClick: () => open(t) } })
+  const rows = results.filter((r) => r.status === 'updated')
+  const updated = rows.map((r) => r.title)
+  if (rows.length === 1) {
+    const [{ title: t, newSeason }] = rows
+    toast.success(`${t.title} has been updated`, {
+      description: newSeason ? `${newSeason.title} is ${newSeason.status === 'FINISHED' ? 'out' : 'airing'}.` : 'New episodes are available.',
+      action: { label: 'View', onClick: () => open(t) },
+    })
   } else if (updated.length > 1) {
     toast.success(`${updated.length} shows have new episodes`, { description: updated.slice(0, 3).map((t) => t.title).join(', ') + (updated.length > 3 ? '…' : '') })
   }

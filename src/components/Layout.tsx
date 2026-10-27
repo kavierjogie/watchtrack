@@ -50,6 +50,7 @@ export function Layout() {
   const closeAdd = () =>
     setParams((p) => {
       p.delete('add')
+      p.delete('q')
       return p
     })
   const share = params.has('share') && titles.length > 0
@@ -150,7 +151,7 @@ export function Layout() {
         </ul>
       </nav>
 
-      <AnimatePresence>{add && <TitleForm open onClose={closeAdd} defaultStatus={ADD_STATUS[add]} />}</AnimatePresence>
+      <AnimatePresence>{add && <TitleForm open onClose={closeAdd} defaultStatus={ADD_STATUS[add]} initialQuery={params.get('q') ?? undefined} />}</AnimatePresence>
       <AnimatePresence>{share && <ShareDialog onClose={closeShare} only={params.get('share') !== '1' ? (params.get('share') ?? undefined) : undefined} />}</AnimatePresence>
     </div>
   )

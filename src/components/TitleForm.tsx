@@ -58,12 +58,15 @@ export function TitleForm({
   existing,
   defaultStatus,
   onSaved,
+  initialQuery,
 }: {
   open: boolean
   onClose: () => void
   existing?: Title
   defaultStatus?: WatchStatus
   onSaved?: (t: Title) => void
+  /** Prefill the search, e.g. a sequel offered on a title's page. */
+  initialQuery?: string
 }) {
   const lib = useLibrary()
   const editing = !!existing
@@ -226,7 +229,7 @@ export function TitleForm({
         </>
       }
     >
-      {!editing && <MetadataSearch onPick={applyMeta} picked={meta} />}
+      {!editing && <MetadataSearch onPick={applyMeta} picked={meta} initialQuery={initialQuery} />}
 
       <form id="title-form" onSubmit={(e) => void submit(e)} className="space-y-5">
         {/* Side by side once there's room for both; on the narrowest phones the fields get the full width. */}
@@ -346,9 +349,9 @@ export function TitleForm({
 const MIN_QUERY = 2
 const DEBOUNCE_MS = 350
 
-function MetadataSearch({ onPick, picked }: { onPick: (r: MetaResult) => void; picked: MetaResult | null }) {
+function MetadataSearch({ onPick, picked, initialQuery = '' }: { onPick: (r: MetaResult) => void; picked: MetaResult | null; initialQuery?: string }) {
   const lib = useLibrary()
-  const [q, setQ] = useState('')
+  const [q, setQ] = useState(initialQuery)
   const [attempt, setAttempt] = useState(0)
   const [search, setSearch] = useState<SearchState | null>(null)
   const [showResults, setShowResults] = useState(true)

@@ -11,7 +11,7 @@
 import { useSyncExternalStore } from 'react'
 import { fetchMazeEpisodes, kitsuOngoing, MetadataError, request, SOURCE_ID, tmdbInit, type KitsuAnime } from './metadata'
 import { getPrefs } from './prefs'
-import type { MetadataSource, SyncInfo, Title } from './types'
+import type { MetadataSource, Sequel, SyncInfo, Title } from './types'
 
 /** What a provider says has aired. Seasonal providers fill `seasons`; Kitsu has no seasons, only an overall count. */
 export interface EpisodeInfo {
@@ -23,6 +23,9 @@ export interface EpisodeInfo {
   /** Final episode count, only once the provider says the series has ended. */
   total: number | null
   next: SyncInfo['nextAiring']
+  /** AniList only (undefined = this provider can't say). */
+  anilistId?: number | null
+  sequel?: Sequel | null
 }
 
 const sum = (counts: Record<number, number>, below = Infinity) =>
@@ -42,8 +45,12 @@ const AUTO_MIN_GAP = 15 * 60000
 
 // ---------- Providers ----------
 
+const NUMERIC_ID = /^\d{1,10}$/
+
 export function canRefresh(t: Title): t is Title & { source: MetadataSource } {
   const s = t.source
+  // AniList isn't in SOURCE_ID (its posters aren't looked up any more), but its ids still refresh.
+  if (s?.provider === 'anilist') return !!t.progress && NUMERIC_ID.test(s.id)
   if (!t.progress || !s || !SOURCE_ID[s.provider]?.test(s.id)) return false
   if (s.provider === 'tmdb') return s.id.startsWith('tv/') && !!getPrefs().tmdbKey
   return s.provider === 'tvmaze' || s.provider === 'kitsu'
@@ -104,10 +111,104 @@ async function fetchTmdb(id: string, signal?: AbortSignal): Promise<EpisodeInfo>
   }
 }
 
-export function fetchEpisodeInfo(source: MetadataSource, signal?: AbortSignal): Promise<EpisodeInfo> {
-  if (source.provider === 'tvmaze') return fetchTvMaze(source.id, signal)
-  if (source.provider === 'kitsu') return fetchKitsu(source.id, signal)
-  return fetchTmdb(source.id, signal)
+// ---------- AniList (anime airing data) ----------
+
+/** AniList currently allows 30 requests a minute, so its calls are spaced ~2 s apart whatever the worker pool does. */
+const ANILIST_GAP_MS = 2100
+let anilistSlot = 0
+async function anilistTurn(signal?: AbortSignal) {
+  const now = Date.now()
+  const at = Math.max(now, anilistSlot)
+  anilistSlot = at + ANILIST_GAP_MS
+  if (at > now) await sleep(at - now, signal)
+}
+
+const ANILIST_QUERY = `query($id:Int){Media(id:$id,type:ANIME){status episodes nextAiringEpisode{episode airingAt}
+relations{edges{relationType node{id type format status siteUrl title{english romaji} startDate{year month day}}}}}}`
+
+interface AniNode {
+  id: number
+  type: string
+  format: string | null
+  status: string | null
+  siteUrl: string
+  title: { english: string | null; romaji: string | null }
+  startDate: { year: number | null; month: number | null; day: number | null } | null
+}
+
+const pad = (n: number) => String(n).padStart(2, '0')
+const aniDate = (d: AniNode['startDate']) => (d?.year ? [d.year, d.month && pad(d.month), d.month && d.day && pad(d.day)].filter(Boolean).join('-') : null)
+
+/** The next TV season, if AniList links one. Films, OVAs and spin-offs aren't "the next season". */
+export function pickSequel(edges: { relationType: string; node: AniNode }[] | undefined): Sequel | null {
+  const n = edges?.find((e) => e.relationType === 'SEQUEL' && e.node?.type === 'ANIME' && ['TV', 'TV_SHORT', 'ONA'].includes(e.node.format ?? '') && e.node.status !== 'CANCELLED')?.node
+  const title = n && (n.title?.english || n.title?.romaji)
+  return n && title && Number.isInteger(n.id) ? { anilistId: n.id, title, status: n.status ?? 'NOT_YET_RELEASED', startDate: aniDate(n.startDate), url: n.siteUrl } : null
+}
+
+type AniMedia = {
+  status: string
+  episodes: number | null
+  nextAiringEpisode: { episode: number; airingAt: number } | null
+  relations?: { edges: { relationType: string; node: AniNode }[] }
+}
+
+export async function fetchAnilist(id: number, signal?: AbortSignal): Promise<EpisodeInfo> {
+  await anilistTurn(signal)
+  const res = await request<{ data?: { Media?: AniMedia } }>(
+    'https://graphql.anilist.co',
+    { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ query: ANILIST_QUERY, variables: { id } }), signal },
+    'anilist',
+  )
+  const m = res?.data?.Media
+  if (!m) throw new MetadataError('AniList sent an unexpected response.')
+  const finished = m.status === 'FINISHED'
+  const count = Number.isInteger(m.episodes) && m.episodes! > 0 ? m.episodes : null
+  const nx = m.nextAiringEpisode
+  const nextEp = nx && Number.isInteger(nx.episode) && Number.isFinite(nx.airingAt) ? nx : null
+  return {
+    ongoing: !finished && m.status !== 'CANCELLED',
+    seasons: {},
+    // While airing, everything before the next scheduled episode has aired: AniList's own schedule, not a guess.
+    aired: nextEp ? nextEp.episode - 1 || null : finished ? count : null,
+    total: finished ? count : null,
+    next: nextEp && { season: null, episode: nextEp.episode, airdate: new Date(nextEp.airingAt * 1000).toISOString() },
+    anilistId: id,
+    sequel: pickSequel(m.relations?.edges),
+  }
+}
+
+/** Kitsu's own cross-reference to AniList (no name matching). null when it has none. */
+async function kitsuAnilistId(kitsuId: string, signal?: AbortSignal): Promise<number | null> {
+  const res = await request<{ data?: { attributes?: { externalSite?: string; externalId?: string } }[] }>(
+    `https://kitsu.app/api/edge/anime/${kitsuId}/mappings?fields[mappings]=externalSite,externalId`,
+    { headers: { Accept: 'application/vnd.api+json' }, signal },
+    'kitsu',
+  )
+  const id = res?.data?.find?.((m) => m.attributes?.externalSite === 'anilist/anime')?.attributes?.externalId
+  return id && NUMERIC_ID.test(id) ? Number(id) : null
+}
+
+/** Kitsu anime refresh from AniList's airing schedule when Kitsu maps it there; Kitsu alone otherwise. */
+async function fetchKitsuAnime(t: Title, id: string, signal?: AbortSignal): Promise<EpisodeInfo> {
+  const anilistId = t.sync?.anilistId !== undefined ? t.sync.anilistId : await kitsuAnilistId(id, signal)
+  if (anilistId) {
+    try {
+      return await fetchAnilist(anilistId, signal)
+    } catch (err) {
+      // Down or rate-limited: try again later. A wrong or removed entry: Kitsu's own data is still better than nothing.
+      if (!(err instanceof MetadataError) || err.retryable) throw err
+    }
+  }
+  return { ...(await fetchKitsu(id, signal)), anilistId }
+}
+
+export function fetchEpisodeInfo(t: Title & { source: MetadataSource }, signal?: AbortSignal): Promise<EpisodeInfo> {
+  const { provider, id } = t.source
+  if (provider === 'tvmaze') return fetchTvMaze(id, signal)
+  if (provider === 'kitsu') return fetchKitsuAnime(t, id, signal)
+  if (provider === 'anilist') return fetchAnilist(Number(id), signal)
+  return fetchTmdb(id, signal)
 }
 
 // ---------- Merge (pure) ----------
@@ -117,9 +218,9 @@ export function fetchEpisodeInfo(source: MetadataSource, signal?: AbortSignal): 
  * seasons/episodes and `sync`. Counts only grow. `changed` = new episodes or seasons are now known (worth telling
  * the user); filling in counts for the first time, or a new next-airing date, doesn't count.
  */
-export function mergeEpisodeInfo(t: Title, info: EpisodeInfo, now: string): { title: Title; changed: boolean } {
+export function mergeEpisodeInfo(t: Title, info: EpisodeInfo, now: string): { title: Title; changed: boolean; newSeason: Sequel | null } {
   const p = t.progress
-  if (!p) return { title: t, changed: false }
+  if (!p) return { title: t, changed: false, newSeason: null }
   let changed = false
   let progress = p
   let next = info.next
@@ -160,15 +261,31 @@ export function mergeEpisodeInfo(t: Title, info: EpisodeInfo, now: string): { ti
     progress = { ...p, totalEpisodes: total }
   }
 
-  const sync: SyncInfo = { checkedAt: now, changedAt: changed ? now : (t.sync?.changedAt ?? null), ongoing: info.ongoing, aired: info.aired, nextAiring: next }
+  // A sequel is news once it's actually out (announcements aren't), and only on later refreshes: the first one just
+  // learns what already exists. A sequel already seen out isn't announced again.
+  const sequel = info.sequel !== undefined ? info.sequel : t.sync?.sequel
+  const prev = t.sync?.sequel
+  const isOut = (s: Sequel | null | undefined): s is Sequel => !!s && s.status !== 'NOT_YET_RELEASED'
+  const newSeason = t.sync && isOut(sequel) && !(prev?.anilistId === sequel.anilistId && isOut(prev)) ? sequel : null
+
+  const sync: SyncInfo = {
+    checkedAt: now,
+    changedAt: changed || newSeason ? now : (t.sync?.changedAt ?? null),
+    ongoing: info.ongoing,
+    aired: info.aired,
+    nextAiring: next,
+    anilistId: info.anilistId !== undefined ? info.anilistId : t.sync?.anilistId,
+    sequel,
+  }
   // updatedAt is left alone: a metadata refresh isn't user activity and mustn't reorder "recently updated" lists.
-  return { title: { ...t, progress, sync }, changed }
+  return { title: { ...t, progress, sync }, changed, newSeason }
 }
 
 // ---------- Refresh lifecycle ----------
 
 export type RefreshResult =
-  | { status: 'updated' | 'unchanged'; title: Title }
+  | { status: 'updated'; title: Title; newSeason: Sequel | null }
+  | { status: 'unchanged'; title: Title }
   | { status: 'failed'; title: Title; error: string }
   | { status: 'skipped'; title: Title }
 
@@ -227,17 +344,18 @@ export function refreshTitle(t: Title, patch: Patch, signal?: AbortSignal): Prom
     if (!canRefresh(t)) return { status: 'skipped', title: t }
     try {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new MetadataError("You're offline.")
-      const info = await withRetry(() => fetchEpisodeInfo(t.source, signal), signal)
-      let changed = false
+      const info = await withRetry(() => fetchEpisodeInfo(t, signal), signal)
       const now = new Date().toISOString()
+      let changed = false
+      let newSeason: Sequel | null = null
       const saved = await patch(t.id, (current) => {
         const r = mergeEpisodeInfo(current, info, now)
-        changed = r.changed
+        ;({ changed, newSeason } = r)
         return r.title
       })
       if (!saved) return { status: 'skipped', title: t } // deleted while we were fetching
       failedAt.delete(t.id)
-      return { status: changed ? 'updated' : 'unchanged', title: saved }
+      return changed || newSeason ? { status: 'updated', title: saved, newSeason } : { status: 'unchanged', title: saved }
     } catch (err) {
       failedAt.set(t.id, Date.now())
       return { status: 'failed', title: t, error: err instanceof Error ? err.message : 'Refresh failed.' }
