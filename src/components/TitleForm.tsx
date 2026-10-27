@@ -11,6 +11,7 @@ import { describePosition, emptyProgress } from '../lib/progress'
 import { createTitle } from '../lib/titles'
 import { MEDIA_LABEL, STATUS_LABEL, type MediaType, type Poster as PosterRef, type Title, type WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
+import { useRefreshEpisodes } from '../state/useSync'
 import { Modal } from './Modal'
 import { Poster } from './Poster'
 import { buildProgress, ProgressFields, progressToForm, type ProgressForm } from './ProgressEditor'
@@ -69,6 +70,7 @@ export function TitleForm({
   initialQuery?: string
 }) {
   const lib = useLibrary()
+  const { refreshOne } = useRefreshEpisodes()
   const editing = !!existing
   const [form, setForm] = useState<FormState>(() => fromTitle(existing ?? null, defaultStatus ? { status: defaultStatus } : {}))
   const [progress, setProgress] = useState<ProgressForm>(() =>
@@ -163,6 +165,14 @@ export function TitleForm({
       // Changing type: movies have no episode progress, series need one.
       progressValue = form.mediaType === 'movie' ? null : (existing.progress ?? emptyProgress(form.mediaType === 'anime' ? 'absolute' : 'seasonal'))
     }
+    // Re-linked (e.g. from a single-season anime entry to the whole show): the old source's counts and totals don't apply.
+    if (editing && meta && progressValue)
+      progressValue = {
+        ...progressValue,
+        seasonEpisodeCounts: { ...meta.seasonEpisodeCounts },
+        totalSeasons: meta.totalSeasons,
+        totalEpisodes: meta.totalEpisodes && !meta.ongoing ? meta.totalEpisodes : null,
+      }
 
     setSaving(true)
     try {
@@ -188,6 +198,8 @@ export function TitleForm({
         saved = {
           ...existing,
           ...fields,
+          // Provider state belongs to the old source (its AniList id, sequel, airing dates), so it starts over.
+          ...(meta && { source: meta.source, backdropUrl: meta.backdropUrl, sync: undefined }),
           completedAt: form.status === 'completed' ? (existing.completedAt ?? now) : null,
           updatedAt: now,
         }
@@ -197,6 +209,7 @@ export function TitleForm({
         if (existing.poster?.kind === 'local' && posterRef?.kind === 'local' && posterRef.imageId !== existing.poster.imageId)
           await deleteImage(existing.poster.imageId)
         toast.success('Saved', { description: saved.title })
+        if (meta) void refreshOne(saved)
       } else {
         saved = createTitle({ ...fields, backdropUrl: meta?.backdropUrl ?? null, source: meta?.source ?? null }, now)
         await lib.save(saved)
@@ -229,7 +242,7 @@ export function TitleForm({
         </>
       }
     >
-      {!editing && <MetadataSearch onPick={applyMeta} picked={meta} initialQuery={initialQuery} />}
+      <MetadataSearch onPick={applyMeta} picked={meta} initialQuery={initialQuery} relink={editing} />
 
       <form id="title-form" onSubmit={(e) => void submit(e)} className="space-y-5">
         {/* Side by side once there's room for both; on the narrowest phones the fields get the full width. */}
@@ -349,7 +362,7 @@ export function TitleForm({
 const MIN_QUERY = 2
 const DEBOUNCE_MS = 350
 
-function MetadataSearch({ onPick, picked, initialQuery = '' }: { onPick: (r: MetaResult) => void; picked: MetaResult | null; initialQuery?: string }) {
+function MetadataSearch({ onPick, picked, initialQuery = '', relink = false }: { onPick: (r: MetaResult) => void; picked: MetaResult | null; initialQuery?: string; relink?: boolean }) {
   const lib = useLibrary()
   const [q, setQ] = useState(initialQuery)
   const [attempt, setAttempt] = useState(0)
@@ -395,8 +408,9 @@ function MetadataSearch({ onPick, picked, initialQuery = '' }: { onPick: (r: Met
   return (
     <div className="mb-5 space-y-3 rounded-2xl bg-surface-2 p-3">
       <p className="text-sm font-medium">
-        Find artwork & details <span className="font-normal text-muted">(optional)</span>
+        {relink ? 'Link to a different source' : 'Find artwork & details'} <span className="font-normal text-muted">(optional)</span>
       </p>
+      {relink && <p className="text-xs text-muted">Linked to one season only? Pick the whole show (TVmaze or TMDB) so new episodes of later seasons are found.</p>}
       {/* Not a <form>: it sits inside the dialog next to the main form. */}
       <div className="relative">
         {loading ? (
