@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react'
 import { MotionConfig } from 'framer-motion'
 import { Component, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
@@ -86,6 +87,7 @@ export default function App() {
           </LibraryProvider>
         </BrowserRouter>
       </CrashScreen>
+      <Analytics />
     </MotionConfig>
   )
 }
