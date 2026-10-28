@@ -3,6 +3,7 @@ import { Eye, LinkIcon, ListX } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { EmptyState, PosterGridSkeleton, ProgressBar, progressLine, Rating, Section } from '../components/cards'
+import { Logo } from '../components/Logo'
 import { Poster } from '../components/Poster'
 import { STATUS } from '../lib/backup'
 import { progressFraction } from '../lib/progress'
@@ -35,8 +36,7 @@ export function SharedPage() {
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-10">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/icon.svg" alt="" className="size-7" />
-            <span className="font-semibold tracking-tight">WatchTrack</span>
+            <Logo />
           </Link>
           <Link to="/" className="btn-secondary min-h-9 px-3 text-xs">
             Open my WatchTrack

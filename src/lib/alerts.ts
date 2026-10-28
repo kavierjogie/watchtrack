@@ -261,7 +261,7 @@ export const notifySupported = () => typeof window !== 'undefined' && 'Notificat
 /** Uses the service worker when there is one (needed on Android, and its click handler reopens the app). */
 export async function showSystemNotification(title: string, body: string, url: string, tag?: string): Promise<boolean> {
   if (!notifySupported() || Notification.permission !== 'granted') return false
-  const opts: NotificationOptions = { body, icon: '/pwa-192.png', badge: '/pwa-192.png', tag, data: { url } }
+  const opts: NotificationOptions = { body, icon: '/pwa-192.png', badge: '/badge-96.png', tag, data: { url } }
   try {
     const reg = await navigator.serviceWorker?.getRegistration()
     if (reg) {

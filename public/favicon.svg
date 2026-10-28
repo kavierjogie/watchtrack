@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Small-size cut of icon.svg: bigger W, heavier strokes, so it holds up at 16×16. -->
+  <rect width="512" height="512" rx="104" fill="#171725"/>
+  <g fill="none" stroke-width="84" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M78 118 L176 394 L256 236 L336 394 L434 118" stroke="#6a5aa3"/>
+    <path d="M78 118 L176 394 L256 236 L336 394 L392.8 234" stroke="#a78bfa"/>
+  </g>
+  <circle cx="392.8" cy="234" r="52" fill="#f5f3ff" stroke="#171725" stroke-width="34" paint-order="stroke"/>
+</svg>

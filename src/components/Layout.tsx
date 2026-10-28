@@ -7,6 +7,7 @@ import type { WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
 import { useAutoSync } from '../state/useSync'
 import { AlertBell } from './Alerts'
+import { Logo } from './Logo'
 import { ShareDialog } from './ShareDialog'
 import { TitleForm } from './TitleForm'
 
@@ -95,8 +96,7 @@ export function Layout() {
       <aside className="sticky top-0 hidden h-dvh flex-col overflow-y-auto border-r border-divider bg-bg-2 px-3 py-5 lg:flex">
         <div className="mb-6 flex items-center justify-between gap-2">
           <Link to="/" className="flex items-center gap-2.5 rounded-xl px-3">
-            <img src="/icon.svg" alt="" className="size-8" />
-            <span className="text-[15px] font-semibold tracking-tight">WatchTrack</span>
+            <Logo className="size-8" />
           </Link>
           <AlertBell />
         </div>
@@ -130,8 +130,7 @@ export function Layout() {
       {/* Mobile top bar */}
       <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-divider bg-bg/80 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur-xl lg:hidden reduce-transparency:bg-bg reduce-transparency:backdrop-blur-none">
         <Link to="/" className="flex min-w-0 items-center gap-2 rounded-lg">
-          <img src="/icon.svg" alt="" className="size-7" />
-          <span className="truncate font-semibold tracking-tight">WatchTrack</span>
+          <Logo />
         </Link>
         <div className="flex items-center">
           <NavLink to="/upcoming" className={({ isActive }) => `icon-btn ${isActive ? 'text-accent-text' : ''}`} aria-label="Upcoming releases">
