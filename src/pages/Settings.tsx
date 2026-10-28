@@ -1,4 +1,4 @@
-import { Bell, BellRing, Download, HardDrive, RefreshCw, Smartphone, Trash2, Upload } from 'lucide-react'
+import { Bell, BellRing, Download, HardDrive, RefreshCw, Shield, Smartphone, Trash2, Upload } from 'lucide-react'
 import { alertsOn, notifySupported, showSystemNotification } from '../lib/alerts'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -301,13 +301,48 @@ export function SettingsPage() {
         </button>
       </Card>
 
-      <section className="space-y-2 px-1 text-xs text-muted">
-        <p>Credits: anime data from Kitsu; TV data from TVmaze (CC BY-SA). This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
-        <p>No analytics, tracking or telemetry.</p>
-      </section>
+      <Card id="privacy" title="Privacy" icon={<Shield className="size-5 text-accent-text" aria-hidden />}>
+        <div className="space-y-2 text-sm text-muted">
+          <p>WatchTrack is free, has no accounts, ads, analytics, tracking or telemetry, and never sells or shares your data.</p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Your library, history, notes and posters are stored only in this browser. WatchTrack's developer can't see them.</li>
+            <li>
+              To find titles, posters and new episodes, the app sends title names and IDs (never your library or progress) to the data sources below. TMDB requests
+              go through WatchTrack's server (hosted on Vercel) to keep its API key private. As with any website, these services see your IP address.
+            </li>
+            <li>Share links put the list you chose in the link itself; only people you send it to can see it.</li>
+            <li>Notifications are optional and shown by your own browser — nothing is sent to a push server.</li>
+          </ul>
+        </div>
+      </Card>
+
+      <Card title="Credits">
+        <a href="https://www.themoviedb.org" target="_blank" rel="noopener noreferrer" className="inline-block">
+          <img src="/tmdb.svg" alt="TMDB" className="h-4 w-auto" />
+        </a>
+        <ul className="space-y-1 text-sm text-muted">
+          <li>
+            Movie and TV data and images from <Ext href="https://www.themoviedb.org">TMDB</Ext>. This product uses the TMDB API but is not endorsed or certified by TMDB.
+          </li>
+          <li>
+            TV data from <Ext href="https://www.tvmaze.com">TVmaze</Ext> (<Ext href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA</Ext>).
+          </li>
+          <li>
+            Anime data from <Ext href="https://kitsu.app">Kitsu</Ext> and <Ext href="https://anilist.co">AniList</Ext>.
+          </li>
+        </ul>
+      </Card>
 
       <AnimatePresence>{plan && <ImportDialog plan={plan} onClose={() => setPlan(null)} />}</AnimatePresence>
     </div>
+  )
+}
+
+function Ext({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent-text underline underline-offset-2">
+      {children}
+    </a>
   )
 }
 
