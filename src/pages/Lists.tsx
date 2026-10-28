@@ -89,13 +89,14 @@ export function ContinuePage() {
   return (
     <>
       <PageHeader title="Continue Watching" subtitle="Every unfinished title and the exact episode to watch next." />
-      <div className="mb-5 flex flex-wrap items-center gap-2">
+      {/* One row on every screen: the chips keep their size and the sort menu shrinks (clipping its label) on the narrowest phones. */}
+      <div className="mb-5 flex items-center gap-2">
         {(['all', 'anime', 'tv'] as const).map((m) => (
-          <button key={m} type="button" className="chip" aria-pressed={type === m} onClick={() => setType(m)}>
+          <button key={m} type="button" className="chip shrink-0" aria-pressed={type === m} onClick={() => setType(m)}>
             {m === 'all' ? 'All' : MEDIA_LABEL[m]}
           </button>
         ))}
-        <select className="input ml-auto w-auto" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort by">
+        <select className="input ml-auto w-auto min-w-0" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort by">
           {/* Short labels so the menu fits beside the type chips on phones. */}
           <option value="recent">Most recent</option>
           <option value="idle">Least recent</option>
