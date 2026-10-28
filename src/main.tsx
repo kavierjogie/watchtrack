@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { inject } from '@vercel/analytics'
 import App from './App'
 import './index.css'
 import { applyTheme, getPrefs } from './lib/prefs'
@@ -9,6 +10,9 @@ applyTheme(getPrefs().theme)
 
 // Ask the browser not to evict IndexedDB under storage pressure. Chrome/Safari decide silently; Firefox asks once.
 void navigator.storage?.persist?.().catch(() => {})
+
+// Initialize Vercel Web Analytics
+inject()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
