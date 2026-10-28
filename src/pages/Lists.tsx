@@ -96,8 +96,9 @@ export function ContinuePage() {
           </button>
         ))}
         <select className="input ml-auto w-auto" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort by">
-          <option value="recent">Recently watched</option>
-          <option value="idle">Longest since watched</option>
+          {/* Short labels so the menu fits beside the type chips on phones. */}
+          <option value="recent">Most recent</option>
+          <option value="idle">Least recent</option>
           <option value="title">Title A–Z</option>
         </select>
       </div>
