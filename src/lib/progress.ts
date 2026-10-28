@@ -1,4 +1,4 @@
-import type { Numbering, Progress, SkipRange } from './types'
+import type { Numbering, Progress, SkipRange, SyncInfo } from './types'
 
 export interface EpisodeRef {
   season: number | null
@@ -60,6 +60,29 @@ export function position(p: Progress): Position {
     return { state: 'season-finished', season: p.season ?? 1 }
   }
   return { state: 'next', next: { season: p.season, episode: p.nextEpisode } }
+}
+
+/**
+ * Caught up on a show that's still airing: the user's next episode hasn't aired yet. Returns the confirmed next
+ * release (episode null when the provider gives only a date, airdate null when nothing is scheduled), or null when
+ * there's an aired episode to watch or the show has ended.
+ */
+export function waitingFor(p: Progress, sync: SyncInfo | undefined, now = Date.now()): { episode: EpisodeRef | null; airdate: string | null } | null {
+  if (!sync?.ongoing) return null
+  const n = sync.nextAiring && !(Date.parse(sync.nextAiring.airdate) < now) ? sync.nextAiring : null
+  const release = { episode: n?.episode != null ? { season: n.season, episode: n.episode } : null, airdate: n?.airdate ?? null }
+  const pos = position(p)
+  if (pos.state === 'next') {
+    const { season, episode } = pos.next
+    const unaired =
+      (n?.episode != null && n.season === season && episode >= n.episode) ||
+      (p.numbering === 'absolute' && sync.aired != null && episode > sync.aired)
+    return unaired ? release : null
+  }
+  // Watched every aired episode of the season: waiting for the rest of it, or for the next season to be scheduled.
+  if (pos.state === 'season-finished') return n ? release : hasKnownNextSeason(p) ? null : release
+  if (pos.state === 'series-finished' && n) return release
+  return null
 }
 
 /** Derived: the most recent episode completed, or null if unknown/not started. */

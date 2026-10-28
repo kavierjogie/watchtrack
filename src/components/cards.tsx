@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion'
-import { Check, ChevronRight, CirclePause, Play, Star, type LucideIcon } from 'lucide-react'
+import { CalendarClock, Check, ChevronRight, CirclePause, Play, Star, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { daysSince, timeAgo } from '../lib/format'
-import { describePosition, formatEp, lastWatched, position, progressFraction } from '../lib/progress'
+import { describePosition, formatEp, lastWatched, position, progressFraction, waitingFor } from '../lib/progress'
 import { lastActivity } from '../lib/titles'
 import { MEDIA_LABEL, STATUS_LABEL, type Title, type WatchStatus } from '../lib/types'
 import { useWatchActions } from '../state/useWatchActions'
@@ -149,6 +149,8 @@ export function ContinueCard({ t, extra }: { t: Title; extra?: ReactNode }) {
   const pos = position(p)
   const last = lastWatched(p)
   const idle = daysSince(lastActivity(t))
+  // Caught up on a running show: say when the next episode airs instead of offering episodes that aren't out yet.
+  const waiting = waitingFor(p, t.sync)
 
   return (
     <motion.article
@@ -168,8 +170,23 @@ export function ContinueCard({ t, extra }: { t: Title; extra?: ReactNode }) {
           {t.status === 'on_hold' && <StatusBadge status="on_hold" />}
         </div>
         <p className="mt-0.5 text-lg font-semibold tracking-tight text-accent-text">
-          {pos.state === 'next' ? `${formatEp(pos.next, p.numbering)} next` : describePosition(p)}
+          {waiting ? 'Caught up' : pos.state === 'next' ? `${formatEp(pos.next, p.numbering)} next` : describePosition(p)}
         </p>
+        {waiting && (
+          <p className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-info">
+            <CalendarClock className="size-3.5 shrink-0" aria-hidden />
+            {waiting.airdate ? (
+              <span>
+                {waiting.episode ? formatEp(waiting.episode, p.numbering) : 'Next episode'} airs{' '}
+                <time dateTime={waiting.airdate} title={new Date(waiting.airdate).toLocaleString()}>
+                  {timeAgo(waiting.airdate)}
+                </time>
+              </span>
+            ) : (
+              <span>Next episode not announced yet</span>
+            )}
+          </p>
+        )}
         <p className="mt-0.5 text-xs text-muted">
           {last ? `Last: ${formatEp(last, p.numbering)} · ` : ''}
           {t.lastWatchedAt ? `watched ${timeAgo(t.lastWatchedAt)}` : `updated ${timeAgo(t.updatedAt)}`}
@@ -179,7 +196,7 @@ export function ContinueCard({ t, extra }: { t: Title; extra?: ReactNode }) {
           <ProgressBar value={progressFraction(p)} />
         </div>
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
-          {pos.state === 'next' && (
+          {pos.state === 'next' && !waiting && (
             <button type="button" className="btn-primary min-h-9 px-3" onClick={() => void markWatched(t)}>
               <Check className="size-4" aria-hidden />
               Watched {pos.next.season != null && p.numbering === 'seasonal' ? `S${pos.next.season}E${pos.next.episode}` : `E${pos.next.episode}`}
@@ -190,7 +207,7 @@ export function ContinueCard({ t, extra }: { t: Title; extra?: ReactNode }) {
               Set episode
             </Link>
           )}
-          {pos.state === 'season-finished' && (
+          {pos.state === 'season-finished' && !waiting && (
             <>
               <button type="button" className="btn-primary min-h-9 px-3" onClick={() => void nextSeason(t)}>
                 Start season {(p.season ?? 0) + 1}
@@ -200,7 +217,7 @@ export function ContinueCard({ t, extra }: { t: Title; extra?: ReactNode }) {
               </button>
             </>
           )}
-          {pos.state === 'series-finished' && (
+          {pos.state === 'series-finished' && !waiting && (
             <button type="button" className="btn-primary min-h-9 px-3" onClick={() => void setStatus(t, 'completed')}>
               Mark completed
             </button>

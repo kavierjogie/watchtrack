@@ -8,8 +8,9 @@ import {
   setLastWatched,
   setNextEpisode,
   startNextSeason,
+  waitingFor,
 } from './progress'
-import type { Progress } from './types'
+import type { Progress, SyncInfo } from './types'
 
 const seasonal = (o: Partial<Progress> = {}): Progress => ({ ...emptyProgress('seasonal'), ...o })
 const absolute = (o: Partial<Progress> = {}): Progress => ({ ...emptyProgress('absolute'), ...o })
@@ -149,5 +150,39 @@ describe('skipped episodes', () => {
     })
     const r = markWatched(p)!
     expect(r.progress).toMatchObject({ season: 2, nextEpisode: 2 })
+  })
+})
+
+describe('waitingFor (caught up on a show still airing)', () => {
+  const NOW = Date.parse('2026-10-28T12:00:00Z')
+  const sync = (over: Partial<SyncInfo> = {}): SyncInfo => ({ checkedAt: '', changedAt: null, ongoing: true, aired: null, nextAiring: null, ...over })
+  const inSeason = (season: number, nextEpisode: number, counts: Record<number, number>): Progress => ({ ...emptyProgress('seasonal'), season, nextEpisode, seasonEpisodeCounts: counts })
+  const friday = '2026-10-30T20:00:00Z'
+
+  it('waits for the next episode of the current season once every aired one is watched', () => {
+    const p = inSeason(2, 6, { 1: 10, 2: 5 })
+    expect(waitingFor(p, sync({ nextAiring: { season: 2, episode: 6, airdate: friday } }), NOW)).toEqual({ episode: { season: 2, episode: 6 }, airdate: friday })
+  })
+
+  it('waits for an announced next season, or says nothing is scheduled yet', () => {
+    const p = inSeason(2, 9, { 1: 10, 2: 8 })
+    expect(waitingFor(p, sync({ nextAiring: { season: 3, episode: 1, airdate: friday } }), NOW)?.episode).toEqual({ season: 3, episode: 1 })
+    expect(waitingFor(p, sync(), NOW)).toEqual({ episode: null, airdate: null })
+  })
+
+  it('works for overall numbering, from the next airing or the aired count', () => {
+    const p: Progress = { ...emptyProgress('absolute'), nextEpisode: 13 }
+    expect(waitingFor(p, sync({ nextAiring: { season: null, episode: 13, airdate: friday } }), NOW)?.airdate).toBe(friday)
+    expect(waitingFor(p, sync({ aired: 12 }), NOW)).toEqual({ episode: null, airdate: null })
+  })
+
+  it('is null when there is an aired episode to watch, the show has ended, or the date has passed', () => {
+    expect(waitingFor(inSeason(2, 3, { 2: 5 }), sync({ nextAiring: { season: 2, episode: 6, airdate: friday } }), NOW)).toBeNull()
+    expect(waitingFor(inSeason(2, 6, { 2: 5 }), sync({ ongoing: false }), NOW)).toBeNull()
+    expect(waitingFor(inSeason(2, 6, { 2: 5 }), undefined, NOW)).toBeNull()
+    const aired = sync({ nextAiring: { season: 2, episode: 6, airdate: '2026-10-27T20:00:00Z' } })
+    expect(waitingFor({ ...emptyProgress('absolute'), nextEpisode: 6 }, aired, NOW)).toBeNull()
+    // Between seasons with the next one already known: starting it is the right action, not waiting.
+    expect(waitingFor({ ...inSeason(2, 9, { 2: 8, 3: 10 }) }, sync(), NOW)).toBeNull()
   })
 })

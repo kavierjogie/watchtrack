@@ -89,18 +89,18 @@ export function ContinuePage() {
   return (
     <>
       <PageHeader title="Continue Watching" subtitle="Every unfinished title and the exact episode to watch next." />
-      {/* One row on every screen: short sort labels and tighter phone spacing keep the menu's text whole down to 320px wide. */}
-      <div className="mb-5 flex items-center gap-2 max-sm:gap-1.5">
+      {/* One row on every screen: the chips keep their size and the sort menu shrinks (clipping its label) on the narrowest phones. */}
+      <div className="mb-5 flex items-center gap-2">
         {(['all', 'anime', 'tv'] as const).map((m) => (
-          <button key={m} type="button" className="chip shrink-0 max-sm:px-2.5" aria-pressed={type === m} onClick={() => setType(m)}>
+          <button key={m} type="button" className="chip shrink-0" aria-pressed={type === m} onClick={() => setType(m)}>
             {m === 'all' ? 'All' : MEDIA_LABEL[m]}
           </button>
         ))}
         <select className="input ml-auto w-auto min-w-0" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort by">
-          {/* Short labels so the menu fits beside the type chips on phones; the menu is labelled "Sort by" for screen readers. */}
-          <option value="recent">Recent</option>
-          <option value="idle">Oldest</option>
-          <option value="title">A–Z</option>
+          {/* Short labels so the menu fits beside the type chips on phones. */}
+          <option value="recent">Most recent</option>
+          <option value="idle">Least recent</option>
+          <option value="title">Title A–Z</option>
         </select>
       </div>
       {loading ? (
