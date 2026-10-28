@@ -40,7 +40,13 @@ const listeners = new Set<() => void>()
 export function getPrefs(): Prefs {
   if (cache) return cache
   try {
-    cache = { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Prefs>) }
+    const raw: unknown = JSON.parse(localStorage.getItem(KEY) ?? '{}')
+    const saved = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
+    // Known keys with the right type only. Drops the TMDB key older versions kept here (TMDB now goes through /api/tmdb).
+    cache = Object.fromEntries(
+      Object.entries(DEFAULTS).map(([k, v]) => [k, typeof saved[k] === typeof v ? saved[k] : v]),
+    ) as unknown as Prefs
+    if ('tmdbKey' in saved) localStorage.setItem(KEY, JSON.stringify(cache))
   } catch {
     cache = { ...DEFAULTS }
   }

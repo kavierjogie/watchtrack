@@ -2,7 +2,7 @@
 
 A private, offline-first tracker for anime, TV series and movies. Its one job: **always know the exact next episode to watch**, even after months away.
 
-- No account, no backend, no database server, no analytics.
+- No account, no database server, no analytics. The only server code is a stateless TMDB proxy (`api/tmdb.ts`) that keeps the API key off the browser.
 - Everything is stored in your browser (IndexedDB) on the device you use.
 - Installable as an app (PWA) and works offline once loaded.
 
@@ -32,9 +32,10 @@ Requires Node 20+.
 
 1. Push this folder to a GitHub repo.
 2. In Vercel: **Add New → Project →** import the repo. It detects Vite automatically (build `npm run build`, output `dist`).
-3. Deploy. No environment variables are needed.
+3. Optional, for TMDB (movies and extra TV results): add `TMDB_API_KEY` under **Settings → Environment Variables** (see `.env.example`). Without it the app still works with Kitsu and TVmaze.
+4. Deploy.
 
-`vercel.json` rewrites unknown paths to `index.html` so deep links like `/title/abc` work, and stops the service worker file being cached.
+`vercel.json` rewrites unknown paths to `index.html` so deep links like `/title/abc` work, stops the service worker file being cached, and sets security headers (Content-Security-Policy, nosniff, Referrer-Policy, Permissions-Policy). If you add a new provider host for API calls, it must be https; scripts may only load from the app itself.
 
 ## Using it
 
@@ -101,9 +102,9 @@ Search is only used to fill in title details and posters. Only the search text i
 | --- | --- | --- | --- |
 | [Kitsu](https://kitsu.docs.apiary.io) | Anime (and anime movies) | None | Public JSON:API, CORS-enabled. |
 | [TVmaze](https://www.tvmaze.com/api) | TV series, per-season episode counts | None | CORS-enabled; data is CC BY-SA, so a source link is shown on each title. |
-| [TMDB](https://developer.themoviedb.org) | Movies + extra TV results | **Your own** | Paste a free v3 API key or read-access token in Settings. Stored only in this browser. Attribution is shown in Settings. |
+| [TMDB](https://developer.themoviedb.org) | Movies + extra TV results | Server (`TMDB_API_KEY`) | Requests go through `/api/tmdb`, which adds the key server-side and only allows the endpoints the app uses. Attribution is shown in Settings. |
 
-No keys are bundled in the source, and requests go straight from the browser to the provider (no proxy). Rate-limit, offline and network errors show a message and leave the form usable. Poster images from these hosts are cached by the service worker so saved titles keep their artwork offline.
+No keys are bundled in the source. Kitsu and TVmaze are called straight from the browser; TMDB goes through the proxy so its key never reaches the client. Older versions stored a user-supplied TMDB key in localStorage; it is deleted automatically on first load. Rate-limit, offline and network errors show a message and leave the form usable. Poster images from these hosts are cached by the service worker so saved titles keep their artwork offline.
 
 ## Project structure
 
@@ -126,7 +127,7 @@ IndexedDB stores: `titles`, `watchHistory`, `images` (Blobs), `settings` (reserv
 
 ## Tests
 
-`npm test` runs 44 tests covering next-episode calculation, season advancement, unknown season counts, manual corrections, skipped episodes, completed movies, IndexedDB persistence, undo, export/import round trips (including images), duplicate handling, backup validation, and metadata response mapping.
+`npm test` covers next-episode calculation, season advancement, unknown season counts, manual corrections, skipped episodes, completed movies, IndexedDB persistence, undo, export/import round trips (including images), duplicate handling, backup validation (including malformed and hostile files), and metadata response mapping.
 
 ## Decisions & defaults
 

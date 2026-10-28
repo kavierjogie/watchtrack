@@ -20,15 +20,16 @@ export function emptyProgress(numbering: Numbering = 'seasonal'): Progress {
 
 const sameSeason = (r: SkipRange, season: number | null) => r.season === season
 
+const skipAt = (p: Progress, season: number | null, ep: number) => p.skipped.find((r) => sameSeason(r, season) && ep >= r.from && ep <= r.to)
+
 export function isSkipped(p: Progress, season: number | null, ep: number): boolean {
-  return p.skipped.some((r) => sameSeason(r, season) && ep >= r.from && ep <= r.to)
+  return !!skipAt(p, season, ep)
 }
 
-/** First episode >= ep in `season` that is not in a skipped range. */
+/** First episode >= ep in `season` that is not in a skipped range. Jumps whole ranges, so huge ranges can't hang. */
 function firstUnskippedFrom(p: Progress, season: number | null, ep: number): number {
   let e = ep
-  // Ranges are few; loop until we land outside all of them.
-  for (let guard = 0; guard < 10000 && isSkipped(p, season, e); guard++) e++
+  for (let i = 0, r = skipAt(p, season, e); r && i <= p.skipped.length; i++, r = skipAt(p, season, e)) e = r.to + 1
   return e
 }
 
@@ -89,7 +90,7 @@ export function waitingFor(p: Progress, sync: SyncInfo | undefined, now = Date.n
 export function lastWatched(p: Progress): EpisodeRef | null {
   if (p.nextEpisode == null) return null
   let e = p.nextEpisode - 1
-  while (e >= 1 && isSkipped(p, p.season, e)) e--
+  for (let i = 0, r = skipAt(p, p.season, e); r && i <= p.skipped.length; i++, r = skipAt(p, p.season, e)) e = r.from - 1
   if (e >= 1) return { season: p.season, episode: e }
   // Next is the start of a season: last watched was the end of the previous one, if known.
   if (p.numbering === 'seasonal' && p.season != null && p.season > 1) {
@@ -162,12 +163,6 @@ export function startNextSeason(p: Progress): Progress {
     totalSeasons: p.totalSeasons != null && p.totalSeasons < season ? season : p.totalSeasons,
     nextEpisode: firstUnskippedFrom(moved, season, 1),
   }
-}
-
-/** Switch numbering style, keeping the episode number the user sees. */
-export function setNumbering(p: Progress, numbering: Numbering): Progress {
-  if (p.numbering === numbering) return p
-  return { ...p, numbering, season: numbering === 'seasonal' ? (p.season ?? 1) : null }
 }
 
 export function formatEp(ref: EpisodeRef | null, numbering: Numbering): string {

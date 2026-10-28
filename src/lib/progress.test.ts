@@ -186,3 +186,19 @@ describe('waitingFor (caught up on a show still airing)', () => {
     expect(waitingFor({ ...inSeason(2, 9, { 2: 8, 3: 10 }) }, sync(), NOW)).toBeNull()
   })
 })
+
+describe('huge skipped ranges', () => {
+  // A crafted backup (or a typo like "1-999999999") used to loop once per episode and freeze the app.
+  const p = { ...emptyProgress('absolute'), nextEpisode: 1_000_000_001, skipped: [{ season: null, from: 1, to: 1_000_000_000 }] }
+
+  it('works out "last watched" without stepping through every episode', () => {
+    expect(lastWatched(p)).toBeNull()
+    expect(lastWatched({ ...p, skipped: [{ season: null, from: 5, to: 1_000_000_000 }] })).toEqual({ season: null, episode: 4 })
+  })
+
+  it('jumps over a skipped range when advancing', () => {
+    expect(setLastWatched({ ...p, nextEpisode: 1 }, null, 0).nextEpisode).toBe(1_000_000_001)
+    const chained = { ...p, nextEpisode: 1, skipped: [{ season: null, from: 1, to: 3 }, { season: null, from: 4, to: 6 }] }
+    expect(setLastWatched(chained, null, 0).nextEpisode).toBe(7)
+  })
+})

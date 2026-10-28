@@ -159,3 +159,63 @@ describe('backup export / import', () => {
     )
   })
 })
+
+describe('backup import hardening', () => {
+  const file = (over: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      format: 'watchtrack-backup',
+      version: 1,
+      titles: [{ ...createTitle({ title: 'Frieren', mediaType: 'anime' }), ...over }],
+      history: [],
+      images: [],
+      ...extra,
+    })
+
+  it('drops non-http links and wrongly typed fields instead of trusting them', () => {
+    const [t] = parseBackup(
+      file({
+        source: { provider: 'kitsu', id: '1', url: 'javascript:alert(1)' },
+        poster: { kind: 'remote', url: 'data:text/html,<script>alert(1)</script>' },
+        backdropUrl: 'javascript:alert(1)',
+        genres: 'Action',
+        altTitles: [1, 'Sousou no Frieren'],
+        notes: { evil: true },
+        sync: { checkedAt: '2026-01-01', sequel: { anilistId: 1, title: 'S2', status: 'X', url: 'javascript:alert(1)' } },
+      }),
+    ).titles
+    expect(t.source).toBeNull()
+    expect(t.poster).toBeNull()
+    expect(t.backdropUrl).toBeNull()
+    expect(t.genres).toEqual([])
+    expect(t.altTitles).toEqual(['Sousou no Frieren'])
+    expect(t.notes).toBe('')
+    expect(t.sync?.sequel).toBeNull()
+  })
+
+  it('rejects unusable progress numbers', () => {
+    const bad = (progress: Record<string, unknown>) => () =>
+      parseBackup(file({ progress: { numbering: 'absolute', season: null, nextEpisode: 1, seasonEpisodeCounts: {}, totalSeasons: null, totalEpisodes: null, skipped: [], rewatching: false, ...progress } }))
+    expect(bad({ nextEpisode: 1.5 })).toThrow(/invalid episode progress/)
+    expect(bad({ skipped: [{ season: null, from: 1, to: '9' }] })).toThrow(/invalid progress details/)
+    expect(bad({ seasonEpisodeCounts: { 1: '12' } })).toThrow(/invalid progress details/)
+    expect(bad({ totalEpisodes: -1 })).toThrow(/invalid episode totals/)
+  })
+
+  it('rejects duplicate ids and non-image or corrupt images', () => {
+    const t = createTitle({ title: 'A', mediaType: 'tv' })
+    expect(() => parseBackup(JSON.stringify({ format: 'watchtrack-backup', version: 1, titles: [t, t], history: [], images: [] }))).toThrow(/appears twice/)
+    const img = { id: 'i', createdAt: '2026-01-01', type: 'image/png', data: 'aGVsbG8=' }
+    expect(() => parseBackup(file({}, { images: [img] }))).not.toThrow()
+    expect(() => parseBackup(file({}, { images: [{ ...img, type: 'text/html' }] }))).toThrow(/invalid image/)
+    expect(() => parseBackup(file({}, { images: [{ ...img, data: 'not base64!' }] }))).toThrow(/invalid image/)
+  })
+
+  it('drops undo snapshots that would restore broken progress', () => {
+    const t = createTitle({ title: 'A', mediaType: 'tv' })
+    const h = { id: 'h', titleId: t.id, at: '2026-01-01', kind: 'episode', season: 1, episode: 2, label: null }
+    const json = (before: unknown) => JSON.stringify({ format: 'watchtrack-backup', version: 1, titles: [t], history: [{ ...h, before }], images: [] })
+    expect(parseBackup(json({ status: 'watching', progress: { numbering: 'nope' } })).history[0].before).toBeNull()
+    const good = { status: 'watching', progress: t.progress, completedAt: null, lastWatchedAt: null, watchedDate: null }
+    expect(parseBackup(json(good)).history[0].before).toEqual(good)
+  })
+})

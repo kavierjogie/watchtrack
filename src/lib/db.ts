@@ -144,10 +144,6 @@ export async function undoHistory(title: Title, entry: HistoryEntry): Promise<Ti
   return restored
 }
 
-export async function deleteHistoryEntry(id: string): Promise<void> {
-  await (await getDb()).delete('watchHistory', id)
-}
-
 // ---------- Images ----------
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024

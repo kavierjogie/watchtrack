@@ -1,5 +1,6 @@
-import { bulkWrite, listAllHistory, listImages, listTitles, newId } from './db'
-import type { HistoryEntry, MediaType, Release, Sequel, StoredImage, SyncInfo, Title, WatchStatus } from './types'
+import { ALLOWED_IMAGE_TYPES, bulkWrite, listAllHistory, listImages, listTitles, newId } from './db'
+import { isHttpUrl } from './metadata'
+import type { HistoryEntry, HistoryKind, MediaType, MetadataSource, Poster, Release, Sequel, StoredImage, SyncInfo, Title, WatchStatus } from './types'
 
 /**
  * Backup file format (JSON):
@@ -82,6 +83,21 @@ export const STATUS: WatchStatus[] = ['watching', 'on_hold', 'plan', 'completed'
 export const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 export const isStr = (v: unknown): v is string => typeof v === 'string'
 const isNumOrNull = (v: unknown) => v === null || (typeof v === 'number' && Number.isFinite(v))
+/** Episode and season numbers: whole and non-negative. No upper cap, so backups with any typed-in value still load. */
+const isCount = (v: unknown) => Number.isSafeInteger(v) && (v as number) >= 0
+const isCountOrNull = (v: unknown) => v === null || isCount(v)
+const isSkipRange = (r: unknown) => isObj(r) && isCountOrNull(r.season) && isCount(r.from) && isCount(r.to)
+
+/** Why a progress record is unusable, or null when it's fine. Also used for undo snapshots in history. */
+function checkProgress(p: unknown): string | null {
+  if (!isObj(p)) return 'invalid progress'
+  if (p.numbering !== 'seasonal' && p.numbering !== 'absolute') return 'invalid numbering'
+  if (!isCountOrNull(p.season) || !isCountOrNull(p.nextEpisode)) return 'invalid episode progress'
+  if (!(p.totalSeasons == null || isCount(p.totalSeasons)) || !(p.totalEpisodes == null || isCount(p.totalEpisodes))) return 'invalid episode totals'
+  if (!Array.isArray(p.skipped) || !p.skipped.every(isSkipRange) || !isObj(p.seasonEpisodeCounts) || !Object.values(p.seasonEpisodeCounts).every(isCount))
+    return 'invalid progress details'
+  return null
+}
 
 function checkTitle(t: unknown, i: number): string | null {
   const at = `Title #${i + 1}`
@@ -92,35 +108,70 @@ function checkTitle(t: unknown, i: number): string | null {
   if (!STATUS.includes(t.status as WatchStatus)) return `${at} ("${t.title}") has an invalid status.`
   if (!isNumOrNull(t.rating)) return `${at} ("${t.title}") has an invalid rating.`
   if (t.progress !== null) {
-    const p = t.progress
-    if (!isObj(p)) return `${at} ("${t.title}") has invalid progress.`
-    if (p.numbering !== 'seasonal' && p.numbering !== 'absolute') return `${at} ("${t.title}") has invalid numbering.`
-    if (!isNumOrNull(p.season) || !isNumOrNull(p.nextEpisode)) return `${at} ("${t.title}") has invalid episode progress.`
-    if (!Array.isArray(p.skipped) || !isObj(p.seasonEpisodeCounts)) return `${at} ("${t.title}") has invalid progress details.`
+    const err = checkProgress(t.progress)
+    if (err) return `${at} ("${t.title}") has ${err}.`
   }
   for (const k of ['createdAt', 'updatedAt'] as const) if (!isStr(t[k])) return `${at} ("${t.title}") is missing ${k}.`
   return null
 }
 
-/** Fill fields added in later versions so older backups still load. */
-function normalizeTitle(t: Title): Title {
+const strOr = <T,>(v: unknown, fallback: T) => (isStr(v) ? v : fallback)
+const strList = (v: unknown) => (Array.isArray(v) ? v.filter(isStr) : [])
+const httpOrNull = (v: unknown) => (isHttpUrl(v) ? v : null)
+const PROVIDERS: MetadataSource['provider'][] = ['kitsu', 'anilist', 'tvmaze', 'tmdb']
+
+/** Only shapes the app can render; links must be http(s). Anything else is dropped rather than trusted. */
+function normalizePoster(p: unknown): Poster | null {
+  if (!isObj(p)) return null
+  if (p.kind === 'remote') return isHttpUrl(p.url) ? { kind: 'remote', url: p.url } : null
+  if (p.kind === 'local' && isStr(p.imageId) && p.imageId) return isHttpUrl(p.url) ? { kind: 'local', imageId: p.imageId, url: p.url } : { kind: 'local', imageId: p.imageId }
+  return null
+}
+
+function normalizeSource(s: unknown): MetadataSource | null {
+  return isObj(s) && PROVIDERS.includes(s.provider as MetadataSource['provider']) && isStr(s.id) && isHttpUrl(s.url)
+    ? { provider: s.provider as MetadataSource['provider'], id: s.id, url: s.url }
+    : null
+}
+
+/**
+ * Fill fields added in later versions so older backups still load, and coerce wrongly-typed optional fields to
+ * their defaults so a damaged record can't crash the pages that render it. Also run on records read from IndexedDB.
+ */
+export function normalizeTitle(t: Title): Title {
   return {
     ...t,
-    altTitles: t.altTitles ?? [],
-    synopsis: t.synopsis ?? '',
-    year: t.year ?? null,
-    genres: t.genres ?? [],
-    tags: t.tags ?? [],
-    notes: t.notes ?? '',
-    poster: t.poster ?? null,
-    backdropUrl: t.backdropUrl ?? null,
-    watchedDate: t.watchedDate ?? null,
-    source: t.source ?? null,
-    importNote: t.importNote ?? null,
-    completedAt: t.completedAt ?? null,
-    lastWatchedAt: t.lastWatchedAt ?? null,
+    altTitles: strList(t.altTitles),
+    synopsis: strOr(t.synopsis, ''),
+    year: Number.isInteger(t.year) ? t.year : null,
+    genres: strList(t.genres),
+    tags: strList(t.tags),
+    notes: strOr(t.notes, ''),
+    poster: normalizePoster(t.poster),
+    backdropUrl: httpOrNull(t.backdropUrl),
+    watchedDate: strOr(t.watchedDate, null),
+    source: normalizeSource(t.source),
+    importNote: strOr(t.importNote, null),
+    completedAt: strOr(t.completedAt, null),
+    lastWatchedAt: strOr(t.lastWatchedAt, null),
     sync: normalizeSync(t.sync),
     alerts: typeof t.alerts === 'boolean' ? t.alerts : undefined,
+  }
+}
+
+const HISTORY_KINDS: HistoryKind[] = ['episode', 'special', 'movie', 'correction', 'status']
+
+/** An undo snapshot that would restore unusable progress is dropped: that entry just can't be undone. */
+const validSnapshot = (s: unknown) => isObj(s) && STATUS.includes(s.status as WatchStatus) && (s.progress === null || !checkProgress(s.progress))
+
+function normalizeHistory(h: HistoryEntry): HistoryEntry {
+  return {
+    ...h,
+    kind: HISTORY_KINDS.includes(h.kind) ? h.kind : 'correction',
+    season: isCountOrNull(h.season) ? h.season : null,
+    episode: isCountOrNull(h.episode) ? h.episode : null,
+    label: strOr(h.label, null),
+    before: validSnapshot(h.before) ? h.before : null,
   }
 }
 
@@ -131,7 +182,7 @@ const isRelease = (r: unknown): r is Release =>
 function normalizeSync(s: unknown): Title['sync'] {
   if (!isObj(s) || !isStr(s.checkedAt)) return undefined
   const q = s.sequel
-  const sequel = isObj(q) && Number.isInteger(q.anilistId) && isStr(q.title) && isStr(q.status) && isStr(q.url) ? (q as unknown as Sequel) : null
+  const sequel = q === undefined ? undefined : isObj(q) && Number.isInteger(q.anilistId) && isStr(q.title) && isStr(q.status) && isHttpUrl(q.url) ? (q as unknown as Sequel) : null
   const next = isObj(s.nextAiring) && isStr(s.nextAiring.airdate) ? (s.nextAiring as unknown as SyncInfo['nextAiring']) : null
   // A malformed list is dropped as a whole: the next refresh just re-learns it without alerting.
   const upcoming = Array.isArray(s.upcoming) && s.upcoming.every(isRelease) ? s.upcoming : undefined
@@ -150,18 +201,31 @@ export function parseBackup(text: string): Backup {
     throw new Error('This backup was made by a newer version of the app. Update the app and try again.')
   if (!Array.isArray(raw.titles) || !Array.isArray(raw.history) || !Array.isArray(raw.images))
     throw new Error('The backup is missing titles, history or images.')
+  const ids = new Set<string>()
   raw.titles.forEach((t, i) => {
     const err = checkTitle(t, i)
     if (err) throw new Error(err)
+    const { id, title } = t as Title
+    if (ids.has(id)) throw new Error(`Title #${i + 1} ("${title}") appears twice in the backup.`)
+    ids.add(id)
   })
   for (const h of raw.history) {
     if (!isObj(h) || !isStr(h.id) || !isStr(h.titleId) || !isStr(h.at)) throw new Error('The backup contains an invalid history entry.')
   }
   for (const img of raw.images) {
-    if (!isObj(img) || !isStr(img.id) || !isStr(img.type) || !isStr(img.data)) throw new Error('The backup contains an invalid image.')
+    if (!isObj(img) || !isStr(img.id) || !isStr(img.createdAt) || !ALLOWED_IMAGE_TYPES.includes(img.type as string) || !isStr(img.data) || !BASE64.test(img.data))
+      throw new Error('The backup contains an invalid image.')
   }
-  return { ...(raw as unknown as Backup), titles: (raw.titles as Title[]).map(normalizeTitle) }
+  return {
+    ...(raw as unknown as Backup),
+    titles: (raw.titles as Title[]).map(normalizeTitle),
+    history: (raw.history as HistoryEntry[]).map(normalizeHistory),
+  }
 }
+
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/
+/** Bigger than any real library with uploaded posters; stops a wrong or hostile file from exhausting memory. */
+export const MAX_BACKUP_BYTES = 200 * 1024 * 1024
 
 // ---------- Import planning ----------
 

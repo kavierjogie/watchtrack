@@ -512,7 +512,7 @@ function MetadataSearch({ onPick, picked, initialQuery = '', relink = false }: {
   const current = active && search?.query === query ? search : null
   const loading = active && (!current || current.pending > 0)
   // Until the new query answers, keep showing the previous results rather than flashing an empty list.
-  const results = active ? ((current ?? search)?.results ?? []) : []
+  const results = useMemo(() => (active ? ((current ?? search)?.results ?? []) : []), [active, current, search])
   // Season entries of a show that's listed whole are tucked away: the whole show already tracks every season.
   const [showSeasons, setShowSeasons] = useState(false)
   const folded = useMemo(() => seasonEntries(results), [results])

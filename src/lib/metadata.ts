@@ -60,7 +60,9 @@ export async function request<T>(url: string, init: RequestInit = {}, provider: 
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 10000)
   // The caller can cancel too (e.g. a newer search replaced this one).
-  init.signal?.addEventListener('abort', () => ctrl.abort())
+  const cancel = () => ctrl.abort()
+  if (init.signal?.aborted) ctrl.abort()
+  init.signal?.addEventListener('abort', cancel, { once: true })
   try {
     const res = await fetch(url, { ...init, signal: ctrl.signal })
     if (res.status === 429) {
@@ -76,6 +78,7 @@ export async function request<T>(url: string, init: RequestInit = {}, provider: 
     throw new MetadataError(`Couldn't reach ${PROVIDER_LABEL[provider]} — it may be down. Try another source or add the title manually.`, true)
   } finally {
     clearTimeout(timer)
+    init.signal?.removeEventListener('abort', cancel)
   }
 }
 
@@ -108,8 +111,9 @@ const kitsuPoster = (img: unknown): PosterPair => ({
   thumbUrl: pickImage(img, ['small', 'medium', 'large', 'original']),
 })
 const mazePoster = (img: unknown): PosterPair => ({ posterUrl: pickImage(img, ['original', 'medium']), thumbUrl: pickImage(img, ['medium', 'original']) })
+const isTmdbPath = (path: unknown): path is string => typeof path === 'string' && /^\/[\w.-]+$/.test(path)
 const tmdbPoster = (path: unknown): PosterPair =>
-  typeof path === 'string' && /^\/[\w.-]+$/.test(path) ? { posterUrl: `${TMDB_IMG}w500${path}`, thumbUrl: `${TMDB_IMG}w92${path}` } : { posterUrl: null, thumbUrl: null }
+  isTmdbPath(path) ? { posterUrl: `${TMDB_IMG}w500${path}`, thumbUrl: `${TMDB_IMG}w92${path}` } : { posterUrl: null, thumbUrl: null }
 
 // ---------- Kitsu ----------
 
@@ -325,7 +329,7 @@ export function tmdbToResult(r: TmdbItem, kind: 'movie' | 'tv' = r.media_type ==
     synopsis: r.overview,
     genres,
     ...tmdbPoster(r.poster_path),
-    backdropUrl: r.backdrop_path ? `${TMDB_IMG}w1280${r.backdrop_path}` : null,
+    backdropUrl: isTmdbPath(r.backdrop_path) ? `${TMDB_IMG}w1280${r.backdrop_path}` : null,
     totalEpisodes: null,
     totalSeasons: null,
     seasonEpisodeCounts: {},

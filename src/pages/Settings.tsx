@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { PageHeader } from '../components/cards'
 import { Modal, useConfirm } from '../components/Modal'
-import { applyImport, createBackup, downloadJson, parseBackup, planImport, type DuplicateStrategy, type ImportMode, type ImportPlan } from '../lib/backup'
+import { applyImport, createBackup, downloadJson, MAX_BACKUP_BYTES, parseBackup, planImport, type DuplicateStrategy, type ImportMode, type ImportPlan } from '../lib/backup'
 import { clearAll } from '../lib/db'
 import { resetDiscover } from '../lib/discover'
 import { formatBytes, today } from '../lib/format'
@@ -194,6 +194,7 @@ export function SettingsPage() {
   const onFile = async (file: File | undefined) => {
     if (!file) return
     try {
+      if (file.size > MAX_BACKUP_BYTES) throw new Error(`This file is ${formatBytes(file.size)}, too large to be a WatchTrack backup.`)
       setPlan(planImport(parseBackup(await file.text()), lib.titles))
     } catch (err) {
       toast.error('Import failed', { description: err instanceof Error ? err.message : 'Invalid file.' })

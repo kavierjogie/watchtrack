@@ -7,7 +7,7 @@
  *  - Kitsu: popular / top-rated lists, lists by category, and media relationships (sequel, side story…) per anime.
  *  - TVmaze: no "similar" or genre-filter endpoint. Its paged show index (250 shows a page, genres, rating, popularity
  *    weight) is the discovery pool; similarity is genre overlap. Rate limit: 20 requests / 10 s.
- *  - TMDB (only with the user's own key): trending, discover-by-genre and real per-title recommendations.
+ *  - TMDB (via the /api/tmdb proxy): trending, discover-by-genre and real per-title recommendations.
  */
 import { useSyncExternalStore } from 'react'
 import { isObj, normTitle } from './backup'
@@ -150,7 +150,7 @@ async function mazePage(n: number): Promise<Candidate[]> {
     }))
 }
 
-// ---------- TMDB (user's own key) ----------
+// ---------- TMDB (via the /api/tmdb proxy) ----------
 
 /** TMDB's genre ids. Stable for years, so no request is spent fetching them. "Sci-Fi & Fantasy" splits into both. */
 const TMDB_GENRES: Record<number, string> = {

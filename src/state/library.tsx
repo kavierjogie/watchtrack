@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { normalizeTitle } from '../lib/backup'
 import * as db from '../lib/db'
 import type { Change } from '../lib/titles'
 import type { Title } from '../lib/types'
@@ -33,7 +34,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(async () => {
     try {
       const [t, h] = await Promise.all([db.listTitles(), db.listAllHistory()])
-      setTitles(t)
+      // Stored records are untrusted too (older versions, imports, manual edits): a damaged field mustn't crash a page.
+      setTitles(t.map(normalizeTitle))
       setEpisodesLogged(h.filter((e) => e.kind === 'episode').length)
       setHistoryVersion((v) => v + 1)
       setError(null)
@@ -46,8 +48,6 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void reload()
-    // Ask the browser not to evict our data under storage pressure (best effort).
-    void navigator.storage?.persist?.()
   }, [reload])
 
   const upsert = (t: Title) => setTitles((prev) => (prev.some((p) => p.id === t.id) ? prev.map((p) => (p.id === t.id ? t : p)) : [...prev, t]))
@@ -67,7 +67,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       },
       patch: async (id, fn) => {
         const t = await db.updateTitle(id, fn)
-        if (t) upsert(t)
+        if (t) upsert(normalizeTitle(t))
         return t
       },
       commit: async ({ title, history }) => {
