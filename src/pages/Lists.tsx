@@ -132,6 +132,7 @@ export function PlanPage() {
     { sort: 'added' },
   )
   const { setStatus } = useWatchActions()
+  const prefs = usePrefs()
 
   return (
     <>
@@ -147,6 +148,8 @@ export function PlanPage() {
       <FilterBar f={f} setF={setF} genres={genres} sorts={['added', 'title', 'rating', 'updated']} />
       {loading ? (
         <PosterGridSkeleton />
+      ) : result.length && prefs.libraryView === 'grid' ? (
+        <TitleCollection titles={result} />
       ) : result.length ? (
         <ul className="card divide-y divide-line">
           {result.map((t) => (
