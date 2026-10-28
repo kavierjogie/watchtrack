@@ -1,10 +1,10 @@
-import { ImagePlus, Loader2, RotateCw, Search, Trash2 } from 'lucide-react'
+import { ImagePlus, Images, Loader2, RotateCw, Search, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
 import { titleKey } from '../lib/backup'
 import { deleteImage, putImage, validateImage } from '../lib/db'
 import { today } from '../lib/format'
-import { enrich, PROVIDER_LABEL, searchAll, type MetaResult, type SearchState } from '../lib/metadata'
+import { enrich, findPosters, PROVIDER_LABEL, searchAll, type MetaResult, type PosterOption, type SearchState } from '../lib/metadata'
 import { savePoster } from '../lib/posters'
 import { getPrefs } from '../lib/prefs'
 import { describePosition, emptyProgress } from '../lib/progress'
@@ -80,6 +80,7 @@ export function TitleForm({
   const [poster, setPoster] = useState<PosterDraft>({ kind: 'keep' })
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [pickPoster, setPickPoster] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
@@ -244,6 +245,15 @@ export function TitleForm({
             <button type="button" className="btn-secondary w-full min-h-9 px-2 text-xs" onClick={() => fileRef.current?.click()}>
               <ImagePlus className="size-4" aria-hidden /> Upload
             </button>
+            <button
+              type="button"
+              className="btn-secondary w-full min-h-9 px-2 text-xs"
+              aria-expanded={pickPoster}
+              disabled={!form.title.trim()}
+              onClick={() => setPickPoster((v) => !v)}
+            >
+              <Images className="size-4" aria-hidden /> Other art
+            </button>
             {previewPoster && (
               <button type="button" className="btn-ghost w-full min-h-8 px-2 text-xs" onClick={() => setPoster({ kind: 'none' })}>
                 <Trash2 className="size-3.5" aria-hidden /> Remove
@@ -293,6 +303,15 @@ export function TitleForm({
             </div>
           </div>
         </div>
+
+        {pickPoster && (
+          <PosterPicker
+            title={form.title.trim()}
+            mediaType={form.mediaType}
+            selected={poster.kind === 'remote' ? poster.url : null}
+            onPick={(url) => setPoster({ kind: 'remote', url })}
+          />
+        )}
 
         {!editing && form.mediaType !== 'movie' && (
           <fieldset className="card space-y-3 p-4">
@@ -347,6 +366,56 @@ export function TitleForm({
         )}
       </form>
     </Modal>
+  )
+}
+
+/** Artwork for this title from every source; picking one replaces the poster when the form is saved. */
+function PosterPicker({ title, mediaType, selected, onPick }: { title: string; mediaType: MediaType; selected: string | null; onPick: (url: string) => void }) {
+  const [options, setOptions] = useState<PosterOption[] | null>(null)
+
+  useEffect(() => {
+    const ctrl = new AbortController()
+    setOptions(null)
+    // Debounced so typing in the title field doesn't search on every key.
+    const timer = setTimeout(() => void findPosters(title, mediaType, ctrl.signal).then((o) => !ctrl.signal.aborted && setOptions(o)), DEBOUNCE_MS)
+    return () => {
+      clearTimeout(timer)
+      ctrl.abort()
+    }
+  }, [title, mediaType])
+
+  return (
+    <div className="space-y-2 rounded-2xl bg-surface-2 p-3">
+      <p className="text-sm font-medium">
+        Choose artwork <span className="font-normal text-muted">for "{title}"</span>
+      </p>
+      {!options ? (
+        <p className="flex items-center gap-2 text-xs text-muted" role="status">
+          <Loader2 className="size-4 animate-spin" aria-hidden /> Looking across Kitsu, TVmaze and TMDB…
+        </p>
+      ) : options.length === 0 ? (
+        <p className="text-xs text-muted" role="status">
+          No other artwork found. Check the title's spelling, or upload your own.
+        </p>
+      ) : (
+        <ul className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-5" aria-label="Artwork options">
+          {options.map((o) => (
+            <li key={o.posterUrl}>
+              <button
+                type="button"
+                className={`w-full rounded-xl p-1 text-left transition-colors hover:bg-surface ${selected === o.posterUrl ? 'ring-2 ring-accent' : ''}`}
+                aria-pressed={selected === o.posterUrl}
+                title={o.label}
+                onClick={() => onPick(o.posterUrl)}
+              >
+                <Poster poster={{ kind: 'remote', url: o.thumbUrl }} title={o.label} mediaType={mediaType} />
+                <span className="mt-1 block truncate text-[11px] text-muted">{PROVIDER_LABEL[o.provider]}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

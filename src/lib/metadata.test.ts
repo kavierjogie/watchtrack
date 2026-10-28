@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { combineResults, enrich, MetadataError, sameTitle, searchAll, searchTitles, showName, wholeShowMatch, type MetaResult, type Provider, type SearchState } from './metadata'
+import { combineResults, enrich, findPosters, MetadataError, sameTitle, searchAll, searchTitles, showName, wholeShowMatch, type MetaResult, type Provider, type SearchState } from './metadata'
 import { createTitle, relinkTitle } from './titles'
 
 const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }))
@@ -137,6 +137,26 @@ describe('unified search', () => {
   })
 
   const mazeRow = { show: { id: 169, name: 'Breaking Bad', url: 'https://www.tvmaze.com/shows/169', premiered: '2008-01-20', genres: ['Drama'], summary: null, status: 'Ended', type: 'Scripted', language: 'English', image: null } }
+
+  it('collects artwork from every provider that answered, skipping failures, movies and unrelated titles', async () => {
+    const show = (id: number, name: string, image: string | null) => ({ show: { ...mazeRow.show, id, name, image: image && { medium: `${image}-m`, original: image } } })
+    vi.stubGlobal('fetch', vi.fn((url: string) =>
+      url.includes('kitsu')
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : url.startsWith('/api/tmdb')
+          ? json({ results: [
+              { id: 1396, media_type: 'tv', name: 'Breaking Bad', first_air_date: '2008-01-20', overview: '', poster_path: '/bb.jpg', backdrop_path: null },
+              { id: 559969, media_type: 'movie', title: 'El Camino: A Breaking Bad Movie', release_date: '2019-10-11', overview: '', poster_path: '/ec.jpg', backdrop_path: null },
+            ] })
+          : json([show(169, 'Breaking Bad', 'https://tvmaze/bb.jpg'), show(2, 'Breaking Bad', null), show(3, 'Better Call Saul', 'https://tvmaze/bcs.jpg')]),
+    ))
+    const out = await findPosters('Breaking Bad', 'tv')
+    expect(out.map((o) => [o.provider, o.posterUrl])).toEqual([
+      ['tvmaze', 'https://tvmaze/bb.jpg'],
+      ['tmdb', 'https://image.tmdb.org/t/p/w500/bb.jpg'],
+    ])
+    expect(out[0]).toMatchObject({ thumbUrl: 'https://tvmaze/bb.jpg-m', label: 'Breaking Bad · 2008' })
+  })
 
   it('shows results from the providers that answered when another fails', async () => {
     vi.stubGlobal('fetch', vi.fn((url: string) => (url.includes('kitsu') ? Promise.reject(new TypeError('Failed to fetch')) : url.startsWith('/api/tmdb') ? json({ results: [] }) : json([mazeRow]))))

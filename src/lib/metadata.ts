@@ -489,6 +489,29 @@ export async function searchAll(query: string, signal: AbortSignal, onUpdate: (s
   )
 }
 
+export interface PosterOption {
+  provider: Provider
+  posterUrl: string
+  thumbUrl: string
+  /** Which entry the art belongs to, so a wrong match is easy to spot. */
+  label: string
+}
+
+/**
+ * Poster choices for a title from every provider, found by name. The user picks by eye, so a namesake showing up is harmless.
+ * Providers that fail are skipped. ponytail: one poster per search result; add TMDB's /images endpoint for alternate art.
+ */
+export async function findPosters(title: string, mediaType: MediaType, signal?: AbortSignal): Promise<PosterOption[]> {
+  const lists = await Promise.all(searchProviders().map((p) => searchTitles(title, p, signal).catch(() => [])))
+  const seen = new Set<string>()
+  return lists.flatMap((list) =>
+    combineResults(title, [list])
+      .filter((r) => r.posterUrl && (r.mediaType === 'movie') === (mediaType === 'movie') && !seen.has(r.posterUrl) && seen.add(r.posterUrl))
+      .slice(0, 6)
+      .map((r) => ({ provider: r.source.provider, posterUrl: r.posterUrl!, thumbUrl: r.thumbUrl ?? r.posterUrl!, label: [r.title, r.year].filter(Boolean).join(' · ') })),
+  )
+}
+
 /**
  * The TVmaze show a single-season anime entry belongs to: same name (title or alt title) and same premiere year.
  * Kitsu's first-season entry shares both with the show. When unsure, no match: the user picks by hand instead.
