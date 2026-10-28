@@ -32,7 +32,9 @@ export interface Backup {
 }
 
 /** Case, accent and punctuation-insensitive form of a name, for comparisons only. */
-export const normTitle = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '')
+// A standalone "x" between words is the "×" some sites write ("SPY x FAMILY" = "Spy×Family"), so it's dropped like punctuation.
+export const normTitle = (s: string) =>
+  s.toLowerCase().normalize('NFKD').replace(/\sx\s/g, ' ').replace(/[^\p{L}\p{N}]+/gu, '')
 
 export const titleKey = (t: { title: string; mediaType: MediaType }) => `${t.mediaType}:${normTitle(t.title)}`
 

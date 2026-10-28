@@ -1,10 +1,10 @@
-import { ImagePlus, Images, Loader2, RotateCw, Search, Trash2 } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { ImagePlus, Images, Layers, Loader2, RotateCw, Search, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
 import { titleKey } from '../lib/backup'
 import { deleteImage, putImage, validateImage } from '../lib/db'
 import { today } from '../lib/format'
-import { enrich, findPosters, PROVIDER_LABEL, searchAll, type MetaResult, type PosterOption, type SearchState } from '../lib/metadata'
+import { asWholeShow, enrich, findPosters, findWholeShow, PROVIDER_LABEL, seasonEntries, seasonOf, showName, searchAll, type MetaResult, type PosterOption, type SearchState } from '../lib/metadata'
 import { savePoster } from '../lib/posters'
 import { getPrefs } from '../lib/prefs'
 import { describePosition, emptyProgress } from '../lib/progress'
@@ -77,6 +77,8 @@ export function TitleForm({
     progressToForm(existing?.progress ?? emptyProgress('absolute'), getPrefs().progressMode),
   )
   const [meta, setMeta] = useState<MetaResult | null>(null)
+  const [wholeShow, setWholeShow] = useState<{ entry: MetaResult; show: MetaResult; season: number | null; part: boolean } | null>(null)
+  const [oneSeason, setOneSeason] = useState(false)
   const [poster, setPoster] = useState<PosterDraft>({ kind: 'keep' })
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -101,8 +103,50 @@ export function TitleForm({
         )
       : undefined
 
-  const applyMeta = (r: MetaResult) => {
+  /**
+   * Source and episode counts only, so switching between the whole show and one season keeps the user's edits.
+   * `season`: tracking a whole show from that season, numbered season by season (anime otherwise counts overall).
+   */
+  const applyCounts = (r: MetaResult, season?: number) => {
     setMeta(r)
+    const numbering = season != null || r.mediaType !== 'anime' ? 'seasonal' : 'absolute'
+    setProgress((p) => {
+      const s = numbering === 'seasonal' ? String(season ?? (p.season || 1)) : ''
+      const count = r.seasonEpisodeCounts[Number(s || 1)]
+      return {
+        ...p,
+        numbering,
+        season: s,
+        totalEpisodes: r.totalEpisodes && !r.ongoing ? String(r.totalEpisodes) : '',
+        totalSeasons: r.totalSeasons ? String(r.totalSeasons) : '',
+        seasonCount: count ? String(count) : '',
+      }
+    })
+  }
+
+  /** Track a season entry through its whole show (named after the show), or as that season alone. */
+  const trackWhole = (w: NonNullable<typeof wholeShow>, whole: boolean) => {
+    applyCounts(whole ? asWholeShow(w.entry, w.show) : w.entry, whole ? (w.season ?? 1) : undefined)
+    const show = { title: showName(w.entry.title), year: w.show.year ? String(w.show.year) : '' }
+    const season = { title: w.entry.title, year: w.entry.year ? String(w.entry.year) : '' }
+    const [from, to] = whole ? [season, show] : [show, season]
+    // Only swap what the user hasn't changed since picking.
+    setForm((f) => ({ ...f, title: f.title === from.title ? to.title : f.title, year: f.year === from.year ? to.year : f.year }))
+    setOneSeason(!whole)
+  }
+
+  /**
+   * `show`: the whole show a season entry belongs to. Tracked by default so later seasons keep counting, except for a
+   * split season ("Part 2"): providers number those differently, so the user chooses.
+   */
+  const applyMeta = (r: MetaResult, show: MetaResult | null = null) => {
+    const { season, part } = seasonOf(r.title)
+    const w = show && { entry: r, show, season, part }
+    setWholeShow(w)
+    if (!w) {
+      applyCounts(r)
+      setOneSeason(false)
+    }
     setForm((f) => ({
       ...f,
       title: r.title,
@@ -113,15 +157,7 @@ export function TitleForm({
       genres: r.genres.join(', '),
     }))
     if (r.posterUrl) setPoster({ kind: 'remote', url: r.posterUrl })
-    const numbering = r.mediaType === 'anime' ? 'absolute' : 'seasonal'
-    setProgress((p) => ({
-      ...p,
-      numbering,
-      season: numbering === 'seasonal' ? p.season || '1' : '',
-      totalEpisodes: r.totalEpisodes && !r.ongoing ? String(r.totalEpisodes) : '',
-      totalSeasons: r.totalSeasons ? String(r.totalSeasons) : '',
-      seasonCount: r.seasonEpisodeCounts[Number(p.season || 1)] ? String(r.seasonEpisodeCounts[Number(p.season || 1)]) : '',
-    }))
+    if (w) trackWhole(w, !part)
   }
 
   const onFile = (file: File | undefined) => {
@@ -234,7 +270,29 @@ export function TitleForm({
         </>
       }
     >
-      <MetadataSearch onPick={applyMeta} picked={meta} initialQuery={initialQuery} relink={editing} />
+      <MetadataSearch
+        onPick={applyMeta}
+        picked={wholeShow?.entry ?? meta}
+        initialQuery={initialQuery}
+        relink={editing}
+      />
+      {wholeShow && (
+        <div className="-mt-3 mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl bg-info/10 px-3 py-2 text-xs" role="status">
+          <Layers className="size-4 shrink-0 text-info" aria-hidden />
+          <span className="min-w-0 flex-1">
+            {!oneSeason
+              ? `Tracking every season of ${showName(wholeShow.entry.title)} from ${PROVIDER_LABEL[wholeShow.show.source.provider]}${
+                  wholeShow.season ? `, starting at season ${wholeShow.season}` : ''
+                }.${wholeShow.part ? ' Check the season and episode below: split seasons are numbered differently between sites.' : ''}`
+              : wholeShow.part
+                ? `This is part of a season. Track the whole show (${PROVIDER_LABEL[wholeShow.show.source.provider]}) instead so later seasons are found? You'll set the season below.`
+                : 'Tracking this season only. New episodes of later seasons won’t be found.'}
+          </span>
+          <button type="button" className="btn-ghost min-h-8 px-2 text-xs" onClick={() => trackWhole(wholeShow, oneSeason)}>
+            {oneSeason ? 'Track all seasons' : 'Just this season'}
+          </button>
+        </div>
+      )}
 
       <form id="title-form" onSubmit={(e) => void submit(e)} className="space-y-5">
         {/* Side by side once there's room for both; on the narrowest phones the fields get the full width. */}
@@ -428,7 +486,7 @@ function PosterPicker({ title, mediaType, selected, onPick }: { title: string; m
 const MIN_QUERY = 2
 const DEBOUNCE_MS = 350
 
-function MetadataSearch({ onPick, picked, initialQuery = '', relink = false }: { onPick: (r: MetaResult) => void; picked: MetaResult | null; initialQuery?: string; relink?: boolean }) {
+function MetadataSearch({ onPick, picked, initialQuery = '', relink = false }: { onPick: (r: MetaResult, wholeShow: MetaResult | null) => void; picked: MetaResult | null; initialQuery?: string; relink?: boolean }) {
   const lib = useLibrary()
   const [q, setQ] = useState(initialQuery)
   const [attempt, setAttempt] = useState(0)
@@ -455,6 +513,10 @@ function MetadataSearch({ onPick, picked, initialQuery = '', relink = false }: {
   const loading = active && (!current || current.pending > 0)
   // Until the new query answers, keep showing the previous results rather than flashing an empty list.
   const results = active ? ((current ?? search)?.results ?? []) : []
+  // Season entries of a show that's listed whole are tucked away: the whole show already tracks every season.
+  const [showSeasons, setShowSeasons] = useState(false)
+  const folded = useMemo(() => seasonEntries(results), [results])
+  const visible = showSeasons ? results : results.filter((r) => !folded.has(r))
   const retry = () => {
     skipDebounce.current = true
     setSearch(null) // show "Searching…" instead of the previous error until the new answers arrive
@@ -466,7 +528,11 @@ function MetadataSearch({ onPick, picked, initialQuery = '', relink = false }: {
 
   async function pick(r: MetaResult) {
     setBusy(r.source.id)
-    onPick(await enrich(r))
+    // Kitsu lists each anime season separately; find the whole show up front so later seasons are tracked without a relink.
+    // A failed lookup just means this season alone, as before.
+    // Later seasons only for new titles (see findWholeShow).
+    const [entry, show] = await Promise.all([enrich(r), r.source.provider === 'kitsu' && r.mediaType === 'anime' ? findWholeShow(r, !relink).catch(() => null) : null])
+    onPick(entry, show)
     setShowResults(false)
     setBusy(null)
   }
@@ -490,6 +556,7 @@ function MetadataSearch({ onPick, picked, initialQuery = '', relink = false }: {
           onChange={(e) => {
             setQ(e.target.value)
             setShowResults(true)
+            setShowSeasons(false)
           }}
           onKeyDown={(e) => {
             if (e.key !== 'Enter') return
@@ -529,7 +596,7 @@ function MetadataSearch({ onPick, picked, initialQuery = '', relink = false }: {
 
       {showResults && results.length > 0 && (
         <ul className="grid max-h-72 grid-cols-1 gap-1 overflow-y-auto" aria-label="Search results">
-          {results.map((r) => (
+          {visible.map((r) => (
             <li key={`${r.source.provider}-${r.source.id}`}>
               <button
                 type="button"
@@ -553,6 +620,13 @@ function MetadataSearch({ onPick, picked, initialQuery = '', relink = false }: {
             </li>
           ))}
         </ul>
+      )}
+
+      {showResults && folded.size > 0 && (
+        <button type="button" className="btn-ghost min-h-8 w-full px-2 text-xs" aria-expanded={showSeasons} onClick={() => setShowSeasons((v) => !v)}>
+          <Layers className="size-3.5" aria-hidden />
+          {showSeasons ? 'Hide single seasons' : `Show ${folded.size} single-season ${folded.size === 1 ? 'entry' : 'entries'}`}
+        </button>
       )}
 
       {picked && !showResults && (

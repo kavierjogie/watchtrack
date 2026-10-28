@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { combineResults, enrich, findPosters, MetadataError, sameTitle, searchAll, searchTitles, showName, wholeShowMatch, type MetaResult, type Provider, type SearchState } from './metadata'
+import { combineResults, enrich, findPosters, MetadataError, sameTitle, searchAll, searchTitles, seasonEntries, seasonOf, showName, wholeShowMatch, type MetaResult, type Provider, type SearchState } from './metadata'
 import { createTitle, relinkTitle } from './titles'
 
 const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }))
@@ -215,6 +215,34 @@ describe('linking a single-season anime entry to the whole show', () => {
     expect(wholeShowMatch(s1, [...others, show])).toBe(show)
     expect(wholeShowMatch(s1, others)).toBeNull()
     expect(wholeShowMatch({ ...s1, title: 'MHA' }, [result({ provider: 'tvmaze', id: '3', title: 'Boku no Hero Academia', year: 2016 })])?.source.id).toBe('3')
+  })
+
+  it('matches a later-season entry to its show only when asked, and only by a stripped season name', () => {
+    const show = result({ provider: 'tvmaze', id: '13615', title: 'My Hero Academia', year: 2016 })
+    const s2 = { title: 'My Hero Academia Season 2', altTitles: ['Boku no Hero Academia 2nd Season'], year: 2017 }
+    expect(wholeShowMatch(s2, [show])).toBeNull()
+    expect(wholeShowMatch(s2, [show], true)).toBe(show)
+    // A show that started after the season can't be its parent; a same-name remake without a season part isn't a season.
+    expect(wholeShowMatch(s2, [result({ provider: 'tvmaze', id: '9', title: 'My Hero Academia', year: 2030 })], true)).toBeNull()
+    expect(wholeShowMatch({ title: 'Hunter x Hunter', altTitles: [], year: 2011 }, [result({ provider: 'tvmaze', id: '5', title: 'Hunter x Hunter', year: 1999 })], true)).toBeNull()
+  })
+
+  it('folds season entries away only when their whole show is in the results', () => {
+    const show = result({ provider: 'tvmaze', id: '60', title: 'Spy×Family', year: 2022 })
+    const part2 = result({ provider: 'kitsu', id: '1', title: 'SPY x FAMILY Part 2', year: 2022 })
+    const s2 = result({ provider: 'kitsu', id: '2', title: 'SPY x FAMILY Season 2', year: 2023 })
+    const special = result({ provider: 'kitsu', id: '3', title: 'Ayataka Spy x Family Movie Campaign', year: 2024 })
+    expect([...seasonEntries([show, part2, s2, special])]).toEqual([part2, s2])
+    // No whole show listed: the season entries are all there is, so nothing is hidden.
+    expect(seasonEntries([part2, s2]).size).toBe(0)
+  })
+
+  it('reads the season number and split-season parts from an entry name', () => {
+    expect(seasonOf('Mushoku Tensei: Jobless Reincarnation Season 2')).toEqual({ season: 2, part: false })
+    expect(seasonOf('Mushoku Tensei: Isekai Ittara Honki Dasu 3rd Season')).toEqual({ season: 3, part: false })
+    expect(seasonOf('SPY x FAMILY Part 2')).toEqual({ season: null, part: true })
+    expect(seasonOf('Attack on Titan: Season 3 Part 2')).toEqual({ season: 3, part: true })
+    expect(seasonOf('Frieren')).toEqual({ season: null, part: false })
   })
 
   it('strips the season part from a season entry name', () => {

@@ -517,16 +517,52 @@ export async function findPosters(title: string, mediaType: MediaType, signal?: 
  * Kitsu's first-season entry shares both with the show. When unsure, no match: the user picks by hand instead.
  * ponytail: TVmaze only; add TMDB as a second source if shows turn up that TVmaze doesn't have.
  */
-export function wholeShowMatch(t: { title: string; altTitles: string[]; year: number | null }, results: MetaResult[]): MetaResult | null {
+export function wholeShowMatch(t: { title: string; altTitles: string[]; year: number | null }, results: MetaResult[], laterSeasons = false): MetaResult | null {
   const mine = [t.title, ...t.altTitles].map(normTitle).filter(Boolean)
-  return results.find((r) => r.mediaType !== 'movie' && r.year != null && r.year === t.year && names(r).some((n) => mine.includes(n))) ?? null
+  const exact = results.find((r) => r.mediaType !== 'movie' && r.year != null && r.year === t.year && names(r).some((n) => mine.includes(n)))
+  if (exact || !laterSeasons) return exact ?? null
+  // A later season ("… Season 2", "… Part 2") premieres after its show: same name once the season part is stripped,
+  // and the show started in or before the season's year (an announced season has no year yet). Only names that
+  // actually carried a season part count.
+  const stripped = [t.title, ...t.altTitles].filter((n) => showName(n) !== n).map((n) => normTitle(showName(n)))
+  if (!stripped.length) return null
+  return results.find((r) => r.mediaType !== 'movie' && r.year != null && (t.year == null || r.year <= t.year) && names(r).some((n) => stripped.includes(n))) ?? null
+}
+
+/**
+ * Season entries ("… Season 2", "… Part 2", recaps) of a show that's also in the results as a whole show. The whole
+ * show tracks every season, so search folds these away until asked; with no whole show they're the only option and stay.
+ */
+export function seasonEntries(results: MetaResult[]): Set<MetaResult> {
+  const shows = results.filter((r) => r.source.provider !== 'kitsu' && r.mediaType !== 'movie')
+  return new Set(results.filter((r) => r.source.provider === 'kitsu' && r.mediaType !== 'movie' && wholeShowMatch(r, shows, true)))
+}
+
+/** Which season a season entry's name points at. `part`: a split season ("Part 2", "Cour 2"), which providers number differently. */
+export function seasonOf(title: string): { season: number | null; part: boolean } {
+  const m = /\bseason\s*(\d+)/i.exec(title) ?? /\b(\d+)(?:st|nd|rd|th)\s+season\b/i.exec(title)
+  return { season: m ? Number(m[1]) : null, part: /\b(part|cour)\s*\d+/i.test(title) }
 }
 
 /** A season entry's name without its season part: "My Hero Academia Season 2" → "My Hero Academia". */
 export const showName = (title: string) => title.replace(/[\s:,-]+(season|part|cour)\s*\d+.*$/i, '').replace(/\s+\d+(st|nd|rd|th)? season$/i, '') || title
 
-export async function findWholeShow(t: { title: string; altTitles: string[]; year: number | null }): Promise<MetaResult | null> {
-  const match = wholeShowMatch(t, await searchTitles(showName(t.title), 'tvmaze'))
+/** A season entry's names, art and synopsis, tracked through the whole show's source so every season's episodes count. */
+export const asWholeShow = (season: MetaResult, show: MetaResult): MetaResult => ({
+  ...season,
+  source: show.source,
+  seasonEpisodeCounts: show.seasonEpisodeCounts,
+  totalSeasons: show.totalSeasons,
+  totalEpisodes: show.totalEpisodes,
+  ongoing: show.ongoing,
+})
+
+/**
+ * `laterSeasons`: also match a "Season 2"/"Part 2" entry to its show. Only for new titles: an existing title's episode
+ * numbers count from that season's start, so relinking it would put it at the wrong episode.
+ */
+export async function findWholeShow(t: { title: string; altTitles: string[]; year: number | null }, laterSeasons = false): Promise<MetaResult | null> {
+  const match = wholeShowMatch(t, await searchTitles(showName(t.title), 'tvmaze'), laterSeasons)
   return match && enrich(match)
 }
 
