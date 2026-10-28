@@ -372,6 +372,12 @@ export function TitleForm({
 /** Artwork for this title from every source; picking one replaces the poster when the form is saved. */
 function PosterPicker({ title, mediaType, selected, onPick }: { title: string; mediaType: MediaType; selected: string | null; onPick: (url: string) => void }) {
   const [options, setOptions] = useState<PosterOption[] | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
+
+  // On phones the picker opens below the fold of the dialog, so bring it (and the results once they arrive) into view.
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [options])
 
   useEffect(() => {
     const ctrl = new AbortController()
@@ -385,7 +391,7 @@ function PosterPicker({ title, mediaType, selected, onPick }: { title: string; m
   }, [title, mediaType])
 
   return (
-    <div className="space-y-2 rounded-2xl bg-surface-2 p-3">
+    <div ref={ref} className="space-y-2 rounded-2xl bg-surface-2 p-3">
       <p className="text-sm font-medium">
         Choose artwork <span className="font-normal text-muted">for "{title}"</span>
       </p>
