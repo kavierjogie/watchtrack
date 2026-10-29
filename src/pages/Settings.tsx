@@ -303,8 +303,12 @@ export function SettingsPage() {
 
       <Card id="privacy" title="Privacy" icon={<Shield className="size-5 text-accent-text" aria-hidden />}>
         <div className="space-y-2 text-sm text-muted">
-          <p>WatchTrack is free, has no accounts, ads, analytics, tracking or telemetry, and never sells or shares your data.</p>
+          <p>WatchTrack is free, has no accounts, ads or tracking cookies, and never sells or shares your data.</p>
           <ul className="list-disc space-y-1 pl-5">
+            <li>
+              Visits are counted with Vercel Web Analytics, which is cookie-free and sees only the page address (never titles, searches or share links), referrer,
+              browser, device type and country.
+            </li>
             <li>Your library, history, notes and posters are stored only in this browser. WatchTrack's developer can't see them.</li>
             <li>
               To find titles, posters and new episodes, the app sends title names and IDs (never your library or progress) to the data sources below. TMDB requests
@@ -313,6 +317,11 @@ export function SettingsPage() {
             <li>Share links put the list you chose in the link itself; only people you send it to can see it.</li>
             <li>Notifications are optional and shown by your own browser — nothing is sent to a push server.</li>
           </ul>
+          <p>
+            <a href="/about#privacy" className="underline hover:text-fg">
+              How WatchTrack stores your data
+            </a>
+          </p>
         </div>
       </Card>
 

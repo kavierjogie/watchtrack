@@ -34,10 +34,20 @@ export function Dashboard() {
   if (titles.length === 0) {
     return (
       <div className="space-y-8">
-        <Hero title="Welcome to WatchTrack" subtitle="Track every anime, series and movie you watch — and always know the next episode. Everything stays private, in this browser.">
+        <Hero
+          title="Track anime, TV shows and movies in one place"
+          subtitle="One watchlist for everything you watch. Log episodes with a tap and always know the next one. No sign-up: your library stays in this browser."
+        >
           <Link to="?add=1" className="btn-primary">
             <Plus className="size-4" aria-hidden /> Add your first title
           </Link>
+          {/* Plain links: these are static pages outside the app's router. */}
+          <a href="/about" className="btn-secondary">
+            How it works
+          </a>
+          <a href="/guides" className="btn-ghost">
+            Guides
+          </a>
         </Hero>
         <div className="grid gap-3 sm:grid-cols-3">
           {[

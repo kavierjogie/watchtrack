@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0b12" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>How a Local-Storage Watchlist Works | WatchTrack</title>
+    <meta name="description" content="What it means when a watchlist stores data in your browser: the privacy benefits, what can delete it, and how backups keep it safe." />
+    <link rel="canonical" href="https://watchtrack-eta.vercel.app/guides/watchlist-local-storage" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="WatchTrack" />
+    <meta property="og:title" content="How a Local-Storage Watchlist Works, and How to Keep It Safe" />
+    <meta property="og:description" content="The privacy benefits of a browser-stored watchlist, what can delete it, and how backups protect it." />
+    <meta property="og:url" content="https://watchtrack-eta.vercel.app/guides/watchlist-local-storage" />
+    <meta property="og:image" content="https://watchtrack-eta.vercel.app/pwa-512.png" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="stylesheet" href="/src/index.css" />
+    <script type="application/ld+json">
+      [
+        {
+          "@context": "https://schema.org",
+          "@type": "Article",
+          "headline": "How a local-storage watchlist works, and how to keep it safe",
+          "description": "The privacy benefits of a browser-stored watchlist, what can delete it, and how backups protect it.",
+          "datePublished": "2026-10-29",
+          "dateModified": "2026-10-29",
+          "mainEntityOfPage": "https://watchtrack-eta.vercel.app/guides/watchlist-local-storage",
+          "image": "https://watchtrack-eta.vercel.app/pwa-512.png"
+        },
+        {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "WatchTrack", "item": "https://watchtrack-eta.vercel.app/" },
+            { "@type": "ListItem", "position": 2, "name": "Guides", "item": "https://watchtrack-eta.vercel.app/guides" },
+            { "@type": "ListItem", "position": 3, "name": "Local-storage watchlists" }
+          ]
+        }
+      ]
+    </script>
+  </head>
+  <body>
+    <header class="border-b border-divider bg-bg-2">
+      <div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <a href="/" class="flex min-w-0 items-center gap-2 rounded-lg">
+          <img src="/icon.svg" alt="" width="28" height="28" class="size-7 shrink-0" />
+          <span class="text-[15px] font-semibold tracking-[-0.02em]">Watch<span class="text-accent-text">Track</span></span>
+        </a>
+        <nav aria-label="Site" class="flex items-center gap-1 text-sm">
+          <a href="/guides" class="btn-ghost px-3">Guides</a>
+          <a href="/" class="btn-primary px-3">Open app</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-3xl px-4 pb-16 pt-8 sm:px-6">
+      <nav aria-label="Breadcrumb" class="text-sm text-muted">
+        <a href="/" class="hover:text-fg">WatchTrack</a> <span aria-hidden="true">›</span> <a href="/guides" class="hover:text-fg">Guides</a>
+      </nav>
+      <article class="prose-page">
+        <h1 class="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">How a local-storage watchlist works, and how to keep it safe</h1>
+        <p class="text-sm text-muted">Updated <time datetime="2026-10-29">29 October 2026</time></p>
+        <p class="text-lg">
+          Some watchlist apps keep your data on their servers behind an account. Others, including WatchTrack, keep it in your browser on your own device. Both
+          work, but they have different trade-offs, and it's worth knowing them before you put years of viewing history into one.
+        </p>
+
+        <h2>What "stored in your browser" means</h2>
+        <p>
+          Modern browsers give every website its own private storage area. The main one for apps is <strong>IndexedDB</strong>, a small database inside the browser
+          that can hold structured data and images. Only pages from that same website can read it. Other sites can't, and the website's owner can't either unless
+          the page deliberately uploads it.
+        </p>
+
+        <h2>The benefits</h2>
+        <ul>
+          <li><strong>No account:</strong> no email, password or profile to create, leak or forget.</li>
+          <li><strong>Private by default:</strong> your viewing history isn't sitting in someone else's database.</li>
+          <li><strong>Works offline:</strong> the data is already on the device, so updating your progress doesn't need a connection.</li>
+          <li><strong>Fast:</strong> reading from the device is quicker than a round trip to a server.</li>
+        </ul>
+
+        <h2>The trade-offs</h2>
+        <ul>
+          <li>
+            <strong>One browser, one copy.</strong> Chrome on your laptop, Safari on your phone and Firefox on your desktop each have their own separate storage. There's
+            no automatic sync.
+          </li>
+          <li>
+            <strong>Clearing site data deletes it.</strong> "Clear browsing data" with cookies and site data selected, or removing a site's data in settings, wipes the
+            library for that site.
+          </li>
+          <li><strong>Private or incognito windows are temporary.</strong> Anything saved there is discarded when the window closes.</li>
+          <li>
+            <strong>Browsers can clean up storage.</strong> When a device runs low on space, browsers may evict data from sites. A site can ask for "persistent"
+            storage to be protected, but the browser decides. Safari can also remove a website's stored data if you haven't used the site for a while; web apps added
+            to the iPhone or iPad Home Screen are treated separately.
+          </li>
+        </ul>
+
+        <h2>How to keep a local watchlist safe</h2>
+        <ol>
+          <li><strong>Export a backup regularly</strong>, such as after a big batch of changes or once a month. Keep the file somewhere you already back up.</li>
+          <li><strong>Use the same browser every time</strong> on each device, and not a private window.</li>
+          <li><strong>Check before clearing browsing data.</strong> Most browsers let you keep data for specific sites.</li>
+          <li><strong>On iPhone or iPad, add the app to your Home Screen</strong> if you use it often.</li>
+          <li><strong>Move between devices with a backup file:</strong> export on the old one, import on the new one.</li>
+        </ol>
+
+        <h2>How WatchTrack handles this</h2>
+        <p>
+          <a href="/">WatchTrack</a> stores your titles, progress, history, notes and uploaded posters in IndexedDB and asks the browser for persistent storage on
+          first load. Settings shows how much space the library uses and whether it's protected from cleanup. <strong>Export backup</strong> saves everything as
+          a single JSON file, posters included. <strong>Import backup</strong> checks the file, previews duplicates, and lets you merge or replace. Searching for
+          titles sends only the search text to the metadata services, never your library.
+          <a href="/about#privacy">Read the full privacy and storage details</a>.
+        </p>
+
+        <div class="card mt-10 p-5">
+          <p class="!mt-0 font-semibold text-fg">Try a watchlist that stays on your device</p>
+          <p class="!mt-1 text-sm">Free, with no account.</p>
+          <a href="/" class="btn-primary mt-4">Open WatchTrack</a>
+        </div>
+
+        <h2>Related guides</h2>
+        <ul>
+          <li><a href="/guides/track-anime-and-tv-episodes">How to keep track of the anime and TV episodes you've watched</a></li>
+          <li><a href="/guides/organise-your-watchlist">How to organise your movie, TV and anime watchlist</a></li>
+        </ul>
+      </article>
+    </main>
+
+    <footer class="border-t border-divider">
+      <div class="mx-auto flex max-w-3xl flex-wrap gap-x-5 gap-y-2 px-4 py-6 text-sm text-muted sm:px-6">
+        <a href="/" class="hover:text-fg">WatchTrack app</a>
+        <a href="/about" class="hover:text-fg">About</a>
+        <a href="/guides" class="hover:text-fg">Guides</a>
+        <a href="/about#privacy" class="hover:text-fg">Privacy</a>
+      </div>
+    </footer>
+  </body>
+</html>

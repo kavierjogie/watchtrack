@@ -11,8 +11,14 @@ applyTheme(getPrefs().theme)
 // Ask the browser not to evict IndexedDB under storage pressure. Chrome/Safari decide silently; Firefox asks once.
 void navigator.storage?.persist?.().catch(() => {})
 
-// Initialize Vercel Web Analytics
-inject()
+// Vercel Web Analytics: cookie-free page views. Only the path is sent; title ids, query strings (search text) and
+// the #fragment (share-link contents) are stripped so nothing about the library leaves the device.
+inject({
+  beforeSend: (event) => {
+    const url = new URL(event.url)
+    return { ...event, url: url.origin + url.pathname.replace(/^\/title\/[^/]+/, '/title/[id]') }
+  },
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

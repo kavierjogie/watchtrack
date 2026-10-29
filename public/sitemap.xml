@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Public pages only. App routes (/library, /title/…, /settings, /shared…) show per-device data and are noindex. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://watchtrack-eta.vercel.app/</loc><lastmod>2026-10-29</lastmod></url>
+  <url><loc>https://watchtrack-eta.vercel.app/about</loc><lastmod>2026-10-29</lastmod></url>
+  <url><loc>https://watchtrack-eta.vercel.app/guides</loc><lastmod>2026-10-29</lastmod></url>
+  <url><loc>https://watchtrack-eta.vercel.app/guides/track-anime-and-tv-episodes</loc><lastmod>2026-10-29</lastmod></url>
+  <url><loc>https://watchtrack-eta.vercel.app/guides/organise-your-watchlist</loc><lastmod>2026-10-29</lastmod></url>
+  <url><loc>https://watchtrack-eta.vercel.app/guides/watchlist-local-storage</loc><lastmod>2026-10-29</lastmod></url>
+</urlset>

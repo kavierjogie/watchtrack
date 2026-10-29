@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0b12" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>Watchlist Guides — Tracking Anime, TV Shows & Movies | WatchTrack</title>
+    <meta name="description" content="Practical guides to keeping track of anime and TV episodes, organising a movie and TV watchlist, and keeping a browser-stored watchlist safe." />
+    <link rel="canonical" href="https://watchtrack-eta.vercel.app/guides" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="WatchTrack" />
+    <meta property="og:title" content="Watchlist Guides | WatchTrack" />
+    <meta property="og:description" content="Practical guides to tracking anime and TV episodes and organising your watchlist." />
+    <meta property="og:url" content="https://watchtrack-eta.vercel.app/guides" />
+    <meta property="og:image" content="https://watchtrack-eta.vercel.app/pwa-512.png" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="stylesheet" href="/src/index.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "WatchTrack", "item": "https://watchtrack-eta.vercel.app/" },
+          { "@type": "ListItem", "position": 2, "name": "Guides", "item": "https://watchtrack-eta.vercel.app/guides" }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <header class="border-b border-divider bg-bg-2">
+      <div class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <a href="/" class="flex min-w-0 items-center gap-2 rounded-lg">
+          <img src="/icon.svg" alt="" width="28" height="28" class="size-7 shrink-0" />
+          <span class="text-[15px] font-semibold tracking-[-0.02em]">Watch<span class="text-accent-text">Track</span></span>
+        </a>
+        <nav aria-label="Site" class="flex items-center gap-1 text-sm">
+          <a href="/about" class="btn-ghost px-3">About</a>
+          <a href="/" class="btn-primary px-3">Open app</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="prose-page mx-auto max-w-3xl px-4 pb-16 pt-8 sm:px-6">
+      <nav aria-label="Breadcrumb" class="text-sm text-muted">
+        <a href="/" class="hover:text-fg">WatchTrack</a> <span aria-hidden="true">›</span> <span aria-current="page">Guides</span>
+      </nav>
+      <h1 class="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Watchlist guides</h1>
+      <p class="text-lg">Short, practical answers to the questions that come up when you try to keep track of everything you watch.</p>
+
+      <ul class="!mt-8 !list-none !space-y-3 !pl-0">
+        <li>
+          <a href="/guides/track-anime-and-tv-episodes" class="card-link block p-5">
+            <span class="block font-semibold text-fg">How to keep track of the anime and TV episodes you've watched</span>
+            <span class="mt-1 block text-sm text-muted">Season vs overall numbering, recaps and specials, and never losing your place after a break.</span>
+          </a>
+        </li>
+        <li>
+          <a href="/guides/organise-your-watchlist" class="card-link block p-5">
+            <span class="block font-semibold text-fg">How to organise your movie, TV and anime watchlist</span>
+            <span class="mt-1 block text-sm text-muted">A simple status system that keeps a long plan-to-watch list useful instead of overwhelming.</span>
+          </a>
+        </li>
+        <li>
+          <a href="/guides/watchlist-local-storage" class="card-link block p-5">
+            <span class="block font-semibold text-fg">How a local-storage watchlist works, and how to keep it safe</span>
+            <span class="mt-1 block text-sm text-muted">What "stored in your browser" really means, what can delete it, and how backups protect it.</span>
+          </a>
+        </li>
+      </ul>
+    </main>
+
+    <footer class="border-t border-divider">
+      <div class="mx-auto flex max-w-3xl flex-wrap gap-x-5 gap-y-2 px-4 py-6 text-sm text-muted sm:px-6">
+        <a href="/" class="hover:text-fg">WatchTrack app</a>
+        <a href="/about" class="hover:text-fg">About</a>
+        <a href="/guides" class="hover:text-fg">Guides</a>
+        <a href="/about#privacy" class="hover:text-fg">Privacy</a>
+      </div>
+    </footer>
+  </body>
+</html>

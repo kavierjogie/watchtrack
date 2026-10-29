@@ -50,6 +50,23 @@ function useNotificationClicks() {
 
 const ADD_STATUS: Record<string, WatchStatus> = { plan: 'plan', watching: 'watching', on_hold: 'on_hold', completed: 'completed' }
 
+/** index.html's title is the homepage title; app pages get "Label · WatchTrack". */
+const HOME_TITLE = document.title
+const PAGE_LABELS: Record<string, string> = { '/upcoming': 'Upcoming', '/notifications': 'Notifications', ...Object.fromEntries(NAV.map((n) => [n.to, n.label])) }
+const SITE_URL = 'https://watchtrack-eta.vercel.app'
+
+/**
+ * Only "/" is indexable. Every other app route shows this device's own (for a crawler: empty) library, so it's noindex.
+ * That also covers unknown paths, which render the dashboard with a 200 (SPA rewrite) and would otherwise be soft 404s.
+ */
+export function PageMeta({ pathname }: { pathname: string }) {
+  useEffect(() => {
+    const label = pathname === '/' ? null : (PAGE_LABELS[pathname] ?? (pathname.startsWith('/title/') ? 'Title' : pathname === '/shared' ? 'Shared watchlist' : null))
+    document.title = label ? `${label} · WatchTrack` : HOME_TITLE
+  }, [pathname])
+  return pathname === '/' ? <link rel="canonical" href={`${SITE_URL}/`} /> : <meta name="robots" content="noindex" />
+}
+
 export function Layout() {
   const [params, setParams] = useSearchParams()
   const { pathname } = useLocation()
@@ -88,6 +105,7 @@ export function Layout() {
   return (
     // minmax(0,1fr): a plain 1fr track grows to its content's min-content width (e.g. the horizontal poster rail), pushing the page past the viewport.
     <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
+      <PageMeta pathname={pathname} />
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-3 focus:py-2">
         Skip to content
       </a>
@@ -123,7 +141,12 @@ export function Layout() {
           <ul>
             <SideItem {...SETTINGS} />
           </ul>
-          <p className="px-3 text-[11px] leading-relaxed text-muted">Your data is stored only in this browser on this device.</p>
+          <p className="px-3 text-[11px] leading-relaxed text-muted">
+            Your data is stored only in this browser on this device.{' '}
+            <a href="/about" className="underline hover:text-fg">
+              About WatchTrack
+            </a>
+          </p>
         </div>
       </aside>
 

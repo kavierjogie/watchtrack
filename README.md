@@ -2,7 +2,8 @@
 
 A private, offline-first tracker for anime, TV series and movies. Its one job: **always know the exact next episode to watch**, even after months away.
 
-- No account, no database server, no analytics. The only server code is a stateless TMDB proxy (`api/tmdb.ts`) that keeps the API key off the browser.
+- No account, no database server. The only server code is a stateless TMDB proxy (`api/tmdb.ts`) that keeps the API key off the browser.
+- Visits are counted with cookie-free Vercel Web Analytics. `src/main.tsx` strips query strings, `#` fragments and title ids before anything is sent.
 - Everything is stored in your browser (IndexedDB) on the device you use.
 - Installable as an app (PWA) and works offline once loaded.
 
@@ -36,6 +37,14 @@ Requires Node 20+.
 4. Deploy.
 
 `vercel.json` rewrites unknown paths to `index.html` so deep links like `/title/abc` work, stops the service worker file being cached, and sets security headers (Content-Security-Policy, nosniff, Referrer-Policy, Permissions-Policy). If you add a new provider host for API calls, it must be https; scripts may only load from the app itself.
+
+## Public pages and SEO
+
+Live at **https://watchtrack-eta.vercel.app**. If the domain changes, search the repo for `watchtrack-eta.vercel.app` (HTML heads, `public/robots.txt`, `public/sitemap.xml`, `src/components/Layout.tsx`).
+
+- `/about` and `/guides/*` are plain HTML pages (no JavaScript) built by Vite alongside the app, so any crawler can read them. They share `src/index.css`.
+- Only `/` and those pages are indexable. App routes (`/library`, `/title/…`, `/settings`, `/shared`, unknown paths) get `noindex` from `PageMeta` in `Layout.tsx`, because they show this device's own data (empty for a crawler).
+- Adding a guide: create `guides/<slug>.html` (copy an existing one), add it to `rollupOptions.input` in `vite.config.ts`, to `public/sitemap.xml`, and link it from `guides.html`.
 
 ## Using it
 

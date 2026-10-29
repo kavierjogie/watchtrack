@@ -31,6 +31,8 @@ export default defineConfig({
         // App shell only. Personal data stays in IndexedDB, never in the SW cache.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
         navigateFallback: '/index.html',
+        // Static public pages are real HTML files (precached), not app routes.
+        navigateFallbackDenylist: [/^\/api\//, /^\/about/, /^\/guides/],
         // Opens the right title when a WatchTrack alert notification is clicked.
         importScripts: ['sw-notifications.js'],
         runtimeCaching: [
@@ -48,7 +50,15 @@ export default defineConfig({
       },
     }),
   ],
-  build: { chunkSizeWarningLimit: 700 },
+  build: {
+    chunkSizeWarningLimit: 700,
+    // Public pages are plain HTML (no JS) so every crawler can read them. Add new guides here and to public/sitemap.xml.
+    rollupOptions: {
+      input: Object.fromEntries(
+        ['index', 'about', 'guides', 'guides/track-anime-and-tv-episodes', 'guides/organise-your-watchlist', 'guides/watchlist-local-storage'].map((p) => [p, `${p}.html`]),
+      ),
+    },
+  },
   test: {
     environment: 'node',
   },

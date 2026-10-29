@@ -6,14 +6,59 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0b12" />
-    <meta name="description" content="Track anime, TV series and movies — always know the next episode. Private, offline, no account." />
+    <title>WatchTrack — Track Anime, TV Shows & Movies</title>
+    <meta name="description" content="One watchlist for anime, TV series and movies. Track episodes and seasons, always know what to watch next. No sign-up; your library stays in your browser." />
+    <!-- Canonical (on "/" only) and noindex (on app-only routes) are added per route by src/components/Layout.tsx. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="WatchTrack" />
+    <meta property="og:title" content="WatchTrack — Track Anime, TV Shows & Movies" />
+    <meta property="og:description" content="One watchlist for anime, TV series and movies. Always know the next episode to watch. No sign-up; your library stays in your browser." />
+    <meta property="og:url" content="https://watchtrack-eta.vercel.app/" />
+    <meta property="og:image" content="https://watchtrack-eta.vercel.app/pwa-512.png" />
+    <meta property="og:image:alt" content="WatchTrack logo" />
+    <meta name="twitter:card" content="summary" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>WatchTrack</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://watchtrack-eta.vercel.app/#website",
+            "name": "WatchTrack",
+            "url": "https://watchtrack-eta.vercel.app/"
+          },
+          {
+            "@type": "WebApplication",
+            "name": "WatchTrack",
+            "url": "https://watchtrack-eta.vercel.app/",
+            "description": "A watchlist and episode tracker for anime, TV series and movies. Tracks season and episode progress, organises titles into Watching, Plan to Watch, On Hold, Completed and Dropped, and stores the library in the browser on the user's device.",
+            "applicationCategory": "EntertainmentApplication",
+            "operatingSystem": "Any (runs in a modern web browser; installable as a PWA)",
+            "browserRequirements": "Requires JavaScript and IndexedDB",
+            "isAccessibleForFree": true,
+            "featureList": [
+              "Track anime, TV series and movies in one library",
+              "Season and episode progress with one-tap Watched",
+              "Overall or per-season episode numbering",
+              "Watching, Plan to Watch, On Hold, Completed and Dropped lists",
+              "Upcoming episode and new season alerts",
+              "Read-only share links",
+              "JSON backup export and import",
+              "Works offline once loaded"
+            ],
+            "isPartOf": { "@id": "https://watchtrack-eta.vercel.app/#website" }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
-    <noscript>WatchTrack needs JavaScript to run.</noscript>
+    <noscript>
+      WatchTrack needs JavaScript to run. Read <a href="/about">what WatchTrack is and how it stores your data</a> or browse the <a href="/guides">watchlist guides</a>.
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -3,6 +3,7 @@ import { Eye, LinkIcon, ListX } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { EmptyState, PosterGridSkeleton, ProgressBar, progressLine, Rating, Section } from '../components/cards'
+import { PageMeta } from '../components/Layout'
 import { Logo } from '../components/Logo'
 import { Poster } from '../components/Poster'
 import { STATUS } from '../lib/backup'
@@ -33,6 +34,7 @@ export function SharedPage() {
 
   return (
     <div className="min-h-dvh">
+      <PageMeta pathname="/shared" />
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-10">
           <Link to="/" className="flex items-center gap-2">
