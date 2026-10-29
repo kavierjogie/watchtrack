@@ -1,6 +1,7 @@
 import { isObj, isStr, MEDIA, STATUS } from './backup'
 import { isHttpUrl } from './metadata'
 import { MAX_POSTER_URL, publicPosterUrl } from './posters'
+import { emptyProgress } from './progress'
 import { createTitle } from './titles'
 import type { MediaType, MetadataSource, Numbering, Title, WatchStatus } from './types'
 
@@ -233,4 +234,16 @@ export function sharedToTitle(it: SharedItem): Title {
       rewatching: false,
     },
   })
+}
+
+/** A friend's shared title as a fresh Plan to Watch entry: keeps what the show is (episode counts), drops their position and rating. */
+export function toMyPlan(t: Title): Title {
+  const p = t.progress
+  return {
+    ...t,
+    status: 'plan',
+    rating: null,
+    completedAt: null,
+    progress: p && { ...emptyProgress(p.numbering), seasonEpisodeCounts: p.seasonEpisodeCounts, totalSeasons: p.totalSeasons, totalEpisodes: p.totalEpisodes },
+  }
 }

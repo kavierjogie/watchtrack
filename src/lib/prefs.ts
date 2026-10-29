@@ -17,6 +17,8 @@ export interface Prefs {
   alertDates: boolean
   /** System notifications while the app is in the background. Off until the user turns it on and grants permission. */
   browserNotify: boolean
+  /** ISO time after which the Dashboard may nudge for a backup again ('' = whenever the library is big enough). */
+  backupNudgeAfter: string
 }
 
 const KEY = 'watchtrack:prefs'
@@ -32,6 +34,7 @@ const DEFAULTS: Prefs = {
   alertEpisodes: true,
   alertDates: true,
   browserNotify: false,
+  backupNudgeAfter: '',
 }
 
 let cache: Prefs | null = null
@@ -86,4 +89,13 @@ export function applyTheme(theme: Prefs['theme']) {
   root.style.colorScheme = dark ? 'dark' : 'light'
   // Match the phone's status bar to the page.
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0b0b12' : '#f7f6fb')
+}
+
+/** Nudge once the library is worth losing; exporting or dismissing pushes it back (see snoozeBackupNudge). */
+export function backupNudgeDue(titleCount: number, after: string, now = Date.now()): boolean {
+  return titleCount >= 5 && (!after || Date.parse(after) <= now)
+}
+
+export function snoozeBackupNudge(days: number, now = Date.now()) {
+  setPrefs({ backupNudgeAfter: new Date(now + days * 86_400_000).toISOString() })
 }

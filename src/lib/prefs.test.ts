@@ -21,3 +21,14 @@ describe('prefs', () => {
     expect(getPrefs()).toMatchObject({ alertsOn: true, theme: 'dark' })
   })
 })
+
+describe('backupNudgeDue', () => {
+  it('waits for 5 titles, then respects the snooze date', async () => {
+    const { backupNudgeDue } = await import('./prefs')
+    const now = Date.parse('2026-10-29T12:00:00Z')
+    expect(backupNudgeDue(4, '', now)).toBe(false)
+    expect(backupNudgeDue(5, '', now)).toBe(true)
+    expect(backupNudgeDue(5, '2026-11-01T00:00:00Z', now)).toBe(false)
+    expect(backupNudgeDue(5, '2026-10-28T00:00:00Z', now)).toBe(true)
+  })
+})

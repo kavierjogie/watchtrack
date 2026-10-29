@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { setLastWatched } from './progress'
-import { decodeShare, encodeShare, MAX_PAYLOAD_CHARS, ShareError, shareUrl, sharedToTitle, toSharedItem } from './share'
+import { decodeShare, encodeShare, MAX_PAYLOAD_CHARS, ShareError, shareUrl, sharedToTitle, toMyPlan, toSharedItem } from './share'
 import { createTitle } from './titles'
 import type { Title } from './types'
 
@@ -95,5 +95,15 @@ describe('share links', () => {
   it('keeps markup in titles as plain data', async () => {
     const [t] = await decodeShare(await craft({ v: 1, items: [{ ...item, title: '<img src=x onerror=alert(1)>' }] }))
     expect(t.title).toBe('<img src=x onerror=alert(1)>')
+  })
+})
+
+describe('toMyPlan', () => {
+  it("starts a friend's title from episode 1 in Plan to Watch, keeping its episode counts", () => {
+    const friend = createTitle({ title: 'Frieren', mediaType: 'anime', status: 'completed', rating: 9 })
+    friend.progress = { ...friend.progress!, nextEpisode: 20, totalEpisodes: 28 }
+    const mine = toMyPlan(friend)
+    expect(mine).toMatchObject({ status: 'plan', rating: null, completedAt: null })
+    expect(mine.progress).toMatchObject({ nextEpisode: 1, totalEpisodes: 28, numbering: 'absolute' })
   })
 })

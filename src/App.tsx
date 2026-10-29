@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { Layout } from './components/Layout'
 import { ConfirmProvider } from './components/Modal'
+import { FEEDBACK_MAILTO } from './lib/format'
 import { applyTheme, usePrefs } from './lib/prefs'
 import { Dashboard } from './pages/Dashboard'
 import { DiscoverPage } from './pages/Discover'
@@ -35,6 +36,12 @@ class CrashScreen extends Component<{ children: ReactNode }, { failed: boolean }
             Open Settings
           </a>
         </div>
+        <p className="text-sm text-muted">
+          Keeps happening?{' '}
+          <a href={FEEDBACK_MAILTO} className="underline hover:text-fg">
+            Let me know
+          </a>
+        </p>
       </main>
     )
   }

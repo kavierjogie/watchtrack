@@ -1,9 +1,10 @@
-import { CircleCheck, CirclePause, Clapperboard, Compass, Library, ListPlus, Play, Plus, Share2, Sparkles, Tv } from 'lucide-react'
+import { CircleCheck, CirclePause, Clapperboard, Compass, HardDriveDownload, Library, ListPlus, Play, Plus, Share2, Sparkles, Tv, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ContinueCard, EmptyState, PosterGridSkeleton, Section, SeeAll, StatCard, TitleCard } from '../components/cards'
 import { TitleMenu } from '../components/TitleMenu'
 import { daysSince } from '../lib/format'
+import { backupNudgeDue, snoozeBackupNudge, usePrefs } from '../lib/prefs'
 import { byContinue, lastActivity } from '../lib/titles'
 import { useLibrary } from '../state/library'
 
@@ -16,6 +17,7 @@ function greeting(now = new Date()) {
 
 export function Dashboard() {
   const { titles, loading, episodesLogged } = useLibrary()
+  const { backupNudgeAfter } = usePrefs()
 
   if (loading)
     return (
@@ -87,6 +89,8 @@ export function Dashboard() {
           <Share2 className="size-4" aria-hidden /> Share watchlist
         </Link>
       </Hero>
+
+      {backupNudgeDue(titles.length, backupNudgeAfter) && <BackupNudge />}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Watching" value={count('watching')} icon={Play} to="/continue" />
@@ -183,5 +187,30 @@ function Hero({ title, subtitle, children }: { title: string; subtitle: string; 
         <div className="mt-5 flex flex-wrap gap-2">{children}</div>
       </div>
     </header>
+  )
+}
+
+// iOS Safari clears site storage after ~7 days unused unless the site is on the Home Screen.
+const iosBrowser = /iPhone|iPad|iPod/.test(navigator.userAgent) && !(navigator as { standalone?: boolean }).standalone
+
+/** Data only lives in this browser, so remind people to export before they have something to lose. */
+function BackupNudge() {
+  return (
+    <div role="status" className="card flex items-start gap-3 border-warn/40 p-4">
+      <HardDriveDownload className="mt-0.5 size-5 shrink-0 text-warn" aria-hidden />
+      <div className="min-w-0 flex-1 space-y-2 text-sm">
+        <p className="font-medium">Your library lives only in this browser</p>
+        <p className="text-muted">
+          Clearing browser data deletes it. Export a backup so you can restore it or move it to another device.
+          {iosBrowser && " On iPhone, also tap Share → Add to Home Screen so Safari doesn't clear it after a week away."}
+        </p>
+        <Link to="/settings" className="btn-secondary min-h-9 px-3 text-xs">
+          Export backup
+        </Link>
+      </div>
+      <button type="button" className="btn-ghost size-9 shrink-0 p-0" aria-label="Remind me later" onClick={() => snoozeBackupNudge(7)}>
+        <X className="size-4" aria-hidden />
+      </button>
+    </div>
   )
 }

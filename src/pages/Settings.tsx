@@ -1,4 +1,4 @@
-import { Bell, BellRing, Download, HardDrive, RefreshCw, Shield, Smartphone, Trash2, Upload } from 'lucide-react'
+import { Bell, BellRing, Download, HardDrive, Mail, RefreshCw, Shield, Smartphone, Trash2, Upload } from 'lucide-react'
 import { alertsOn, notifySupported, showSystemNotification } from '../lib/alerts'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -8,8 +8,8 @@ import { Modal, useConfirm } from '../components/Modal'
 import { applyImport, createBackup, downloadJson, MAX_BACKUP_BYTES, parseBackup, planImport, type DuplicateStrategy, type ImportMode, type ImportPlan } from '../lib/backup'
 import { clearAll } from '../lib/db'
 import { resetDiscover } from '../lib/discover'
-import { formatBytes, today } from '../lib/format'
-import { setPrefs, usePrefs, type Prefs } from '../lib/prefs'
+import { FEEDBACK_MAILTO, formatBytes, today } from '../lib/format'
+import { setPrefs, snoozeBackupNudge, usePrefs, type Prefs } from '../lib/prefs'
 import { canRefresh, useSyncState } from '../lib/sync'
 import { MEDIA_LABEL, STATUS_LABEL, type MediaType, type WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
@@ -185,6 +185,7 @@ export function SettingsPage() {
     try {
       const backup = await createBackup()
       downloadJson(backup, `watchtrack-backup-${today()}.json`)
+      snoozeBackupNudge(14)
       toast.success('Backup downloaded', { description: `${backup.titles.length} titles, ${backup.history.length} history entries, ${backup.images.length} images` })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Export failed.')
@@ -292,6 +293,13 @@ export function SettingsPage() {
 
       <Card title="Install on your phone" icon={<Smartphone className="size-5 text-accent-text" aria-hidden />}>
         <InstallHelp />
+      </Card>
+
+      <Card title="Feedback" icon={<Mail className="size-5 text-accent-text" aria-hidden />}>
+        <p className="text-sm text-muted">Found a bug or have an idea? Send it over — every message gets read.</p>
+        <a href={FEEDBACK_MAILTO} className="btn-secondary">
+          <Mail className="size-4" aria-hidden /> Send feedback
+        </a>
       </Card>
 
       <Card title="Danger zone">

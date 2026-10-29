@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { listTitles } from '../lib/db'
 import { encodeShare } from '../lib/share'
 import { createTitle } from '../lib/titles'
+import { LibraryProvider } from '../state/library'
 import { SharedPage } from './Shared'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -22,9 +23,11 @@ async function open(hash: string) {
   await act(async () => {
     root!.render(
       <MemoryRouter initialEntries={[`/shared${hash}`]}>
-        <Routes>
-          <Route path="shared" element={<SharedPage />} />
-        </Routes>
+        <LibraryProvider>
+          <Routes>
+            <Route path="shared" element={<SharedPage />} />
+          </Routes>
+        </LibraryProvider>
       </MemoryRouter>,
     )
   })
@@ -39,7 +42,7 @@ async function craftShare(body: unknown) {
 }
 
 describe('shared watchlist page', () => {
-  it('shows the shared titles read-only and never writes to the local library', async () => {
+  it('shows the shared titles and writes nothing to the local library until the visitor adds them', async () => {
     const payload = await encodeShare([
       createTitle({ title: '<b>Frieren</b>', mediaType: 'anime', status: 'watching' }),
       createTitle({ title: 'Dune', mediaType: 'movie', status: 'plan' }),
@@ -49,10 +52,19 @@ describe('shared watchlist page', () => {
     expect(page.textContent).toContain('<b>Frieren</b>') // rendered as text, not HTML
     expect(page.querySelector('b')).toBeNull()
     expect(page.textContent).toContain('Dune')
-    // No buttons, inputs or links into title pages: nothing to change.
-    expect(page.querySelectorAll('button, input, select, textarea, form')).toHaveLength(0)
+    // No inputs or links into title pages; the only buttons add to the visitor's own list.
+    expect(page.querySelectorAll('input, select, textarea, form')).toHaveLength(0)
+    expect([...page.querySelectorAll('button')].every((b) => b.textContent?.includes('to my list'))).toBe(true)
     expect([...page.querySelectorAll('a')].every((a) => a.getAttribute('href') === '/')).toBe(true)
     expect(await listTitles()).toEqual([])
+
+    const addAll = [...page.querySelectorAll('button')].find((b) => b.textContent?.includes('Add all'))!
+    await act(async () => addAll.click())
+    await act(() => new Promise((r) => setTimeout(r, 50)))
+    const saved = await listTitles()
+    expect(saved.map((t) => [t.title, t.status]).sort()).toEqual([['<b>Frieren</b>', 'plan'], ['Dune', 'plan']])
+    expect(page.textContent).toContain('In your library')
+    expect(page.querySelectorAll('button')).toHaveLength(0)
   })
 
   it('shows a helpful error for a broken link', async () => {
