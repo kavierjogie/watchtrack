@@ -14,6 +14,7 @@ import { SettingsPage } from './pages/Settings'
 import { UpcomingPage } from './pages/Upcoming'
 import { SharedPage } from './pages/Shared'
 import { TitleDetails } from './pages/TitleDetails'
+import { TransferPage } from './pages/Transfer'
 import { LibraryProvider } from './state/library'
 
 /** Last line of defence: a render error shows a way out instead of a blank page. Saved data is never touched. */
@@ -79,6 +80,7 @@ export default function App() {
                   <Route path="notifications" element={<NotificationsPage />} />
                   <Route path="title/:id" element={<TitleDetails />} />
                   <Route path="settings" element={<SettingsPage />} />
+                  <Route path="transfer" element={<TransferPage />} />
                   <Route path="*" element={<Dashboard />} />
                 </Route>
                 {/* Outside Layout: a friend opening a link sees just the shared list, not an empty app. */}

@@ -2,7 +2,7 @@
 
 A private, offline-first tracker for anime, TV series and movies. Its one job: **always know the exact next episode to watch**, even after months away.
 
-- No account, no database server. The only server code is a stateless TMDB proxy (`api/tmdb.ts`) that keeps the API key off the browser.
+- No account, no database server. The only server code is stateless: a TMDB proxy (`api/tmdb.ts`) and the Google OAuth token exchange for optional Drive sync (`api/google-token.ts`).
 - Visits are counted with cookie-free Vercel Web Analytics. `src/main.tsx` strips query strings, `#` fragments and title ids before anything is sent.
 - Everything is stored in your browser (IndexedDB) on the device you use.
 - Installable as an app (PWA) and works offline once loaded.
@@ -34,6 +34,7 @@ Requires Node 20+.
 1. Push this folder to a GitHub repo.
 2. In Vercel: **Add New → Project →** import the repo. It detects Vite automatically (build `npm run build`, output `dist`).
 3. Optional, for TMDB (movies and extra TV results): add `TMDB_API_KEY` under **Settings → Environment Variables** (see `.env.example`). Without it the app still works with Kitsu and TVmaze.
+   Optional, for Google Drive sync: add `VITE_GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (see **Google Drive sync** below).
 4. Deploy.
 
 `vercel.json` rewrites unknown paths to `index.html` so deep links like `/title/abc` work, stops the service worker file being cached, and sets security headers (Content-Security-Policy, nosniff, Referrer-Policy, Permissions-Policy). If you add a new provider host for API calls, it must be https; scripts may only load from the app itself.
@@ -83,12 +84,27 @@ The logic lives in `src/lib/progress.ts` (pure functions) and is covered by `src
 
 ## Your data: where it lives and how to keep it safe
 
-- Data is in **this browser on this device only**. Another browser, phone or computer has a separate, empty copy. Installing the PWA doesn't change that.
-- **Clearing site data / browsing data for this site deletes your library.** The app asks the browser for persistent storage, but that isn't a guarantee.
-- **Export backup** (Settings) downloads everything as one JSON file. **Import backup** validates it, shows a preview with duplicates, and lets you **merge** (keep mine / use backup's / keep both) or **replace**. Replacing asks for confirmation.
-- Use backups to move your library between devices.
+- Data is in **this browser on this device**. Another browser, phone or computer has a separate copy. Installing the PWA doesn't change that.
+- **Clearing site data / browsing data for this site deletes your library**, unless Google Drive sync is on. The app asks the browser for persistent storage, but that isn't a guarantee.
+- **Google Drive sync** (Settings, optional) mirrors the library to the user's own Drive. See below.
+- **Move to another device** (Settings) makes a transfer link, `/transfer#…`, carrying the whole library minus uploaded posters, plus a QR code when it's small enough. Opening it shows the import preview. Code: `src/lib/transfer.ts`.
+- **Import backup file** still reads backup files made by older versions. It validates the file, shows a preview with duplicates, and lets you **merge** (keep mine / use backup's / keep both) or **replace**. Exporting files was removed in favour of sync and transfer links.
+
+### Google Drive sync
+
+- One file, `watchtrack-library.json`, in the user's Drive **appDataFolder** (hidden, only this app can read it). Scope `drive.appdata` is non-sensitive, so Google's app verification isn't needed. The developer has no access to it.
+- Sign-in is OAuth with PKCE via a plain redirect (no Google scripts, so the CSP is unchanged). `api/google-token.ts` adds the client secret and swaps the code or refresh token for an access token; it stores nothing. The refresh token is kept in the browser's localStorage.
+- Each sync: download → merge (`src/lib/merge.ts`: newest `updatedAt` per title wins; history and posters are unions; deletions are tombstones kept 90 days) → write locally → upload if Drive was missing anything. Runs on open, on returning to the tab, when back online, and 5 s after an edit. Code: `src/lib/drive.ts`.
+- **Setup (once):**
+  1. Google Cloud Console → new project → enable **Google Drive API**.
+  2. **OAuth consent screen**: External; app name, support email; add scope `.../auth/drive.appdata`; then **Publish app** (In production). Left in Testing, refresh tokens expire after 7 days and only test users can connect.
+  3. **Credentials → Create OAuth client ID → Web application**. Authorized redirect URIs: `https://watchtrack-eta.vercel.app/settings` and `http://localhost:3000/settings` (for `vercel dev`).
+  4. In Vercel, set `VITE_GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then redeploy. Without them the Drive option is hidden.
+- `npm run dev` doesn't run `/api` functions; use `vercel dev` to test sync locally.
 
 ### Backup file format (`version: 1`)
+
+Also the format of the Drive file (plus a `deleted` list) and of transfer links (without `images`).
 
 ```jsonc
 {

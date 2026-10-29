@@ -11,7 +11,7 @@ import { Modal } from './Modal'
 type Link = { url: string } | { error: string }
 
 /** Copy via the Clipboard API, falling back to selecting the field (insecure contexts, older browsers). */
-async function copyText(text: string, field: HTMLInputElement | null): Promise<boolean> {
+export async function copyText(text: string, field: HTMLInputElement | null): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text)
     return true

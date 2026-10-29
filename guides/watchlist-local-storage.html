@@ -104,18 +104,19 @@
 
         <h2>How to keep a local watchlist safe</h2>
         <ol>
-          <li><strong>Export a backup regularly</strong>, such as after a big batch of changes or once a month. Keep the file somewhere you already back up.</li>
+          <li><strong>Keep a copy somewhere else.</strong> In WatchTrack, connecting Google Drive does this automatically.</li>
           <li><strong>Use the same browser every time</strong> on each device, and not a private window.</li>
           <li><strong>Check before clearing browsing data.</strong> Most browsers let you keep data for specific sites.</li>
           <li><strong>On iPhone or iPad, add the app to your Home Screen</strong> if you use it often.</li>
-          <li><strong>Move between devices with a backup file:</strong> export on the old one, import on the new one.</li>
+          <li><strong>Move between devices</strong> with sync, or a one-time transfer link from the old device to the new one.</li>
         </ol>
 
         <h2>How WatchTrack handles this</h2>
         <p>
           <a href="/">WatchTrack</a> stores your titles, progress, history, notes and uploaded posters in IndexedDB and asks the browser for persistent storage on
-          first load. Settings shows how much space the library uses and whether it's protected from cleanup. <strong>Export backup</strong> saves everything as
-          a single JSON file, posters included. <strong>Import backup</strong> checks the file, previews duplicates, and lets you merge or replace. Searching for
+          first load. Settings shows how much space the library uses and whether it's protected from cleanup. <strong>Google Drive sync</strong> keeps a copy in a
+          hidden app folder in your own Drive and merges changes from your other devices. A <strong>transfer link</strong> copies the library to another device
+          without any account, and the import previews duplicates and lets you merge or replace. Searching for
           titles sends only the search text to the metadata services, never your library.
           <a href="/about#privacy">Read the full privacy and storage details</a>.
         </p>

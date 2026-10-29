@@ -1,16 +1,20 @@
-import { Bell, BellRing, Download, HardDrive, Mail, RefreshCw, Shield, Smartphone, Trash2, Upload } from 'lucide-react'
+import { ArrowRightLeft, Bell, BellRing, Check, Cloud, Copy, HardDrive, Mail, RefreshCw, Share2, Shield, Smartphone, Trash2, Upload } from 'lucide-react'
+import qrcode from 'qrcode-generator'
 import { alertsOn, notifySupported, showSystemNotification } from '../lib/alerts'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { PageHeader } from '../components/cards'
 import { Modal, useConfirm } from '../components/Modal'
-import { applyImport, createBackup, downloadJson, MAX_BACKUP_BYTES, parseBackup, planImport, type DuplicateStrategy, type ImportMode, type ImportPlan } from '../lib/backup'
+import { copyText } from '../components/ShareDialog'
+import { applyImport, MAX_BACKUP_BYTES, parseBackup, planImport, type DuplicateStrategy, type ImportMode, type ImportPlan } from '../lib/backup'
 import { clearAll } from '../lib/db'
 import { resetDiscover } from '../lib/discover'
-import { FEEDBACK_MAILTO, formatBytes, today } from '../lib/format'
-import { markBackedUp, setPrefs, usePrefs, type Prefs } from '../lib/prefs'
+import { connectDrive, disconnectDrive, driveConfigured, driveConnected, finishConnect, markDirty, syncDrive, useDrive } from '../lib/drive'
+import { FEEDBACK_MAILTO, formatBytes, timeAgo } from '../lib/format'
+import { setPrefs, usePrefs, type Prefs } from '../lib/prefs'
 import { canRefresh, useSyncState } from '../lib/sync'
+import { encodeTransfer, MAX_QR_PAYLOAD, transferUrl } from '../lib/transfer'
 import { MEDIA_LABEL, STATUS_LABEL, type MediaType, type WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
 import { useRefreshEpisodes } from '../state/useSync'
@@ -181,17 +185,6 @@ export function SettingsPage() {
     })()
   }, [lib.titles])
 
-  const exportBackup = async () => {
-    try {
-      const backup = await createBackup()
-      downloadJson(backup, `watchtrack-backup-${today()}.json`)
-      markBackedUp(backup.titles.length)
-      toast.success('Backup downloaded', { description: `${backup.titles.length} titles, ${backup.history.length} history entries, ${backup.images.length} images` })
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Export failed.')
-    }
-  }
-
   const onFile = async (file: File | undefined) => {
     if (!file) return
     try {
@@ -212,7 +205,7 @@ export function SettingsPage() {
           <p>
             This permanently deletes all <strong className="text-fg">{lib.titles.length} titles</strong>, their watch history and uploaded posters from this browser.
           </p>
-          <p>It can't be undone. Export a backup first if you might want this data again.</p>
+          <p>It can't be undone.{driveConnected() ? ' Google Drive is disconnected too; the copy in your Drive is kept.' : ''}</p>
         </>
       ),
       confirmLabel: 'Delete everything',
@@ -220,6 +213,8 @@ export function SettingsPage() {
       typeToConfirm: 'DELETE',
     })
     if (!yes) return
+    // Otherwise the next sync would bring everything straight back from Drive.
+    disconnectDrive()
     await clearAll()
     resetDiscover()
     await lib.reload()
@@ -232,11 +227,10 @@ export function SettingsPage() {
 
       <Card title="Your data lives on this device" icon={<HardDrive className="size-5 text-accent-text" aria-hidden />}>
         <div className="space-y-2 text-sm text-muted">
-          <p>Everything you track is stored in this browser's local database (IndexedDB). There's no account, server or cloud copy.</p>
+          <p>Everything you track is stored in this browser's local database (IndexedDB). There's no WatchTrack account or server.</p>
           <ul className="list-disc space-y-1 pl-5">
-            <li>Clearing site data / browsing history for this site deletes your library.</li>
-            <li>Other browsers and devices have their own separate copy — nothing syncs automatically.</li>
-            <li>Installing as an app doesn't change this. Export backups regularly, and use them to move between devices.</li>
+            <li>Clearing site data / browsing history for this site deletes your library, unless Google Drive sync is on.</li>
+            <li>Other browsers and devices have their own copy. Turn on Google Drive sync, or use a transfer link below, to move between them.</li>
           </ul>
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
@@ -245,15 +239,17 @@ export function SettingsPage() {
           <Stat label="Storage used" value={usage ? formatBytes(usage.used) : 'Unavailable'} />
           <Stat label="Protected from cleanup" value={usage ? (usage.persisted ? 'Yes' : 'Best effort') : '—'} />
         </div>
+        <DriveSync />
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-primary" onClick={() => void exportBackup()}>
-            <Download className="size-4" aria-hidden /> Export backup
-          </button>
           <button type="button" className="btn-secondary" onClick={() => fileRef.current?.click()}>
-            <Upload className="size-4" aria-hidden /> Import backup
+            <Upload className="size-4" aria-hidden /> Import backup file
           </button>
           <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
         </div>
+      </Card>
+
+      <Card title="Move to another device" icon={<ArrowRightLeft className="size-5 text-accent-text" aria-hidden />}>
+        <TransferLink />
       </Card>
 
       <Card id="alerts" title="WatchTrack Alerts" icon={<Bell className="size-5 text-accent-text" aria-hidden />}>
@@ -355,6 +351,147 @@ export function SettingsPage() {
   )
 }
 
+/** Google Drive sync controls (lib/drive.ts). Hidden when the deployment has no Google client configured. */
+function DriveSync() {
+  const drive = useDrive()
+  const { reload } = useLibrary()
+
+  useEffect(() => {
+    if (!driveConfigured) return
+    // Back from Google's consent screen with ?code=…; the card itself shows the outcome.
+    void finishConnect().then((connected) => {
+      if (connected)
+        void syncDrive().then((changed) => {
+          if (changed) void reload()
+        })
+    })
+  }, [reload])
+
+  if (!driveConfigured) return null
+
+  const syncNow = () =>
+    void syncDrive().then((changed) => {
+      if (changed) void reload()
+    })
+
+  return (
+    <div className="space-y-3 rounded-xl bg-surface-2 p-4 text-sm">
+      <p className="flex items-center gap-2 font-medium">
+        <Cloud className="size-4 text-accent-text" aria-hidden /> Google Drive sync
+      </p>
+      {drive.refresh ? (
+        <>
+          <p className="text-muted">
+            {drive.syncing ? 'Syncing…' : drive.lastSync ? `Synced to your Google Drive ${timeAgo(drive.lastSync)}.` : 'Connected.'} Changes save automatically and
+            appear on every device where you connect the same Google account.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-secondary" disabled={drive.syncing} onClick={syncNow}>
+              <RefreshCw className={`size-4 ${drive.syncing ? 'animate-spin' : ''}`} aria-hidden /> Sync now
+            </button>
+            <button type="button" className="btn-ghost" onClick={disconnectDrive}>
+              Disconnect
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-muted">
+            Save your library to your own Google Drive and get it back on any device. WatchTrack can only see its own hidden app folder, not your files, and the
+            developer never sees your data.
+          </p>
+          <button type="button" className="btn-primary" onClick={() => void connectDrive()}>
+            <Cloud className="size-4" aria-hidden /> Connect Google Drive
+          </button>
+        </>
+      )}
+      {drive.error && (
+        <p className="text-warn" role="alert">
+          {drive.error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** One-off copy of the whole library to another device, carried inside a link (see lib/transfer.ts). */
+function TransferLink() {
+  const lib = useLibrary()
+  const [link, setLink] = useState<{ url: string; qr: string | null } | null>(null)
+  const [copied, setCopied] = useState(false)
+  const field = useRef<HTMLInputElement>(null)
+
+  const create = async () => {
+    try {
+      const payload = await encodeTransfer()
+      const url = transferUrl(payload)
+      let qr: string | null = null
+      if (payload.length <= MAX_QR_PAYLOAD) {
+        const code = qrcode(0, 'L')
+        code.addData(url)
+        code.make()
+        qr = code.createDataURL(4, 4)
+      }
+      setLink({ url, qr })
+      setCopied(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't create the link.")
+    }
+  }
+
+  const copy = async () => {
+    if (!link) return
+    if (await copyText(link.url, field.current)) {
+      setCopied(true)
+      toast.success('Link copied', { description: 'Open it on your other device.' })
+    } else toast.error("Couldn't copy the link", { description: 'Select the link and copy it manually.' })
+  }
+
+  const share = async () => {
+    if (!link) return
+    if (!navigator.share) return copy()
+    try {
+      await navigator.share({ title: 'My WatchTrack library', url: link.url })
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') await copy()
+    }
+  }
+
+  return (
+    <div className="space-y-3 text-sm text-muted">
+      <p>
+        Copy your whole library to a new phone or browser. Open the link there and choose to merge or replace. Posters you uploaded yourself stay on this device.
+      </p>
+      {!link ? (
+        <button type="button" className="btn-secondary" disabled={lib.titles.length === 0} onClick={() => void create()}>
+          <ArrowRightLeft className="size-4" aria-hidden /> Create transfer link
+        </button>
+      ) : (
+        <>
+          {link.qr ? (
+            <div className="flex flex-wrap items-center gap-4">
+              <img src={link.qr} alt="QR code for the transfer link" className="size-44 rounded-xl bg-white p-1 [image-rendering:pixelated]" />
+              <p className="max-w-xs">Scan with your other phone's camera, or copy the link below.</p>
+            </div>
+          ) : (
+            <p>Too much for a QR code: send the link to yourself (email, notes or chat) and open it on the other device.</p>
+          )}
+          <input ref={field} className="input font-mono text-xs!" readOnly value={link.url} onFocus={(e) => e.target.select()} aria-label="Transfer link" />
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-secondary" onClick={() => void copy()}>
+              {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />} {copied ? 'Copied' : 'Copy link'}
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => void share()}>
+              <Share2 className="size-4" aria-hidden /> Share
+            </button>
+          </div>
+        </>
+      )}
+      <p className="text-xs">This link contains your whole library, including notes. Send it only to yourself.</p>
+    </div>
+  )
+}
+
 function Ext({ href, children }: { href: string; children: ReactNode }) {
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent-text underline underline-offset-2">
@@ -406,7 +543,7 @@ function InstallHelp() {
   )
 }
 
-function ImportDialog({ plan, onClose }: { plan: ImportPlan; onClose: () => void }) {
+export function ImportDialog({ plan, onClose }: { plan: ImportPlan; onClose: () => void }) {
   const lib = useLibrary()
   const confirm = useConfirm()
   const [mode, setMode] = useState<ImportMode>('merge')
@@ -432,6 +569,7 @@ function ImportDialog({ plan, onClose }: { plan: ImportPlan; onClose: () => void
     try {
       const res = await applyImport(plan, mode, dup)
       await lib.reload()
+      markDirty()
       toast.success('Backup imported', { description: `${res.titles.length} titles written` })
       onClose()
     } catch (err) {

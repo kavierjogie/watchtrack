@@ -1,4 +1,5 @@
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
+import { openDB, type DBSchema, type IDBPDatabase, type IDBPObjectStore, type StoreNames } from 'idb'
+import type { Tombstone } from './merge'
 import type { HistoryEntry, StoredImage, Title } from './types'
 
 export const DB_NAME = 'watchtrack'
@@ -110,13 +111,45 @@ export async function updateTitle(id: string, fn: (t: Title) => Title | null): P
 /** Delete a title with its history and locally stored poster. */
 export async function deleteTitle(id: string): Promise<void> {
   const db = await getDb()
-  const tx = db.transaction(['titles', 'watchHistory', 'images'], 'readwrite')
+  const tx = db.transaction(['titles', 'watchHistory', 'images', 'settings'], 'readwrite')
   const title = await tx.objectStore('titles').get(id)
   const keys = await tx.objectStore('watchHistory').index('byTitle').getAllKeys(id)
   await Promise.all(keys.map((k) => tx.objectStore('watchHistory').delete(k)))
   if (title?.poster?.kind === 'local') await tx.objectStore('images').delete(title.poster.imageId)
   await tx.objectStore('titles').delete(id)
+  await addTombstones(tx.objectStore('settings'), [id, ...keys])
   await tx.done
+}
+
+// ---------- Deletions (for Google Drive sync; see merge.ts) ----------
+
+const TOMBSTONES = 'tombstones'
+type SettingsStore = IDBPObjectStore<WatchDB, StoreNames<WatchDB>[], 'settings', 'readwrite'>
+
+async function addTombstones(store: SettingsStore, ids: string[]) {
+  const at = new Date().toISOString()
+  const current = ((await store.get(TOMBSTONES))?.value as Tombstone[] | undefined) ?? []
+  await store.put({ key: TOMBSTONES, value: [...current.filter((t) => !ids.includes(t.id)), ...ids.map((id) => ({ id, at }))] })
+}
+
+export async function listTombstones(): Promise<Tombstone[]> {
+  return ((await (await getDb()).get('settings', TOMBSTONES))?.value as Tombstone[] | undefined) ?? []
+}
+
+/** Write what a Drive sync brought in, in one transaction. `deleteIds` may be title or history ids. */
+export async function applySync(data: { titles: Title[]; history: HistoryEntry[]; images: StoredImage[]; deleteIds: string[]; tombstones: Tombstone[] }) {
+  await guardWrite(async () => {
+    const db = await getDb()
+    const tx = db.transaction(['titles', 'watchHistory', 'images', 'settings'], 'readwrite')
+    await Promise.all([
+      ...data.deleteIds.flatMap((id) => [tx.objectStore('titles').delete(id), tx.objectStore('watchHistory').delete(id)]),
+      ...data.images.map((i) => tx.objectStore('images').put(i)),
+      ...data.titles.map((t) => tx.objectStore('titles').put(t)),
+      ...data.history.map((h) => tx.objectStore('watchHistory').put(h)),
+      tx.objectStore('settings').put({ key: TOMBSTONES, value: data.tombstones }),
+    ])
+    await tx.done
+  })
 }
 
 // ---------- History ----------
@@ -136,9 +169,10 @@ export async function undoHistory(title: Title, entry: HistoryEntry): Promise<Ti
   const restored: Title = { ...title, ...entry.before, updatedAt: new Date().toISOString() }
   await guardWrite(async () => {
     const db = await getDb()
-    const tx = db.transaction(['titles', 'watchHistory'], 'readwrite')
+    const tx = db.transaction(['titles', 'watchHistory', 'settings'], 'readwrite')
     await tx.objectStore('titles').put(restored)
     await tx.objectStore('watchHistory').delete(entry.id)
+    await addTombstones(tx.objectStore('settings'), [entry.id])
     await tx.done
   })
   return restored

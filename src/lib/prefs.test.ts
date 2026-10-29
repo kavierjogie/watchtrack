@@ -27,25 +27,15 @@ describe('backupNudgeDue', () => {
 
   it('first shows at 5 titles', async () => {
     const { backupNudgeDue } = await import('./prefs')
-    expect(backupNudgeDue(4, 0, '', now)).toBe(false)
-    expect(backupNudgeDue(5, 0, '', now)).toBe(true)
-  })
-
-  it('after an export, waits for both 30 days and 5 new titles', async () => {
-    const { backupNudgeDue, getPrefs, markBackedUp } = await import('./prefs')
-    markBackedUp(20, now)
-    const { backupCountAtExport, backupNudgeAfter } = getPrefs()
-    const later = now + 31 * 86_400_000
-    expect(backupNudgeDue(30, backupCountAtExport, backupNudgeAfter, now + 86_400_000)).toBe(false) // grown, too soon
-    expect(backupNudgeDue(22, backupCountAtExport, backupNudgeAfter, later)).toBe(false) // time passed, barely grown
-    expect(backupNudgeDue(25, backupCountAtExport, backupNudgeAfter, later)).toBe(true)
+    expect(backupNudgeDue(4, '', now)).toBe(false)
+    expect(backupNudgeDue(5, '', now)).toBe(true)
   })
 
   it('dismissing hides it for 30 days', async () => {
     const { backupNudgeDue, getPrefs, snoozeBackupNudge } = await import('./prefs')
     snoozeBackupNudge(now)
     const { backupNudgeAfter } = getPrefs()
-    expect(backupNudgeDue(10, 0, backupNudgeAfter, now + 29 * 86_400_000)).toBe(false)
-    expect(backupNudgeDue(10, 0, backupNudgeAfter, now + 31 * 86_400_000)).toBe(true)
+    expect(backupNudgeDue(10, backupNudgeAfter, now + 29 * 86_400_000)).toBe(false)
+    expect(backupNudgeDue(10, backupNudgeAfter, now + 31 * 86_400_000)).toBe(true)
   })
 })

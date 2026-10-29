@@ -46,7 +46,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(bin)
 }
 
-function base64ToBlob(data: string, type: string): Blob {
+export function base64ToBlob(data: string, type: string): Blob {
   const bin = atob(data)
   const bytes = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
@@ -65,15 +65,6 @@ export async function createBackup(): Promise<Backup> {
       images.map(async (i) => ({ id: i.id, type: i.type, createdAt: i.createdAt, data: await blobToBase64(i.blob) })),
     ),
   }
-}
-
-export function downloadJson(data: unknown, filename: string) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 // ---------- Validation ----------

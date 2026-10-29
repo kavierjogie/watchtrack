@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { normalizeTitle } from '../lib/backup'
 import * as db from '../lib/db'
+import { driveConnected, markDirty, onDirty, syncDrive } from '../lib/drive'
 import type { Change } from '../lib/titles'
 import type { Title } from '../lib/types'
 
@@ -50,6 +51,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     void reload()
   }, [reload])
 
+  useDriveAutoSync(reload)
+
   const upsert = (t: Title) => setTitles((prev) => (prev.some((p) => p.id === t.id) ? prev.map((p) => (p.id === t.id ? t : p)) : [...prev, t]))
 
   const value = useMemo<LibraryState>(() => {
@@ -64,6 +67,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       save: async (title) => {
         await db.saveTitle(title)
         upsert(title)
+        markDirty()
       },
       patch: async (id, fn) => {
         const t = await db.updateTitle(id, fn)
@@ -73,12 +77,14 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       commit: async ({ title, history }) => {
         await db.saveTitle(title, history)
         upsert(title)
+        markDirty()
         if (history.kind === 'episode') setEpisodesLogged((n) => n + 1)
         setHistoryVersion((v) => v + 1)
       },
       remove: async (id) => {
         await db.deleteTitle(id)
         setTitles((prev) => prev.filter((t) => t.id !== id))
+        markDirty()
         const h = await db.listAllHistory()
         setEpisodesLogged(h.filter((e) => e.kind === 'episode').length)
       },
@@ -88,6 +94,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         if (!title || !last?.before) return null
         const restored = await db.undoHistory(title, last)
         upsert(restored)
+        markDirty()
         if (last.kind === 'episode') setEpisodesLogged((n) => Math.max(0, n - 1))
         setHistoryVersion((v) => v + 1)
         return restored
@@ -103,4 +110,31 @@ export function useLibrary(): LibraryState {
   const ctx = useContext(Ctx)
   if (!ctx) throw new Error('useLibrary must be used inside LibraryProvider')
   return ctx
+}
+
+/** Google Drive sync triggers: app opened, brought back to the front, back online, and 5 s after the last local edit. */
+function useDriveAutoSync(reload: () => Promise<void>) {
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const run = () => {
+      clearTimeout(timer)
+      if (driveConnected() && navigator.onLine) void syncDrive().then((changed) => {
+        if (changed) void reload()
+      })
+    }
+    const visible = () => document.visibilityState === 'visible' && run()
+    run()
+    document.addEventListener('visibilitychange', visible)
+    window.addEventListener('online', run)
+    const off = onDirty(() => {
+      clearTimeout(timer)
+      timer = setTimeout(run, 5000)
+    })
+    return () => {
+      clearTimeout(timer)
+      off()
+      document.removeEventListener('visibilitychange', visible)
+      window.removeEventListener('online', run)
+    }
+  }, [reload])
 }

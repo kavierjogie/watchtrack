@@ -52,7 +52,7 @@ const ADD_STATUS: Record<string, WatchStatus> = { plan: 'plan', watching: 'watch
 
 /** index.html's title is the homepage title; app pages get "Label · WatchTrack". */
 const HOME_TITLE = document.title
-const PAGE_LABELS: Record<string, string> = { '/upcoming': 'Upcoming', '/notifications': 'Notifications', ...Object.fromEntries(NAV.map((n) => [n.to, n.label])) }
+const PAGE_LABELS: Record<string, string> = { '/upcoming': 'Upcoming', '/notifications': 'Notifications', '/transfer': 'Move library', ...Object.fromEntries(NAV.map((n) => [n.to, n.label])) }
 const SITE_URL = 'https://watchtrack-eta.vercel.app'
 
 /**

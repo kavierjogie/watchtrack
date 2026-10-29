@@ -111,13 +111,30 @@ const concat = (chunks: Uint8Array[]) => {
   return out
 }
 
+/** JSON text → deflate-raw → base64url, for URL fragments (share and transfer links). */
+export async function packFragment(text: string): Promise<string> {
+  const reader = pipe(new TextEncoder().encode(text), new CompressionStream('deflate-raw'))
+  const chunks: Uint8Array[] = []
+  for (let r = await reader.read(); !r.done; r = await reader.read()) chunks.push(r.value)
+  return toBase64Url(concat(chunks))
+}
+
+/** Reverse of packFragment for untrusted input. Throws ShareError("damaged") on bad data, `tooBig` past maxBytes. */
+export async function unpackFragment(fragment: string, maxChars: number, maxBytes: number, tooBig: string): Promise<string> {
+  const s = fragment.replace(/^#/, '').trim()
+  if (s.length > maxChars || !/^[A-Za-z0-9_-]+$/.test(s)) throw new ShareError('The link is damaged or incomplete.')
+  try {
+    return await inflate(fromBase64Url(s), maxBytes, tooBig)
+  } catch (err) {
+    if (err instanceof ShareError) throw err
+    throw new ShareError('The link is damaged or incomplete.')
+  }
+}
+
 /** Payload for the URL fragment. Throws ShareError when the link would be too long. */
 export async function encodeShare(titles: Title[]): Promise<string> {
   const payload = { v: SHARE_VERSION, items: titles.map(toSharedItem) }
-  const reader = pipe(new TextEncoder().encode(JSON.stringify(payload)), new CompressionStream('deflate-raw'))
-  const chunks: Uint8Array[] = []
-  for (let r = await reader.read(); !r.done; r = await reader.read()) chunks.push(r.value)
-  const encoded = toBase64Url(concat(chunks))
+  const encoded = await packFragment(JSON.stringify(payload))
   if (encoded.length > MAX_PAYLOAD_CHARS) {
     const fit = Math.max(1, Math.floor((titles.length * MAX_PAYLOAD_CHARS) / encoded.length))
     throw new ShareError(`${titles.length} titles is too many for one link. Select about ${fit} or fewer and try again.`)
@@ -162,15 +179,15 @@ function validatePayload(raw: unknown): SharedItem[] {
   return raw.items as SharedItem[]
 }
 
-async function inflate(bytes: Uint8Array): Promise<string> {
+async function inflate(bytes: Uint8Array, maxBytes: number, tooBig: string): Promise<string> {
   const reader = pipe(bytes, new DecompressionStream('deflate-raw'))
   const chunks: Uint8Array[] = []
   let size = 0
   for (let r = await reader.read(); !r.done; r = await reader.read()) {
     size += r.value.length
-    if (size > MAX_JSON_BYTES) {
+    if (size > maxBytes) {
       void reader.cancel()
-      throw new ShareError('The shared list is too large to open.')
+      throw new ShareError(tooBig)
     }
     chunks.push(r.value)
   }
@@ -179,16 +196,8 @@ async function inflate(bytes: Uint8Array): Promise<string> {
 
 /** Decode a fragment (with or without the leading #). Throws ShareError with a readable message on any problem. */
 export async function decodeShare(fragment: string): Promise<SharedItem[]> {
-  const s = fragment.replace(/^#/, '').trim()
-  if (!s) throw new ShareError('This link has no watchlist attached.')
-  if (s.length > MAX_PAYLOAD_CHARS || !/^[A-Za-z0-9_-]+$/.test(s)) throw new ShareError('The link is damaged or incomplete.')
-  let json: string
-  try {
-    json = await inflate(fromBase64Url(s))
-  } catch (err) {
-    if (err instanceof ShareError) throw err
-    throw new ShareError('The link is damaged or incomplete.')
-  }
+  if (!fragment.replace(/^#/, '').trim()) throw new ShareError('This link has no watchlist attached.')
+  const json = await unpackFragment(fragment, MAX_PAYLOAD_CHARS, MAX_JSON_BYTES, 'The shared list is too large to open.')
   let raw: unknown
   try {
     raw = JSON.parse(json)
