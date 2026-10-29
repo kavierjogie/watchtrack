@@ -32,7 +32,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
         navigateFallback: '/index.html',
         // Static public pages are real HTML files (precached), not app routes.
-        navigateFallbackDenylist: [/^\/api\//, /^\/about/, /^\/guides/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/about/, /^\/guides/, /^\/privacy/, /^\/terms/],
         // Opens the right title when a WatchTrack alert notification is clicked.
         importScripts: ['sw-notifications.js'],
         runtimeCaching: [
@@ -55,7 +55,7 @@ export default defineConfig({
     // Public pages are plain HTML (no JS) so every crawler can read them. Add new guides here and to public/sitemap.xml.
     rollupOptions: {
       input: Object.fromEntries(
-        ['index', 'about', 'guides', 'guides/track-anime-and-tv-episodes', 'guides/organise-your-watchlist', 'guides/watchlist-local-storage'].map((p) => [p, `${p}.html`]),
+        ['index', 'about', 'privacy', 'terms', 'guides', 'guides/track-anime-and-tv-episodes', 'guides/organise-your-watchlist', 'guides/watchlist-local-storage'].map((p) => [p, `${p}.html`]),
       ),
     },
   },

@@ -142,9 +142,13 @@ export function Layout() {
             <SideItem {...SETTINGS} />
           </ul>
           <p className="px-3 text-[11px] leading-relaxed text-muted">
-            Your data is stored only in this browser on this device.{' '}
+            Your data stays in this browser unless you turn on Google Drive sync.{' '}
             <a href="/about" className="underline hover:text-fg">
-              About WatchTrack
+              About
+            </a>{' '}
+            ·{' '}
+            <a href="/privacy" className="underline hover:text-fg">
+              Privacy
             </a>
           </p>
         </div>

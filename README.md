@@ -43,7 +43,7 @@ Requires Node 20+.
 
 Live at **https://watchtrack-eta.vercel.app**. If the domain changes, search the repo for `watchtrack-eta.vercel.app` (HTML heads, `public/robots.txt`, `public/sitemap.xml`, `src/components/Layout.tsx`).
 
-- `/about` and `/guides/*` are plain HTML pages (no JavaScript) built by Vite alongside the app, so any crawler can read them. They share `src/index.css`.
+- `/about`, `/privacy`, `/terms` and `/guides/*` are plain HTML pages (no JavaScript) built by Vite alongside the app, so any crawler can read them. They share `src/index.css`.
 - Only `/` and those pages are indexable. App routes (`/library`, `/title/…`, `/settings`, `/shared`, unknown paths) get `noindex` from `PageMeta` in `Layout.tsx`, because they show this device's own data (empty for a crawler).
 - Adding a guide: create `guides/<slug>.html` (copy an existing one), add it to `rollupOptions.input` in `vite.config.ts`, to `public/sitemap.xml`, and link it from `guides.html`.
 

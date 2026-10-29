@@ -322,8 +322,12 @@ export function SettingsPage() {
             <li>Notifications are optional and shown by your own browser — nothing is sent to a push server.</li>
           </ul>
           <p>
-            <a href="/about#privacy" className="underline hover:text-fg">
-              How WatchTrack stores your data
+            <a href="/privacy" className="underline hover:text-fg">
+              Privacy Policy
+            </a>{' '}
+            ·{' '}
+            <a href="/terms" className="underline hover:text-fg">
+              Terms of Service
             </a>
           </p>
         </div>
