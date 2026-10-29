@@ -9,7 +9,7 @@ import { applyImport, createBackup, downloadJson, MAX_BACKUP_BYTES, parseBackup,
 import { clearAll } from '../lib/db'
 import { resetDiscover } from '../lib/discover'
 import { FEEDBACK_MAILTO, formatBytes, today } from '../lib/format'
-import { setPrefs, snoozeBackupNudge, usePrefs, type Prefs } from '../lib/prefs'
+import { markBackedUp, setPrefs, usePrefs, type Prefs } from '../lib/prefs'
 import { canRefresh, useSyncState } from '../lib/sync'
 import { MEDIA_LABEL, STATUS_LABEL, type MediaType, type WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
@@ -185,7 +185,7 @@ export function SettingsPage() {
     try {
       const backup = await createBackup()
       downloadJson(backup, `watchtrack-backup-${today()}.json`)
-      snoozeBackupNudge(14)
+      markBackedUp(backup.titles.length)
       toast.success('Backup downloaded', { description: `${backup.titles.length} titles, ${backup.history.length} history entries, ${backup.images.length} images` })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Export failed.')

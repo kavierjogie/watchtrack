@@ -17,7 +17,7 @@ function greeting(now = new Date()) {
 
 export function Dashboard() {
   const { titles, loading, episodesLogged } = useLibrary()
-  const { backupNudgeAfter } = usePrefs()
+  const { backupNudgeAfter, backupCountAtExport } = usePrefs()
 
   if (loading)
     return (
@@ -90,7 +90,7 @@ export function Dashboard() {
         </Link>
       </Hero>
 
-      {backupNudgeDue(titles.length, backupNudgeAfter) && <BackupNudge />}
+      {backupNudgeDue(titles.length, backupCountAtExport, backupNudgeAfter) && <BackupNudge />}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Watching" value={count('watching')} icon={Play} to="/continue" />
@@ -208,7 +208,7 @@ function BackupNudge() {
           Export backup
         </Link>
       </div>
-      <button type="button" className="btn-ghost size-9 shrink-0 p-0" aria-label="Remind me later" onClick={() => snoozeBackupNudge(7)}>
+      <button type="button" className="btn-ghost size-9 shrink-0 p-0" aria-label="Remind me later" onClick={() => snoozeBackupNudge()}>
         <X className="size-4" aria-hidden />
       </button>
     </div>

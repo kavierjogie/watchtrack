@@ -19,6 +19,8 @@ export interface Prefs {
   browserNotify: boolean
   /** ISO time after which the Dashboard may nudge for a backup again ('' = whenever the library is big enough). */
   backupNudgeAfter: string
+  /** Library size at the last export: no nudge until it has grown since. */
+  backupCountAtExport: number
 }
 
 const KEY = 'watchtrack:prefs'
@@ -35,6 +37,7 @@ const DEFAULTS: Prefs = {
   alertDates: true,
   browserNotify: false,
   backupNudgeAfter: '',
+  backupCountAtExport: 0,
 }
 
 let cache: Prefs | null = null
@@ -91,11 +94,20 @@ export function applyTheme(theme: Prefs['theme']) {
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0b0b12' : '#f7f6fb')
 }
 
-/** Nudge once the library is worth losing; exporting or dismissing pushes it back (see snoozeBackupNudge). */
-export function backupNudgeDue(titleCount: number, after: string, now = Date.now()): boolean {
-  return titleCount >= 5 && (!after || Date.parse(after) <= now)
+const NUDGE_TITLES = 5
+const NUDGE_DAYS = 30
+
+/** Nudge once there are 5+ titles not in a backup, and not within 30 days of the last export or dismissal. */
+export function backupNudgeDue(titleCount: number, countAtExport: number, after: string, now = Date.now()): boolean {
+  return titleCount - countAtExport >= NUDGE_TITLES && (!after || Date.parse(after) <= now)
 }
 
-export function snoozeBackupNudge(days: number, now = Date.now()) {
-  setPrefs({ backupNudgeAfter: new Date(now + days * 86_400_000).toISOString() })
+const snoozeUntil = (now: number) => new Date(now + NUDGE_DAYS * 86_400_000).toISOString()
+
+export function snoozeBackupNudge(now = Date.now()) {
+  setPrefs({ backupNudgeAfter: snoozeUntil(now) })
+}
+
+export function markBackedUp(titleCount: number, now = Date.now()) {
+  setPrefs({ backupNudgeAfter: snoozeUntil(now), backupCountAtExport: titleCount })
 }
