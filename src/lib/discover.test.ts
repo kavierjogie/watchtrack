@@ -194,6 +194,55 @@ describe('loadPool', () => {
     expect(s.links).toEqual([{ key: 'kitsu:2', seedId: seed.id, role: 'sequel' }]) // recaps/summaries are skipped
     expect(s.pool.map((c) => c.title)).toContain('Mob 2')
   })
+
+  it('reads which earlier entry a Kitsu list title continues, ignoring "prequels" released after it', async () => {
+    const anime = (id: string, title: string, startDate: string, rels?: string[]) => ({
+      id,
+      type: 'anime',
+      attributes: { slug: id, canonicalTitle: title, titles: {}, subtype: 'TV', startDate, posterImage: null, coverImage: null, synopsis: '', status: 'finished', episodeCount: 12, abbreviatedTitles: [] },
+      relationships: { categories: { data: [] }, ...(rels && { mediaRelationships: { data: rels.map((r) => ({ type: 'mediaRelationships', id: r })) } }) },
+    })
+    const rel = (id: string, role: string, dest: string) => ({ type: 'mediaRelationships', id, attributes: { role }, relationships: { destination: { data: { type: 'anime', id: dest } } } })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        url.includes('kitsu') && url.includes('sort=popularityRank') && !url.includes('filter[subtype]')
+          ? json({
+              data: [
+                anime('2', 'Show 2', '2020-01-01', ['r1']),
+                anime('3', 'Show 3', '2022-01-01', ['r3']), // its prequel is on this page, so JSON:API leaves it out of `included`
+                anime('5', 'Later-made prequel story', '2018-01-01', ['r2']),
+                anime('7', 'Standalone', '2019-01-01', []),
+              ],
+              included: [rel('r1', 'prequel', '1'), anime('1', 'Show', '2017-01-01'), rel('r2', 'prequel', '6'), anime('6', 'Zero', '2021-01-01'), rel('r3', 'prequel', '2')],
+            })
+          : url.includes('kitsu')
+            ? json({ data: [] })
+            : json([]),
+      ),
+    )
+    const s = await run([])
+    const byTitle = (t: string) => s.pool.find((c) => c.title === t)
+    expect(byTitle('Show 2')?.earlier).toMatchObject({ title: 'Show', source: { id: '1' } })
+    expect(byTitle('Show 3')?.earlier).toMatchObject({ title: 'Show 2', source: { id: '2' } })
+    expect(byTitle('Later-made prequel story')?.earlier).toBeNull() // "Zero" came out later: not an earlier entry
+    expect(byTitle('Standalone')?.earlier).toBeNull()
+  })
+})
+
+describe('loadSimilar', () => {
+  it('uses the title’s own provider links and genres, and reports a failed provider instead of throwing', async () => {
+    const t = createTitle({ title: 'Mushishi', mediaType: 'anime', status: 'completed', genres: ['Supernatural', 'Slice of Life'], source: { provider: 'kitsu', id: '77', url: '' } })
+    const fetchMock = vi.fn((url: string) => (url.includes('media-relationships') ? json({}, 503) : json({ data: [] })))
+    vi.stubGlobal('fetch', fetchMock)
+    const s = await d.loadSimilar(t)
+    expect(s.failed.map((f) => f.provider)).toEqual(['kitsu'])
+    expect(s.pool).toEqual([])
+    const urls = fetchMock.mock.calls.map(([u]) => decodeURIComponent(u))
+    expect(urls.some((u) => u.includes('/anime/77/media-relationships'))).toBe(true)
+    expect(urls.some((u) => u.includes('filter[categories]=supernatural'))).toBe(true)
+    expect(urls.every((u) => u.includes('kitsu.app'))).toBe(true) // nothing about the rest of the library is sent
+  })
 })
 
 describe('inferMetadata', () => {

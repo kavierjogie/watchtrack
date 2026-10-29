@@ -8,6 +8,7 @@ import { Modal } from '../components/Modal'
 import { Poster, usePosterUrl } from '../components/Poster'
 import { ProgressEditor } from '../components/ProgressEditor'
 import { TitleForm } from '../components/TitleForm'
+import { SimilarTitles } from './Discover'
 import { alertsOn } from '../lib/alerts'
 import { normTitle } from '../lib/backup'
 import { usePrefs } from '../lib/prefs'
@@ -424,6 +425,8 @@ function Details({ t }: { t: Title }) {
           )}
         </aside>
       </div>
+
+      <SimilarTitles t={t} />
 
       <AnimatePresence>{editProgress && <ProgressEditor title={t} open onClose={closeEditor} />}</AnimatePresence>
       <AnimatePresence>{editDetails && <TitleForm open existing={t} initialQuery={typeof editDetails === 'string' ? editDetails : undefined} onClose={() => setEditDetails(false)} />}</AnimatePresence>

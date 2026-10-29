@@ -1,15 +1,15 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, Compass, Eye, ExternalLink, Loader2, Plus, RotateCw, Sparkles, Star, WifiOff, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { EmptyState, PageHeader, Section } from '../components/cards'
 import { Modal } from '../components/Modal'
 import { Poster } from '../components/Poster'
-import { candidateToTitle, dismiss, likeCandidate, loadPool, restoreDismissed, setFilters, undismiss, useDiscover, withInferred, type PoolState } from '../lib/discover'
+import { candidateToTitle, dismiss, likeCandidate, loadPool, loadSimilar, restoreDismissed, setFilters, undismiss, useDiscover, withInferred, type PoolState } from '../lib/discover'
 import { PROVIDER_LABEL } from '../lib/metadata'
-import { buildDiscover, buildProfile, findTracked, indexLibrary, isTasteGenre, normGenre, topGenres, type Candidate, type Rec, type SortKey } from '../lib/recommend'
-import { MEDIA_LABEL, STATUS_LABEL } from '../lib/types'
+import { buildDiscover, buildProfile, buildSimilar, findTracked, indexLibrary, isPersonal, isTasteGenre, normGenre, topGenres, type Candidate, type Rec, type SortKey } from '../lib/recommend'
+import { MEDIA_LABEL, STATUS_LABEL, type Title } from '../lib/types'
 import { useLibrary } from '../state/library'
 
 const SORT_LABEL: Record<SortKey, string> = { match: 'Best match', popular: 'Most popular', rating: 'Highest rated', newest: 'Newest' }
@@ -35,10 +35,6 @@ export function DiscoverPage() {
   const [pool, setPool] = useState<PoolState | null>(null)
   /** The request the current results finished for; loading while it differs from the one wanted now. */
   const [doneFor, setDoneFor] = useState<string | null>(null)
-  /** Added during this visit: kept on screen so the card can show its new state instead of vanishing. */
-  const [keep, setKeep] = useState<Set<string>>(new Set())
-  const [busy, setBusy] = useState<Set<string>>(new Set())
-  const [details, setDetails] = useState<Rec | null>(null)
 
   // Only refetch when what we'd ask the providers about changes — not on every rating or episode logged.
   const profile = useMemo(() => buildProfile(lib.titles, feedback), [lib.titles, feedback])
@@ -61,9 +57,18 @@ export function DiscoverPage() {
 
   // Titles without genres or a provider id get the ones looked up by exact name (in memory only, never saved).
   const library = useMemo(() => (pool ? withInferred(lib.titles, pool.inferred) : lib.titles), [pool, lib.titles])
+  const setFocus = (id: string | null) => {
+    setParams((p) => {
+      if (id) p.set('like', id)
+      else p.delete('like')
+      return p
+    })
+    if (id) window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  const { actions, keep, setKeep, details, setDetails } = useRecActions(library, (r) => setFocus(moreLikeId(r)))
   const built = useMemo(
-    () => (pool ? buildDiscover(pool.pool, pool.links, library, feedback, { ...filters, focus, keep }) : null),
-    [pool, library, feedback, filters, focus, keep],
+    () => (pool ? buildDiscover(pool.pool, pool.links, library, feedback, { ...filters, focus, keep, round }) : null),
+    [pool, library, feedback, filters, focus, keep, round],
   )
 
   // Genres offered as filters: ones that appear on several candidates, by their provider labels.
@@ -73,70 +78,11 @@ export function DiscoverPage() {
     return [...count].filter(([, v]) => v.n >= 5 && isTasteGenre(v.label)).sort((a, b) => a[1].label.localeCompare(b[1].label))
   }, [pool])
 
-  const setFocus = (id: string | null) => {
-    setParams((p) => {
-      if (id) p.set('like', id)
-      else p.delete('like')
-      return p
-    })
-    if (id) window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const withBusy = async (key: string, fn: () => Promise<void>) => {
-    if (busy.has(key)) return
-    setBusy((b) => new Set(b).add(key))
-    try {
-      await fn()
-    } finally {
-      setBusy((b) => {
-        const n = new Set(b)
-        n.delete(key)
-        return n
-      })
-    }
-  }
-
-  /** Add to the library as planned or already watched. Never touches a title that's already tracked. */
-  const save = (r: Rec, status: 'plan' | 'completed') =>
-    withBusy(r.key, async () => {
-      const existing = findTracked(r.c, indexLibrary(library))
-      if (existing) {
-        toast.info(`${existing.title} is already in your library`, { description: STATUS_LABEL[existing.status] })
-        return
-      }
-      try {
-        const title = await candidateToTitle(r.c, status)
-        // The library may have changed while artwork downloaded (another tab, a double tap).
-        if (findTracked(r.c, indexLibrary(lib.titles))) return
-        await lib.save(title)
-        setKeep((k) => new Set(k).add(r.key))
-        toast.success(status === 'plan' ? `Added ${title.title} to Plan to Watch` : `Marked ${title.title} as watched`, {
-          description: status === 'completed' ? 'Saved as Completed — rate it to sharpen your recommendations.' : undefined,
-          duration: 6000,
-          action: { label: 'Undo', onClick: () => void lib.remove(title.id).catch((err: unknown) => toast.error(errMsg(err))) },
-        })
-      } catch (err) {
-        toast.error(errMsg(err))
-      }
-    })
-
-  const onDismiss = (r: Rec) => {
-    dismiss(r.c)
-    setDetails(null)
-    toast(`Dismissed ${r.c.title}`, { description: "It won't be recommended again.", duration: 6000, action: { label: 'Undo', onClick: () => undismiss(r.key) } })
-  }
-
-  const onMore = (r: Rec) => {
-    setDetails(null)
-    setFocus(r.tracked ? r.tracked.id : likeCandidate(r.c))
-  }
-
   const refresh = () => {
     setKeep(new Set())
     setRound((n) => n + 1)
   }
 
-  const actions = { save, onDismiss, onMore, open: setDetails, busy }
   const sections = built?.sections ?? []
   const failed = pool?.failed ?? []
   const waiting = !pool || (pool.pool.length === 0 && pool.pending > 0)
@@ -155,12 +101,12 @@ export function DiscoverPage() {
               {topGenres(built.profile).length > 0 && <> · you lean towards {topGenres(built.profile).join(', ')}</>}
             </>
           ) : (
-            'Popular, well-rated titles to get you started.'
+            'General picks — popular, well-rated titles, not yet based on your library.'
           )
         }
         action={
-          <button type="button" className="btn-secondary" onClick={refresh} disabled={loading}>
-            <RotateCw className={`size-4 ${loading ? 'animate-spin' : ''}`} aria-hidden /> Refresh
+          <button type="button" className="btn-secondary" onClick={refresh} disabled={loading} title="Load the next page from each catalogue">
+            <RotateCw className={`size-4 ${loading ? 'animate-spin' : ''}`} aria-hidden /> Another set
           </button>
         }
       />
@@ -288,6 +234,7 @@ export function DiscoverPage() {
               title={s.title}
               subtitle={s.subtitle}
               recs={s.recs}
+              general={s.general}
               actions={actions}
               expanded={s.id === 'focus'}
               onClear={s.id === 'focus' ? () => setFocus(null) : undefined}
@@ -321,7 +268,162 @@ interface Actions {
   busy: Set<string>
 }
 
-function RecSection({ title, subtitle, recs, actions, expanded = false, onClear, note }: { title: string; subtitle?: string; recs: Rec[]; actions: Actions; expanded?: boolean; onClear?: () => void; note?: ReactNode }) {
+/** The seed id for "More like this": the library title, or the candidate remembered as a liked title. */
+const moreLikeId = (r: Rec) => (r.tracked ? r.tracked.id : likeCandidate(r.c))
+
+/** Card actions shared by Discover and "Similar titles": add, mark watched, dismiss, details. */
+function useRecActions(library: Title[], onMore: (r: Rec) => void) {
+  const lib = useLibrary()
+  /** Added during this visit: kept on screen so the card can show its new state instead of vanishing. */
+  const [keep, setKeep] = useState<Set<string>>(new Set())
+  const [busy, setBusy] = useState<Set<string>>(new Set())
+  const [details, setDetails] = useState<Rec | null>(null)
+
+  const withBusy = async (key: string, fn: () => Promise<void>) => {
+    if (busy.has(key)) return
+    setBusy((b) => new Set(b).add(key))
+    try {
+      await fn()
+    } finally {
+      setBusy((b) => {
+        const n = new Set(b)
+        n.delete(key)
+        return n
+      })
+    }
+  }
+
+  /** Add to the library as planned or already watched. Never touches a title that's already tracked. */
+  const save = (r: Rec, status: 'plan' | 'completed') =>
+    withBusy(r.key, async () => {
+      const existing = findTracked(r.c, indexLibrary(library))
+      if (existing) {
+        toast.info(`${existing.title} is already in your library`, { description: STATUS_LABEL[existing.status] })
+        return
+      }
+      try {
+        const title = await candidateToTitle(r.c, status)
+        // The library may have changed while artwork downloaded (another tab, a double tap).
+        if (findTracked(r.c, indexLibrary(lib.titles))) return
+        await lib.save(title)
+        setKeep((k) => new Set(k).add(r.key))
+        toast.success(status === 'plan' ? `Added ${title.title} to Plan to Watch` : `Marked ${title.title} as watched`, {
+          description: status === 'completed' ? 'Saved as Completed — rate it to sharpen your recommendations.' : undefined,
+          duration: 6000,
+          action: { label: 'Undo', onClick: () => void lib.remove(title.id).catch((err: unknown) => toast.error(errMsg(err))) },
+        })
+      } catch (err) {
+        toast.error(errMsg(err))
+      }
+    })
+
+  const onDismiss = (r: Rec) => {
+    dismiss(r.c)
+    setDetails(null)
+    toast(`Dismissed ${r.c.title}`, { description: "It won't be recommended again.", duration: 6000, action: { label: 'Undo', onClick: () => undismiss(r.key) } })
+  }
+
+  const actions: Actions = {
+    save,
+    onDismiss,
+    onMore: (r) => {
+      setDetails(null)
+      onMore(r)
+    },
+    open: setDetails,
+    busy,
+  }
+  return { actions, keep, setKeep, details, setDetails }
+}
+
+/**
+ * "Similar titles" for one library title, from its own provider metadata (relationships, recommendations, genre
+ * lists). Library titles are left out; each card lists what it shares with this one.
+ */
+export function SimilarTitles({ t }: { t: Title }) {
+  const lib = useLibrary()
+  const { feedback } = useDiscover()
+  const navigate = useNavigate()
+  const [attempt, setAttempt] = useState(0)
+  const [res, setRes] = useState<{ for: string; data: Awaited<ReturnType<typeof loadSimilar>> } | null>(null)
+  // Refetch only when what we'd ask about changes — not on every episode logged or rating changed.
+  const ask = JSON.stringify([t.id, t.mediaType, t.source?.provider, t.source?.id, t.genres, attempt])
+  const latest = useRef(t)
+  useEffect(() => {
+    latest.current = t
+  })
+  useEffect(() => {
+    let alive = true
+    void loadSimilar(latest.current).then((data) => alive && setRes({ for: ask, data }))
+    return () => {
+      alive = false
+    }
+  }, [ask])
+
+  const data = res?.data
+  const library = useMemo(() => (data ? withInferred(lib.titles, data.inferred) : lib.titles), [data, lib.titles])
+  const { actions, keep, details, setDetails } = useRecActions(library, (r) => navigate(`/discover?like=${encodeURIComponent(moreLikeId(r))}`))
+  const recs = useMemo(() => (data ? buildSimilar(data.pool, data.links, library, feedback, t.id, keep) : []), [data, library, feedback, t.id, keep])
+  const loading = res?.for !== ask
+
+  return (
+    <>
+      {loading ? (
+        <Section title="Similar titles">
+          <p className="-mt-2 text-xs text-muted">Looking at {t.title}'s provider links and genres…</p>
+          <div className={GRID} aria-busy aria-label="Loading similar titles">
+            {Array.from({ length: PREVIEW }, (_, j) => (
+              <div key={j} className="space-y-2">
+                <div className="skeleton aspect-[2/3] rounded-xl" />
+                <div className="skeleton h-3 w-3/4 rounded" />
+              </div>
+            ))}
+          </div>
+        </Section>
+      ) : recs.length ? (
+        <RecSection title="Similar titles" subtitle={`Based on ${t.title}'s own metadata: provider relationships and shared genres.`} recs={recs} actions={actions} />
+      ) : (
+        <Section title="Similar titles">
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-surface-2 px-4 py-3 text-sm text-muted">
+            <span className="min-w-0 flex-1">
+              {data?.failed.length
+                ? `${data.failed[0].message} Couldn't load similar titles.`
+                : t.genres.length || t.source
+                  ? 'Nothing similar found that isn’t already in your library.'
+                  : 'Link this title to a provider or add genres to see similar titles.'}
+            </span>
+            {data?.failed.length ? (
+              <button type="button" className="btn-ghost min-h-8 px-3 text-xs" onClick={() => setAttempt((n) => n + 1)}>
+                <RotateCw className="size-3.5" aria-hidden /> Retry
+              </button>
+            ) : null}
+          </p>
+        </Section>
+      )}
+      <AnimatePresence>{details && <RecDetails r={details} onClose={() => setDetails(null)} actions={actions} />}</AnimatePresence>
+    </>
+  )
+}
+
+function RecSection({
+  title,
+  subtitle,
+  recs,
+  actions,
+  general = false,
+  expanded = false,
+  onClear,
+  note,
+}: {
+  title: string
+  subtitle?: string
+  recs: Rec[]
+  actions: Actions
+  general?: boolean
+  expanded?: boolean
+  onClear?: () => void
+  note?: ReactNode
+}) {
   const [all, setAll] = useState(expanded)
   const shown = all ? recs : recs.slice(0, PREVIEW)
   return (
@@ -341,7 +443,12 @@ function RecSection({ title, subtitle, recs, actions, expanded = false, onClear,
         )
       }
     >
-      {(subtitle || note) && <p className="-mt-2 text-xs text-muted">{note ?? subtitle}</p>}
+      {(subtitle || note || general) && (
+        <p className="-mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+          {general && <span className="rounded-full bg-surface-2 px-2 py-0.5 font-medium text-fg-2">General picks</span>}
+          {note ?? subtitle}
+        </p>
+      )}
       <ul className={GRID}>
         {shown.map((r) => (
           <RecCard key={r.key} r={r} actions={actions} />
@@ -361,9 +468,21 @@ function Score({ c }: { c: Candidate }) {
   )
 }
 
+const MATCH_HINT = 'Relevance score out of 100 from the factors behind this pick — not a probability that you will like it.'
+
+function Match({ r }: { r: Rec }) {
+  return (
+    <span className="tabular-nums" title={MATCH_HINT}>
+      Match {r.match}
+      <span className="sr-only">/100, a relevance score, not a probability</span>
+    </span>
+  )
+}
+
 function RecCard({ r, actions }: { r: Rec; actions: Actions }) {
   const { c, tracked } = r
   const busy = actions.busy.has(r.key)
+  const personal = isPersonal(r)
   return (
     <motion.li layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }} className="flex min-w-0 flex-col">
       <div className="group relative">
@@ -392,11 +511,18 @@ function RecCard({ r, actions }: { r: Rec; actions: Actions }) {
           <span>{MEDIA_LABEL[c.mediaType]}</span>
           {c.year && <span>{c.year}</span>}
           <Score c={c} />
+          {personal && <Match r={r} />}
         </p>
-        <p className="flex gap-1 text-xs text-accent-text">
-          <Sparkles className="mt-0.5 size-3 shrink-0" aria-hidden />
+        <p className={`flex gap-1 text-xs ${personal ? 'text-accent-text' : 'text-muted'}`}>
+          {personal ? <Sparkles className="mt-0.5 size-3 shrink-0" aria-hidden /> : <Compass className="mt-0.5 size-3 shrink-0" aria-hidden />}
           <span className="line-clamp-2">{r.reason}</span>
         </p>
+        {r.shared && r.shared.length > 0 && (
+          <p className="line-clamp-2 text-[11px] text-muted">
+            <span className="sr-only">Shared with this title: </span>
+            {r.shared.slice(0, 4).join(' · ')}
+          </p>
+        )}
       </div>
       <div className="mt-2 flex items-center gap-1">
         {tracked ? (
@@ -473,10 +599,38 @@ function RecDetails({ r, onClose, actions }: { r: Rec; onClose: () => void; acti
             <Score c={c} />
           </p>
           {c.altTitles.length > 0 && <p className="text-sm text-muted">{c.altTitles.slice(0, 3).join(' · ')}</p>}
-          <p className="flex gap-2 rounded-xl bg-accent-soft px-3 py-2 text-sm text-accent-text">
-            <Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden />
-            {r.reason}
-          </p>
+          {isPersonal(r) ? (
+            <div className="space-y-2 rounded-xl bg-accent-soft px-3 py-2 text-sm text-accent-text">
+              <p className="flex gap-2">
+                <Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span className="min-w-0 flex-1">{r.reason}</span>
+                <span className="shrink-0 tabular-nums font-medium">Match {r.match}</span>
+              </p>
+              <details className="text-xs">
+                <summary className="cursor-pointer select-none">Why this pick</summary>
+                <ul className="mt-1.5 space-y-1">
+                  {r.factors.map((f) => (
+                    <li key={f.label} className="flex justify-between gap-3">
+                      <span className="min-w-0">{f.label}</span>
+                      <span className="shrink-0 tabular-nums">
+                        {f.points > 0 ? '+' : ''}
+                        {f.points.toFixed(1)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1.5 text-accent-text/80">{MATCH_HINT}</p>
+              </details>
+            </div>
+          ) : (
+            <p className="flex gap-2 rounded-xl bg-surface-2 px-3 py-2 text-sm text-muted">
+              <Compass className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>
+                {r.reason}. A general pick, not based on your library.
+              </span>
+            </p>
+          )}
+          {r.shared && r.shared.length > 0 && <p className="text-xs text-muted">In common: {r.shared.join(' · ')}</p>}
           {c.genres.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {c.genres.slice(0, 10).map((g) => (

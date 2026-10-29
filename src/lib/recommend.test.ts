@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   buildDiscover,
   buildProfile,
+  buildSimilar,
   candidateKey,
   dedupe,
   emptyFeedback,
+  entryPoint,
   findTracked,
+  genreSimilarity,
   indexLibrary,
-  looksLikeSequel,
+  isPersonal,
   scoreCandidate,
   titleWeight,
   type Candidate,
@@ -31,7 +34,7 @@ function cand(title: string, genres: string[], extra: Partial<Candidate> = {}): 
     date: null,
     synopsis: '',
     genres,
-    posterUrl: null,
+    posterUrl: `https://example.test/${id}.jpg`,
     thumbUrl: null,
     backdropUrl: null,
     totalEpisodes: 12,
@@ -73,7 +76,7 @@ describe('scoring', () => {
     const near = scoreCandidate(cand('Magi', ['Action', 'Adventure', 'Fantasy', 'Magic']), p, [])
     const far = scoreCandidate(cand('K-On!', ['Music', 'School']), p, [])
     expect(near.score).toBeGreaterThan(far.score)
-    expect(near.reason).toBe('Similar to your favourite, Fullmetal Alchemist')
+    expect(near.reason).toBe('Similar to Fullmetal Alchemist, which you rated 10/10')
     expect(far.kind).toBe('popular')
   })
 
@@ -122,13 +125,14 @@ describe('library matching and duplicates', () => {
     expect(dedupe([a, b, a, remake])).toEqual([a, remake])
   })
 
-  it('spots later seasons by name', () => {
-    expect(looksLikeSequel('Attack on Titan Season 3 Part 2')).toBe(true)
-    expect(looksLikeSequel('Jujutsu Kaisen 2nd Season')).toBe(true)
-    expect(looksLikeSequel('Assassination Classroom Second Season')).toBe(true)
-    expect(looksLikeSequel("KonoSuba: God's Blessing on This Wonderful World! 3")).toBe(true)
-    expect(looksLikeSequel('Mob Psycho 100')).toBe(false)
-    expect(looksLikeSequel('Steins;Gate')).toBe(false)
+  it('merges an anime series listed as TV by another provider a year apart, and spots it as tracked', () => {
+    const kitsu = cand('Frieren', ['Adventure', 'Fantasy'], { year: 2023 })
+    const tmdb = cand('Frieren', ['Adventure', 'Fantasy'], { year: 2024, mediaType: 'tv', source: { provider: 'tmdb', id: 'tv/209867', url: '' } })
+    const film = cand('Frieren', ['Fantasy'], { year: 2023, mediaType: 'movie' })
+    expect(dedupe([kitsu, tmdb, film])).toEqual([kitsu, film])
+    const idx = indexLibrary([lib('Frieren', [], { mediaType: 'tv' })])
+    expect(findTracked(kitsu, idx)).toBeDefined()
+    expect(findTracked(film, idx)).toBeUndefined()
   })
 })
 
@@ -145,7 +149,8 @@ describe('buildDiscover', () => {
     ...Array.from({ length: 6 }, (_, i) => cand(`Mystery ${i}`, ['Mystery', 'Thriller', 'Psychological'])),
     ...Array.from({ length: 6 }, (_, i) => cand(`Sitcom ${i}`, ['Comedy', 'Family'], { mediaType: 'tv', source: { provider: 'tvmaze', id: `${100 + i}`, url: '' } })),
     ...Array.from({ length: 3 }, (_, i) => cand(`Gem ${i}`, ['Slice of Life', 'Iyashikei'], { communityScore: 85, popularity: 0.2 })),
-    cand('Some Show Season 2', ['Action', 'Adventure', 'Fantasy']), // unlinked later season
+    // A later season whose first season isn't tracked: swapped for that first season (by Kitsu's relationship data).
+    cand('Some Show Season 2', ['Action', 'Adventure', 'Fantasy'], { earlier: cand('Some Show', [], { year: 2018 }) }),
   ]
 
   it('excludes tracked, dismissed and duplicate titles, and never repeats a title across sections', () => {
@@ -171,9 +176,9 @@ describe('buildDiscover', () => {
     const third = lib('Mushishi', ['Mystery', 'Supernatural', 'Slice of Life'], { rating: 8 })
     const extra = Array.from({ length: 8 }, (_, i) => cand(`Calm ${i}`, ['Supernatural', 'Slice of Life']))
     const { sections } = buildDiscover([...pool, ...extra], [], [...library, third], emptyFeedback(), OPTS)
-    const favs = sections.find((s) => s.id === 'favourites')
+    const favs = sections.find((s) => s.id === 'top-rated')
     expect(favs?.recs.length).toBeGreaterThanOrEqual(3)
-    expect(favs?.recs.some((r) => r.reason === 'Similar to your favourite, Mushishi')).toBe(true)
+    expect(favs?.recs.some((r) => r.reason === 'Similar to Mushishi, which you rated 8/10')).toBe(true)
   })
 
   it('keeps a title added during this visit, flagged as tracked', () => {
@@ -195,7 +200,7 @@ describe('buildDiscover', () => {
 
   it('"More like" includes related titles first, can show tracked ones, and never the title itself', () => {
     const fma = library[0]
-    const sequel = cand('Brotherhood', [])
+    const sequel = cand('Brotherhood', ['Action', 'Adventure', 'Fantasy'])
     const links: Link[] = [{ key: candidateKey(sequel), seedId: fma.id, role: 'alternative_version' }]
     const { sections } = buildDiscover([...pool, sequel], links, library, emptyFeedback(), { ...OPTS, focus: fma.id })
     const focus = sections[0]
@@ -211,10 +216,155 @@ describe('buildDiscover', () => {
     expect(sections.map((s) => s.id)).not.toContain('for-you')
     expect(sections.find((s) => s.id === 'anime')?.recs.length).toBeGreaterThan(0)
     expect(sections.find((s) => s.id === 'tv')?.recs.length).toBe(7) // nothing is tracked, so "Planned Show" counts too
-    expect(sections.flatMap((s) => s.recs).every((r) => r.kind === 'popular' || r.kind === 'quality')).toBe(true)
+    expect(sections.flatMap((s) => s.recs).every((r) => !isPersonal(r))).toBe(true)
+    expect(sections.every((s) => s.general)).toBe(true) // labelled as general picks, not personal
   })
 
   it('returns no sections, not an error, for an empty pool', () => {
     expect(buildDiscover([], [], library, emptyFeedback(), OPTS).sections).toEqual([])
+  })
+})
+
+describe('genre similarity', () => {
+  it('is Jaccard: a title with two tags does not fully match a seed with many', () => {
+    const seed = ['action', 'fantasy', 'military', 'magic', 'drama', 'adventure']
+    expect(genreSimilarity(['action', 'fantasy'], seed).sim).toBeCloseTo(2 / 6)
+    expect(genreSimilarity(['action', 'fantasy', 'military', 'magic'], seed).sim).toBeGreaterThan(genreSimilarity(['action', 'fantasy'], seed).sim)
+    expect(genreSimilarity(['action'], seed).sim).toBe(0)
+  })
+
+  it('keeps an anime’s "More like" row to anime when live-action shares only broad genres', () => {
+    const fma = lib('Fullmetal Alchemist', ['Action', 'Adventure', 'Fantasy', 'Drama'], { rating: 10, source: { provider: 'kitsu', id: '1', url: '' } })
+    const anime = Array.from({ length: 3 }, (_, i) => cand(`Anime ${i}`, ['Action', 'Fantasy', 'Magic']))
+    const live = Array.from({ length: 3 }, (_, i) => cand(`Live ${i}`, ['Action', 'Fantasy', 'Crime'], { mediaType: 'tv', source: { provider: 'tvmaze', id: `${900 + i}`, url: '' } }))
+    const row = buildDiscover([...live, ...anime], [], [fma], emptyFeedback(), { ...OPTS, focus: fma.id }).sections.find((s) => s.id === 'focus')
+    expect(row?.recs.map((r) => r.c.title).sort()).toEqual(['Anime 0', 'Anime 1', 'Anime 2'])
+  })
+})
+
+describe('profile and factors', () => {
+  it('uses several top-rated titles across genres, each with its own picks and factual reasons', () => {
+    const library = [
+      lib('Frieren', ['Adventure', 'Fantasy', 'Drama'], { rating: 10, year: 2023 }),
+      lib('Monster', ['Mystery', 'Thriller', 'Psychological'], { rating: 9, year: 2004 }),
+      lib('Haikyu', ['Sports', 'Comedy', 'School'], { rating: 8, year: 2014 }),
+    ]
+    const pool = [
+      ...Array.from({ length: 4 }, (_, i) => cand(`Quest ${i}`, ['Adventure', 'Fantasy', 'Drama'], { year: 2020 })),
+      ...Array.from({ length: 4 }, (_, i) => cand(`Case ${i}`, ['Mystery', 'Thriller', 'Psychological'], { year: 2010 })),
+      ...Array.from({ length: 4 }, (_, i) => cand(`Rally ${i}`, ['Sports', 'Comedy', 'School'], { year: 2016 })),
+      ...Array.from({ length: 4 }, (_, i) => cand(`Other ${i}`, ['Horror', 'Gore'])),
+    ]
+    const { sections, personal } = buildDiscover(pool, [], library, emptyFeedback(), OPTS)
+    expect(personal).toBe(true)
+    const forYou = sections.find((s) => s.id === 'for-you')!
+    expect(new Set(forYou.recs.map((r) => r.seedId)).size).toBe(3) // every top-rated title is represented
+    expect(forYou.recs.some((r) => r.c.title.startsWith('Other'))).toBe(false)
+    const r = forYou.recs[0]
+    expect(r.match).toBeGreaterThan(0)
+    expect(r.match).toBeLessThanOrEqual(100)
+    expect(r.factors.length).toBeGreaterThan(1)
+    expect(r.factors[0].points).toBeGreaterThanOrEqual(r.factors[r.factors.length - 1].points) // biggest first
+    expect(r.factors.some((f) => /^Shares .* with (Frieren|Monster|Haikyu)$/.test(f.label))).toBe(true)
+  })
+
+  it('scores titles with no genres, rating, popularity or year without NaN, and drops ones it cannot judge or show', () => {
+    const library = [lib('Seed', ['Action', 'Drama'], { rating: 9, year: 2015 })]
+    const bare = cand('Bare', ['Action', 'Drama'], { communityScore: null, popularity: null, year: null })
+    const noGenres = cand('No Genres', [])
+    const noArt = cand('No Art', ['Action', 'Drama'], { posterUrl: null, thumbUrl: null })
+    const untitled = cand('Untitled', ['Action', 'Drama'])
+    const r = scoreCandidate(bare, buildProfile(library, emptyFeedback()), [])
+    expect(Number.isFinite(r.score)).toBe(true)
+    expect(Number.isFinite(r.match)).toBe(true)
+    expect(allKeys(buildDiscover([bare, noGenres, noArt, untitled], [], library, emptyFeedback(), OPTS).sections)).toEqual([candidateKey(bare)])
+  })
+
+  it('still recommends when the most obvious picks are already in the library', () => {
+    const library = [lib('Fullmetal Alchemist', ['Action', 'Adventure', 'Fantasy'], { rating: 10 })]
+    const obvious = Array.from({ length: 4 }, (_, i) => cand(`Obvious ${i}`, ['Action', 'Adventure', 'Fantasy'], { popularity: 1, communityScore: 90 }))
+    const saved = obvious.map((c) => lib(c.title, c.genres, { status: 'plan', source: c.source }))
+    const rest = Array.from({ length: 4 }, (_, i) => cand(`Next ${i}`, ['Action', 'Fantasy', 'Magic']))
+    const keys = allKeys(buildDiscover([...obvious, ...rest], [], [...library, ...saved], emptyFeedback(), OPTS).sections)
+    for (const c of obvious) expect(keys).not.toContain(candidateKey(c))
+    expect(keys.length).toBe(4)
+  })
+
+  it('breaks ties the same way every time, whatever order the providers answered in', () => {
+    const library = [lib('Seed', ['Action', 'Drama'], { rating: 9 })]
+    const pool = Array.from({ length: 10 }, (_, i) => cand(`Twin ${i}`, ['Action', 'Drama']))
+    const a = allKeys(buildDiscover(pool, [], library, emptyFeedback(), OPTS).sections)
+    expect(allKeys(buildDiscover([...pool].reverse(), [], library, emptyFeedback(), OPTS).sections)).toEqual(a)
+    // "Another set" only reshuffles exact ties: same titles.
+    expect(new Set(allKeys(buildDiscover(pool, [], library, emptyFeedback(), { ...OPTS, round: 1 }).sections))).toEqual(new Set(a))
+  })
+
+  it('handles a tiny catalogue', () => {
+    const { sections } = buildDiscover([cand('Only', ['Action', 'Drama'])], [], [lib('Seed', ['Action', 'Drama'], { rating: 9 })], emptyFeedback(), OPTS)
+    expect(allKeys(sections)).toHaveLength(1)
+  })
+})
+
+describe('sequels and seasons (Kitsu relationship data only)', () => {
+  const s1 = cand('Show', ['Action', 'Drama'], { year: 2018 })
+  const s2 = cand('Show 2', ['Action', 'Drama'], { year: 2020, earlier: { ...s1, genres: [] } })
+  const s3 = cand('Show 3', ['Action', 'Drama'], { year: 2022, earlier: s2 })
+  const byKey = new Map([s1, s2, s3].map((c) => [candidateKey(c), c]))
+
+  it('suggests the first entry when nothing of the series is tracked', () => {
+    expect(entryPoint(s3, byKey, indexLibrary([]))).toBe(s1)
+  })
+
+  it('suggests the next entry after a completed one, and nothing after a planned or dropped one', () => {
+    const done = indexLibrary([lib('Show', [], { source: s1.source })])
+    expect(entryPoint(s2, byKey, done)).toBe(s2)
+    expect(entryPoint(s3, byKey, done)).toBe(s2)
+    expect(entryPoint(s2, byKey, indexLibrary([lib('Show', [], { status: 'plan', source: s1.source })]))).toBeNull()
+    expect(entryPoint(s2, byKey, indexLibrary([lib('Show', [], { status: 'dropped', source: s1.source })]))).toBeNull()
+  })
+
+  it('never excludes a standalone or a title without relationship data, whatever its name', () => {
+    const standalone = cand('Mob Psycho 100', ['Action'], { earlier: null })
+    const unknown = cand('Some Show Season 2', ['Action']) // no relationship data: nothing assumed
+    expect(entryPoint(standalone, byKey, indexLibrary([]))).toBe(standalone)
+    expect(entryPoint(unknown, byKey, indexLibrary([]))).toBe(unknown)
+  })
+
+  it('skips a later entry when the entry before it is only known by reference (it may not be the start)', () => {
+    const lone = cand('Lone 3', ['Action', 'Drama'], { earlier: cand('Lone 2', []) })
+    expect(entryPoint(lone, new Map(), indexLibrary([]))).toBeNull()
+    // …unless that entry is tracked: then the library decides.
+    expect(entryPoint(lone, new Map(), indexLibrary([lib('Lone 2', [], { source: lone.earlier!.source })]))).toBe(lone)
+  })
+
+  it('ignores "sequel" links from titles the user has only planned', () => {
+    const planned = lib('Planned', ['Action', 'Drama'], { status: 'plan' })
+    const sequel = cand('Planned 2', [])
+    const links: Link[] = [{ key: candidateKey(sequel), seedId: planned.id, role: 'sequel' }]
+    expect(allKeys(buildDiscover([sequel], links, [planned], emptyFeedback(), OPTS).sections)).not.toContain(candidateKey(sequel))
+  })
+})
+
+describe('buildSimilar (title details)', () => {
+  it('lists related and genre-similar titles with what they share, never the title itself or tracked ones', () => {
+    const t = lib('Mushishi', ['Mystery', 'Supernatural', 'Slice of Life'], { rating: 9, year: 2005, source: { provider: 'kitsu', id: '77', url: '' } })
+    const self = cand('Mushishi', ['Mystery', 'Supernatural', 'Slice of Life'], { source: t.source! })
+    const sideStory = cand('Mushishi Special', [])
+    const calm = cand('Natsume', ['Supernatural', 'Slice of Life', 'Drama'], { year: 2008 })
+    const tracked = cand('Tracked', ['Supernatural', 'Slice of Life'])
+    const loud = cand('Loud', ['Action', 'Mecha'])
+    const library = [t, lib('Tracked', [], { source: tracked.source })]
+    const links: Link[] = [{ key: candidateKey(sideStory), seedId: t.id, role: 'side_story' }]
+    const recs = buildSimilar([self, sideStory, calm, tracked, loud], links, library, emptyFeedback(), t.id)
+    const byTitle = new Map(recs.map((r) => [r.c.title, r]))
+    expect([...byTitle.keys()].sort()).toEqual(['Mushishi Special', 'Natsume'])
+    expect(byTitle.get('Mushishi Special')?.reason).toBe('Side story of Mushishi')
+    expect(byTitle.get('Natsume')?.shared).toEqual(['Supernatural', 'Slice of Life', 'Anime', '2000s'])
+  })
+
+  it('returns nothing for an unknown title or an empty pool', () => {
+    expect(buildSimilar([], [], [], emptyFeedback(), 'nope')).toEqual([])
+    const t = lib('X', ['Action', 'Drama'])
+    expect(buildSimilar([], [], [t], emptyFeedback(), t.id)).toEqual([])
   })
 })

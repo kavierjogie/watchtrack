@@ -14,7 +14,7 @@ import { isObj, normTitle } from './backup'
 import { enrich, kitsuToResult, mazeToResult, request, searchTitles, tmdb, tmdbToResult, type KitsuAnime, type MazeShow, type Provider, type TmdbItem } from './metadata'
 import { savePoster } from './posters'
 import { emptyProgress } from './progress'
-import { buildProfile, candidateKey, emptyFeedback, ROLE_STRENGTH, titleWeight, type Candidate, type Feedback, type FeedbackItem, type Link, type SortKey } from './recommend'
+import { buildProfile, candidateKey, emptyFeedback, ROLE_STRENGTH, tasteGenres, titleWeight, type Candidate, type Feedback, type FeedbackItem, type Link, type SortKey } from './recommend'
 import { createTitle, lastActivity } from './titles'
 import type { MediaType, MetadataSource, Progress, Title } from './types'
 
@@ -109,14 +109,44 @@ function kitsuCandidate(a: KitsuAnime, categories?: Map<string, string>): Candid
   }
 }
 
+type ListAnime = KitsuAnime & { relationships?: { mediaRelationships?: { data?: { id: string }[] } } }
+type Included =
+  | { type: 'categories'; id: string; attributes: { title: string } }
+  | { type: 'mediaRelationships'; id: string; attributes: { role: string }; relationships: { destination: { data: { type: string; id: string } | null } } }
+  | (KitsuAnime & { type: 'anime' })
+/** Sparse fields keep the relationship include small (destinations come back with the same few attributes). */
+const LIST_FIELDS =
+  'fields[anime]=slug,canonicalTitle,titles,abbreviatedTitles,synopsis,startDate,subtype,status,episodeCount,averageRating,popularityRank,posterImage,coverImage,categories,mediaRelationships' +
+  '&fields[categories]=title&fields[mediaRelationships]=role,destination&fields[manga]=startDate'
+
+/**
+ * A Kitsu list with each anime's earliest earlier-released prequel (see Candidate.earlier), so later seasons are told
+ * apart from first entries by Kitsu's own relationship data rather than by their names.
+ */
 async function kitsuList(query: string): Promise<Candidate[]> {
-  const res = await request<{ data: KitsuAnime[]; included?: { id: string; attributes: { title: string } }[] }>(
-    `${KITSU}anime?${query}&page[limit]=20&include=categories&fields[categories]=title`,
+  const res = await request<{ data: ListAnime[]; included?: Included[] }>(
+    `${KITSU}anime?${query}&page[limit]=20&include=categories,mediaRelationships.destination&${LIST_FIELDS}`,
     KITSU_INIT,
     'kitsu',
   )
-  const categories = new Map(res.included?.map((c) => [c.id, c.attributes.title]))
-  return res.data.filter((a) => KITSU_SUBTYPES.has(a.attributes.subtype ?? '')).map((a) => kitsuCandidate(a, categories))
+  const inc = res.included ?? []
+  const categories = new Map(inc.flatMap((i) => (i.type === 'categories' ? [[i.id, i.attributes.title] as const] : [])))
+  // JSON:API lists a resource once: a prequel on the same page is in `data`, not repeated in `included`.
+  const anime = new Map<string, KitsuAnime>([...res.data, ...inc.flatMap((i) => (i.type === 'anime' ? [i] : []))].map((a) => [a.id, a]))
+  const prequelOf = new Map(
+    inc.flatMap((i) => (i.type === 'mediaRelationships' && i.attributes.role === 'prequel' && i.relationships.destination.data?.type === 'anime' ? [[i.id, i.relationships.destination.data.id] as const] : [])),
+  )
+  return res.data
+    .filter((a) => KITSU_SUBTYPES.has(a.attributes.subtype ?? ''))
+    .map((a) => {
+      const rels = a.relationships?.mediaRelationships?.data
+      const start = a.attributes.startDate
+      const earlier = rels
+        ?.map((r) => anime.get(prequelOf.get(r.id) ?? ''))
+        .filter((p): p is KitsuAnime => !!p && KITSU_SUBTYPES.has(p.attributes.subtype ?? '') && !!start && !!p.attributes.startDate && p.attributes.startDate < start)
+        .sort((x, y) => x.attributes.startDate!.localeCompare(y.attributes.startDate!))[0]
+      return { ...kitsuCandidate(a, categories), earlier: rels ? (earlier ? kitsuCandidate(earlier) : null) : undefined }
+    })
 }
 
 /** Kitsu's own relationships for one anime. Related titles come without categories (Kitsu can't nest that include). */
@@ -176,6 +206,46 @@ async function tmdbList(path: string, kind: 'movie' | 'tv'): Promise<Candidate[]
   const data = await tmdb<{ results: TmdbItem[] }>(path)
   return data.results.filter((r) => !r.media_type || r.media_type === kind).map((r) => tmdbCandidate(r, kind))
 }
+
+// ---------- Requests, shared by Discover and "Similar titles" (same cache keys, so one never refetches the other's) ----------
+
+/** Kitsu list cache keys carry a version: v2 added relationship data, so copies cached before it are refetched. */
+const kitsuListTask = (cacheKey: string, ttl: number, query: string): Task => ({
+  provider: 'kitsu',
+  run: async () => ({ cands: await cached(`kitsu2:${cacheKey}`, ttl, () => kitsuList(query)) }),
+})
+
+const kitsuCategoryTask = (genre: string, page: number) => {
+  const slug = genre.replace(/ /g, '-')
+  return kitsuListTask(`cat:${slug}:${page}`, 24 * HOUR, `filter[categories]=${encodeURIComponent(slug)}&sort=popularityRank&page[offset]=${page * 20}`)
+}
+
+const kitsuRelatedTask = (seedId: string, id: string): Task => ({
+  provider: 'kitsu',
+  run: async () => {
+    const rel = await cached(`kitsu:rel:${id}`, 7 * 24 * HOUR, () => kitsuRelated(id))
+    return { cands: rel.map((r) => r.c), links: rel.map((r) => ({ key: candidateKey(r.c), seedId, role: r.role })) }
+  },
+})
+
+const mazePageTask = (n: number): Task => ({ provider: 'tvmaze', run: async () => ({ cands: await cached(`tvmaze:page:${n}`, 3 * 24 * HOUR, () => mazePage(n)) }) })
+
+const tmdbGenreTask = (genre: string, page: number): Task => ({
+  provider: 'tmdb',
+  run: async () => ({
+    cands: await cached(`tmdb:genre:${genre}:${page}`, 24 * HOUR, () =>
+      tmdbList(`discover/movie?sort_by=vote_count.desc&with_genres=${TMDB_MOVIE_GENRE_ID.get(genre)}&page=${page + 1}`, 'movie'),
+    ),
+  }),
+})
+
+const tmdbRecTask = (seedId: string, id: string): Task => ({
+  provider: 'tmdb',
+  run: async () => {
+    const cands = await cached(`tmdb:rec:${id}`, 7 * 24 * HOUR, () => tmdbList(`${id}/recommendations`, id.startsWith('movie') ? 'movie' : 'tv'))
+    return { cands, links: cands.map((c) => ({ key: candidateKey(c), seedId, role: 'tmdb-recommended' })) }
+  },
+})
 
 // ---------- Filling in metadata for titles that have none ----------
 
@@ -292,17 +362,15 @@ export async function loadPool(library: Title[], feedback: Feedback, round: numb
       report()
     })
   }
-  const list = (tasks: Task[], provider: Provider, cacheKey: string, ttl: number, fetch: () => Promise<Candidate[]>) =>
-    tasks.push({ provider, run: async () => ({ cands: await cached(cacheKey, ttl, fetch) }) })
-
   // Phase 1 needs nothing from the library: popular lists. Starts at once, alongside the metadata lookups.
-  const general: Task[] = []
-  list(general, 'kitsu', `kitsu:popular:${page}`, 12 * HOUR, () => kitsuList(`sort=popularityRank&page[offset]=${page * 20}`))
-  list(general, 'kitsu', `kitsu:movies:${page}`, 12 * HOUR, () => kitsuList(`filter[subtype]=movie&sort=popularityRank&page[offset]=${page * 20}`))
-  list(general, 'kitsu', `kitsu:rated:${page}`, 24 * HOUR, () => kitsuList(`filter[subtype]=TV&sort=ratingRank&page[offset]=${40 + page * 20}`))
-  // TVmaze: two fixed index pages of long-running favourites plus one that rotates with Refresh.
-  for (const n of [0, 1, 2 + (round % 8)]) list(general, 'tvmaze', `tvmaze:page:${n}`, 3 * 24 * HOUR, () => mazePage(n))
-  list(general, 'tmdb', 'tmdb:trending:movie', 12 * HOUR, () => tmdbList('trending/movie/week', 'movie'))
+  const general: Task[] = [
+    kitsuListTask(`popular:${page}`, 12 * HOUR, `sort=popularityRank&page[offset]=${page * 20}`),
+    kitsuListTask(`movies:${page}`, 12 * HOUR, `filter[subtype]=movie&sort=popularityRank&page[offset]=${page * 20}`),
+    kitsuListTask(`rated:${page}`, 24 * HOUR, `filter[subtype]=TV&sort=ratingRank&page[offset]=${40 + page * 20}`),
+    // TVmaze: two fixed index pages of long-running favourites plus one that rotates with Refresh.
+    ...[0, 1, 2 + (round % 8)].map(mazePageTask),
+    { provider: 'tmdb', run: async () => ({ cands: await cached('tmdb:trending:movie', 12 * HOUR, () => tmdbList('trending/movie/week', 'movie')) }) },
+  ]
   pending++ // the lookups below
   const generalDone = run(general)
   inferred = await inferMetadata(library)
@@ -322,36 +390,47 @@ export async function loadPool(library: Title[], feedback: Feedback, round: numb
     .filter(([g, v]) => v > 0.2 && profile.genreTypes.get(g)?.has('anime'))
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
-    .map(([g]) => g.replace(/ /g, '-'))
-  for (const slug of animeGenres)
-    list(personal, 'kitsu', `kitsu:cat:${slug}:${page}`, 24 * HOUR, () => kitsuList(`filter[categories]=${encodeURIComponent(slug)}&sort=popularityRank&page[offset]=${page * 20}`))
-  for (const s of seeds.filter((s) => s.source?.provider === 'kitsu' && NUMERIC_ID.test(s.source.id)).slice(0, 5)) {
-    const id = s.source!.id
-    personal.push({
-      provider: 'kitsu',
-      run: async () => {
-        const rel = await cached(`kitsu:rel:${id}`, 7 * 24 * HOUR, () => kitsuRelated(id))
-        return { cands: rel.map((r) => r.c), links: rel.map((r) => ({ key: candidateKey(r.c), seedId: s.id, role: r.role })) }
-      },
-    })
-  }
+    .map(([g]) => g)
+  for (const g of animeGenres) personal.push(kitsuCategoryTask(g, page))
+  for (const s of seeds.filter((s) => s.source?.provider === 'kitsu' && NUMERIC_ID.test(s.source.id)).slice(0, 5)) personal.push(kitsuRelatedTask(s.id, s.source!.id))
   const movieGenre = [...profile.genres].filter(([g, v]) => v > 0.2 && TMDB_MOVIE_GENRE_ID.has(g)).sort((a, b) => b[1] - a[1])[0]?.[0]
-  if (movieGenre)
-    list(personal, 'tmdb', `tmdb:genre:${movieGenre}:${page}`, 24 * HOUR, () =>
-      tmdbList(`discover/movie?sort_by=vote_count.desc&with_genres=${TMDB_MOVIE_GENRE_ID.get(movieGenre)}&page=${page + 1}`, 'movie'),
-    )
-  for (const s of seeds.filter((s) => s.source?.provider === 'tmdb' && TMDB_ID.test(s.source.id)).slice(0, 4)) {
-    const id = s.source!.id
-    personal.push({
-      provider: 'tmdb',
-      run: async () => {
-        const cands = await cached(`tmdb:rec:${id}`, 7 * 24 * HOUR, () => tmdbList(`${id}/recommendations`, id.startsWith('movie') ? 'movie' : 'tv'))
-        return { cands, links: cands.map((c) => ({ key: candidateKey(c), seedId: s.id, role: 'tmdb-recommended' })) }
-      },
-    })
-  }
+  if (movieGenre) personal.push(tmdbGenreTask(movieGenre, page))
+  for (const s of seeds.filter((s) => s.source?.provider === 'tmdb' && TMDB_ID.test(s.source.id)).slice(0, 4)) personal.push(tmdbRecTask(s.id, s.source!.id))
   report() // lookups done: the page can already re-rank with the filled-in library
   await Promise.all([generalDone, run(personal)])
+}
+
+/**
+ * Candidates for "Similar titles" on one library title's page, from that title's own metadata: its provider
+ * relationships / recommendations, and lists for its genres. Shares Discover's cache. Sends only that title's
+ * provider id (or, when it has none, its name for an exact-match lookup) and genre names. Never throws.
+ */
+export async function loadSimilar(t: Title): Promise<Omit<PoolState, 'pending'>> {
+  const inferred = await inferMetadata([t])
+  const [full] = withInferred([t], inferred)
+  const src = full.source
+  const genres = tasteGenres(full.genres)
+  const tasks: Task[] = []
+  if (src?.provider === 'kitsu' && NUMERIC_ID.test(src.id)) tasks.push(kitsuRelatedTask(t.id, src.id))
+  if (src?.provider === 'tmdb' && TMDB_ID.test(src.id)) tasks.push(tmdbRecTask(t.id, src.id))
+  if (full.mediaType === 'anime' || src?.provider === 'kitsu') tasks.push(...genres.slice(0, 2).map((g) => kitsuCategoryTask(g, 0)))
+  else if (full.mediaType === 'tv') tasks.push(...[0, 1].map(mazePageTask))
+  else {
+    const g = genres.find((x) => TMDB_MOVIE_GENRE_ID.has(x))
+    if (g) tasks.push(tmdbGenreTask(g, 0))
+  }
+  const results: { cands: Candidate[]; links?: Link[] }[] = tasks.map(() => ({ cands: [] }))
+  const failed: PoolState['failed'] = []
+  await runQueued(
+    tasks,
+    (provider, err) => {
+      if (!failed.some((f) => f.provider === provider)) failed.push({ provider, message: err instanceof Error ? err.message : 'Request failed.' })
+    },
+    (i, value) => {
+      if (value) results[i] = value
+    },
+  )
+  return { pool: results.flatMap((r) => r.cands), links: results.flatMap((r) => r.links ?? []), inferred, failed }
 }
 
 // ---------- Saving a recommendation ----------
