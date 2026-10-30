@@ -1,17 +1,17 @@
-import { Check, Copy, Share2, TriangleAlert } from 'lucide-react'
+import { Check, Copy, LinkIcon, Share2, TriangleAlert } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { copyText } from '../lib/format'
 import { withPublicPosters } from '../lib/posters'
-import { encodeShare, shareUrl } from '../lib/share'
+import { createShortLink, encodeShare, shareUrl } from '../lib/share'
 import { MEDIA, STATUS } from '../lib/backup'
 import { MEDIA_LABEL, STATUS_LABEL, type Title } from '../lib/types'
 import { useLibrary } from '../state/library'
 import { Modal } from './Modal'
 
-type Link = { url: string } | { error: string }
+type Link = { payload: string } | { error: string }
 
-/** Longer links get cut off when sent in an Instagram DM, and a cut link can't be opened. */
+/** Longer links get cut off when sent in an Instagram DM, and a cut link can't be opened. Only the long fallback link can get there. */
 const INSTAGRAM_DM_LIMIT = 1000
 
 /** `only`: start with just this title selected (sharing from its page) instead of the whole library. */
@@ -20,12 +20,16 @@ export function ShareDialog({ onClose, only }: { onClose: () => void; only?: str
   const [selected, setSelected] = useState(() => new Set(only && titles.some((t) => t.id === only) ? [only] : titles.map((t) => t.id)))
   // Keyed by the selection it was built for, so a stale link is never shown or copied.
   const [built, setBuilt] = useState<{ for: Title[]; link: Link } | null>(null)
+  // The stored link for a selection, also keyed so it's never reused. url null: the server couldn't store it, so use the long link.
+  const [short, setShort] = useState<{ for: Title[]; url: string | null } | null>(null)
+  const [creating, setCreating] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const field = useRef<HTMLInputElement>(null)
   const chosen = useMemo(() => titles.filter((t) => selected.has(t.id)), [titles, selected])
   const link = built?.for === chosen ? built.link : null
+  const made = short?.for === chosen ? short : null
 
-  // Rebuild the link whenever the selection changes, so Copy/Share run inside the click (browsers require that).
+  // Rebuild the payload whenever the selection changes. Local only: nothing is uploaded until Create link is pressed.
   useEffect(() => {
     if (!chosen.length) return
     let alive = true
@@ -36,7 +40,7 @@ export function ShareDialog({ onClose, only }: { onClose: () => void; only?: str
         return encodeShare(ready)
       })
       .then(
-        (payload) => alive && setBuilt({ for: chosen, link: { url: shareUrl(payload) } }),
+        (payload) => alive && setBuilt({ for: chosen, link: { payload } }),
         (err: unknown) => alive && setBuilt({ for: chosen, link: { error: err instanceof Error ? err.message : 'Could not create the link.' } }),
       )
     return () => {
@@ -44,7 +48,16 @@ export function ShareDialog({ onClose, only }: { onClose: () => void; only?: str
     }
   }, [chosen, save])
 
-  const url = link && 'url' in link ? link.url : null
+  const payload = link && 'payload' in link ? link.payload : null
+  const url = made && payload ? (made.url ?? shareUrl(payload)) : null
+
+  const create = async () => {
+    if (!payload) return
+    setCreating(true)
+    const shortUrl = await createShortLink(payload).catch(() => null)
+    setShort({ for: chosen, url: shortUrl })
+    setCreating(false)
+  }
 
   const copy = async () => {
     if (!url) return
@@ -81,14 +94,20 @@ export function ShareDialog({ onClose, only }: { onClose: () => void; only?: str
       onClose={onClose}
       title="Share watchlist"
       footer={
-        <>
-          <button type="button" className="btn-secondary" onClick={() => void copy()} disabled={!url}>
-            {copied === url ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />} {copied === url ? 'Copied' : 'Copy link'}
+        url ? (
+          <>
+            <button type="button" className="btn-secondary" onClick={() => void copy()}>
+              {copied === url ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />} {copied === url ? 'Copied' : 'Copy link'}
+            </button>
+            <button type="button" className="btn-primary" onClick={() => void share()}>
+              <Share2 className="size-4" aria-hidden /> Share
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn-primary" onClick={() => void create()} disabled={!payload || creating}>
+            <LinkIcon className="size-4" aria-hidden /> {creating ? 'Creating link…' : 'Create link'}
           </button>
-          <button type="button" className="btn-primary" onClick={() => void share()} disabled={!url}>
-            <Share2 className="size-4" aria-hidden /> Share
-          </button>
-        </>
+        )
       }
     >
       <div className="space-y-4 text-sm">
@@ -151,7 +170,7 @@ export function ShareDialog({ onClose, only }: { onClose: () => void; only?: str
               ref={field}
               className="input font-mono text-xs!"
               readOnly
-              value={url ?? (chosen.length ? 'Creating link…' : 'Select at least one title')}
+              value={url ?? (chosen.length ? 'Press Create link when your selection is ready' : 'Select at least one title')}
               onFocus={(e) => e.target.select()}
             />
           </label>
@@ -164,7 +183,17 @@ export function ShareDialog({ onClose, only }: { onClose: () => void; only?: str
           </p>
         )}
 
-        <p className="text-xs text-muted">Anyone with this link can see the titles in it. The list is stored inside the link itself, not uploaded anywhere.</p>
+        {made && !made.url && url && (
+          <p className="text-xs text-muted" role="status">
+            Couldn't create a short link, so this one holds the whole list instead.
+          </p>
+        )}
+
+        <p className="text-xs text-muted">
+          {made && !made.url
+            ? 'Anyone with this link can see the titles in it. The list is stored inside the link itself, not uploaded anywhere.'
+            : "Anyone with this link can see the titles in it. The list is stored on WatchTrack's server for 90 days, then deleted."}
+        </p>
       </div>
     </Modal>
   )

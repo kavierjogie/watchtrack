@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Check, Eye, LinkIcon, ListX, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { EmptyState, PosterGridSkeleton, ProgressBar, progressLine, Rating, Section } from '../components/cards'
 import { PageMeta } from '../components/Layout'
@@ -9,19 +9,21 @@ import { Logo } from '../components/Logo'
 import { Poster } from '../components/Poster'
 import { STATUS, titleKey } from '../lib/backup'
 import { progressFraction } from '../lib/progress'
-import { decodeShare, sharedToTitle, toMyPlan } from '../lib/share'
+import { decodeShare, fetchShare, sharedToTitle, toMyPlan } from '../lib/share'
 import { MEDIA_LABEL, STATUS_LABEL, type Title } from '../lib/types'
 import { useLibrary } from '../state/library'
 
 type State = { state: 'loading' } | { state: 'error'; message: string } | { state: 'ok'; titles: Title[] }
 const LOADING: State = { state: 'loading' }
 
-/** Read-only view of a shared list. Reads only the URL fragment; never touches the visitor's library. */
+/** Read-only view of a shared list, from a short link (/s/:id) or the URL fragment; never touches the visitor's library. */
 export function SharedPage() {
   const { hash } = useLocation()
-  // Keyed by the fragment it came from, so pasting another link in this tab never shows the old list.
-  const [result, setResult] = useState<{ hash: string; s: State } | null>(null)
-  const s = result?.hash === hash ? result.s : LOADING
+  const { id } = useParams()
+  const from = id ?? hash
+  // Keyed by the link it came from, so pasting another link in this tab never shows the old list.
+  const [result, setResult] = useState<{ from: string; s: State } | null>(null)
+  const s = result?.from === from ? result.s : LOADING
   const lib = useLibrary()
   const mine = new Set(lib.titles.map(titleKey))
   const missing = s.state === 'ok' ? s.titles.filter((t) => !mine.has(titleKey(t))) : []
@@ -41,14 +43,14 @@ export function SharedPage() {
 
   useEffect(() => {
     let alive = true
-    decodeShare(hash).then(
-      (items) => alive && setResult({ hash, s: { state: 'ok', titles: items.map(sharedToTitle) } }),
-      (err: unknown) => alive && setResult({ hash, s: { state: 'error', message: err instanceof Error ? err.message : 'The link could not be read.' } }),
+    ;(id ? fetchShare(id) : decodeShare(hash)).then(
+      (items) => alive && setResult({ from: id ?? hash, s: { state: 'ok', titles: items.map(sharedToTitle) } }),
+      (err: unknown) => alive && setResult({ from: id ?? hash, s: { state: 'error', message: err instanceof Error ? err.message : 'The link could not be read.' } }),
     )
     return () => {
       alive = false
     }
-  }, [hash])
+  }, [id, hash])
 
   return (
     <div className="min-h-dvh">
@@ -89,10 +91,12 @@ export function SharedPage() {
             body={
               <>
                 <p>{s.message}</p>
-                <p className="mt-2">
-                  Shared links never expire — the whole list is stored inside the link itself. If it won't open, it was probably cut off when it was copied or sent. Ask
-                  for the link again and paste it in full.
-                </p>
+                {!id && (
+                  <p className="mt-2">
+                    Links like this one never expire — the whole list is stored inside the link itself. If it won't open, it was probably cut off when it was copied or sent. Ask
+                    for the link again and paste it in full.
+                  </p>
+                )}
               </>
             }
             action={

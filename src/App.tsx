@@ -103,6 +103,14 @@ export default function App() {
                     </Suspense>
                   }
                 />
+                <Route
+                  path="s/:id"
+                  element={
+                    <Suspense fallback={null}>
+                      <SharedPage />
+                    </Suspense>
+                  }
+                />
               </Routes>
               <Toaster
                 position="top-center"

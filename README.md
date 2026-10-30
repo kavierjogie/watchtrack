@@ -57,12 +57,13 @@ Live at **https://watchtrack-eta.vercel.app**. If the domain changes, search the
 - **Undo**: every progress or status change stores the previous state; undo from the toast, the title page, or the card menu.
 
 ### Sharing your watchlist
-**Home → Share watchlist** (or **Library → Share**). Pick titles, then **Copy link** or **Share** (the phone's share sheet, falling back to copy). The friend opens `/shared#…` in any browser and sees a read-only list, with no account, app or import needed. Their own library is never touched.
+**Home → Share watchlist** (or **Library → Share**). Pick titles, press **Create link**, then **Copy link** or **Share** (the phone's share sheet, falling back to copy). The friend opens `/s/<id>` in any browser and sees a read-only list, with no account, app or import needed. Their own library is never touched.
 
-- The list lives in the link itself (JSON → deflate-raw via the browser's `CompressionStream` → base64url, after the `#`), so nothing is uploaded and links never expire. Code: `src/lib/share.ts`.
+- The list (JSON → deflate-raw via the browser's `CompressionStream` → base64url) is stored in Upstash Redis for 90 days by `api/share.ts`, only when **Create link** is pressed. Set `KV_REST_API_URL` and `KV_REST_API_TOKEN` by connecting Upstash for Redis in Vercel's Marketplace. Creating links is limited to 30 an hour per IP. Code: `src/lib/share.ts`.
+- If the store is missing or fails, the app falls back to a `/shared#<payload>` link that holds the whole list after the `#`. Those links, including older ones, never expire.
 - Included: title, type, status, season/episode progress, year, rating, online poster URL. Left out: notes, history, ids, dates, settings, keys, uploaded posters.
-- Anyone with the link can read it. Fragments aren't encryption.
-- Links are capped at 30,000 characters. If a selection is bigger, you're told to pick fewer titles. Nothing is silently dropped.
+- Anyone with the link can read it. Neither form is encrypted.
+- Lists are capped at 30,000 compressed characters. If a selection is bigger, you're told to pick fewer titles. Nothing is silently dropped.
 
 ## Episode tracking rules
 
@@ -162,4 +163,4 @@ IndexedDB stores: `titles`, `watchHistory`, `images` (Blobs), `settings` (alert 
 - **"Episodes logged"** on the dashboard counts episodes marked watched in the app; imported positions aren't counted as history.
 - **Ratings are 1–10.**
 - Status "Dropped" is available in addition to the requested lists.
-- **In-app browsers** (Instagram, Facebook, Android WebViews) get a banner pointing to the real browser, because their storage is separate and Google blocks sign-in there. Share links over 1,000 characters warn that Instagram DMs will cut them off.
+- **In-app browsers** (Instagram, Facebook, Android WebViews) get a banner pointing to the real browser, because their storage is separate and Google blocks sign-in there. Long fallback share links over 1,000 characters warn that Instagram DMs will cut them off.

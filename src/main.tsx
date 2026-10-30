@@ -29,7 +29,7 @@ void navigator.storage?.persist?.().catch(() => {})
 inject({
   beforeSend: (event) => {
     const url = new URL(event.url)
-    return { ...event, url: url.origin + url.pathname.replace(/^\/title\/[^/]+/, '/title/[id]') }
+    return { ...event, url: url.origin + url.pathname.replace(/^\/title\/[^/]+/, '/title/[id]').replace(/^\/s\/[^/]+/, '/s/[id]') }
   },
 })
 

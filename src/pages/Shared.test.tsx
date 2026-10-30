@@ -36,6 +36,23 @@ async function open(hash: string) {
   return document.body
 }
 
+async function openShort(id: string) {
+  root = createRoot(document.body.appendChild(document.createElement('div')))
+  await act(async () => {
+    root!.render(
+      <MemoryRouter initialEntries={[`/s/${id}`]}>
+        <LibraryProvider>
+          <Routes>
+            <Route path="s/:id" element={<SharedPage />} />
+          </Routes>
+        </LibraryProvider>
+      </MemoryRouter>,
+    )
+  })
+  await act(() => new Promise((r) => setTimeout(r, 50)))
+  return document.body
+}
+
 async function craftShare(body: unknown) {
   const out = await new Response(new Response(JSON.stringify(body)).body!.pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer()
   return btoa(String.fromCharCode(...new Uint8Array(out))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -106,6 +123,31 @@ describe('shared watchlist page', () => {
     const page = await open(`#${payload}`)
     await act(() => new Promise((r) => setTimeout(r, 20)))
     expect(page.querySelector('img[alt="WandaVision poster"]')?.getAttribute('src')).toBe('https://static.tvmaze.com/w.jpg')
+    vi.unstubAllGlobals()
+  })
+
+  it('opens a short link from the server', async () => {
+    const payload = await encodeShare([createTitle({ title: 'Short Link Show', mediaType: 'tv', status: 'watching' })])
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(payload)))
+    vi.stubGlobal('fetch', fetchMock)
+    const page = await openShort('abcdefghijk')
+    expect(fetchMock.mock.calls[0]).toEqual(['/api/share?id=abcdefghijk'])
+    expect(page.textContent).toContain('Short Link Show')
+    vi.unstubAllGlobals()
+  })
+
+  it('explains an expired short link, without claiming links never expire', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('', { status: 404 }))))
+    const page = await openShort('abcdefghijk')
+    expect(page.textContent).toContain('expired')
+    expect(page.textContent).not.toContain('never expire')
+    vi.unstubAllGlobals()
+  })
+
+  it('tells a visitor to check their connection when a short link cannot load', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('offline'))))
+    const page = await openShort('abcdefghijk')
+    expect(page.textContent).toContain('Check your connection')
     vi.unstubAllGlobals()
   })
 

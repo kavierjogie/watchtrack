@@ -6,9 +6,9 @@ import { createTitle } from './titles'
 import type { MediaType, MetadataSource, Numbering, Title, WatchStatus } from './types'
 
 /**
- * Share links carry the whole list in the URL fragment: /shared#<payload>.
- * payload = base64url(deflate-raw(JSON)). The fragment never reaches a server, so nothing is uploaded.
- * Fragments are not encryption: anyone with the link can read it. Only display fields go in — no notes,
+ * Short links (/s/<id>) keep the payload on the server for 90 days (api/share.ts), only once the user asks for a link.
+ * If that fails, or for older links, the whole list travels in the URL fragment: /shared#<payload>.
+ * payload = base64url(deflate-raw(JSON)). Neither form is encryption: anyone with the link can read it. Only display fields go in — no notes,
  * history, internal ids, timestamps, settings or keys. The public catalogue id (src) is there so the recipient can
  * look a poster up when its URL is missing or dead.
  *
@@ -145,6 +145,22 @@ export async function encodeShare(titles: Title[]): Promise<string> {
 }
 
 export const shareUrl = (payload: string, origin = window.location.origin) => `${origin}${SHARE_PATH}#${payload}`
+
+/** Stores the payload on the server (api/share.ts) and returns a short /s/<id> link. Throws if the server can't. */
+export async function createShortLink(payload: string, origin = window.location.origin): Promise<string> {
+  const res = await fetch('/api/share', { method: 'POST', body: payload })
+  if (!res.ok) throw new ShareError('Could not create a short link.')
+  const { id } = (await res.json()) as { id: string }
+  return `${origin}/s/${id}`
+}
+
+/** Loads and checks the list behind a short link. Throws ShareError with a readable message on any problem. */
+export async function fetchShare(id: string): Promise<SharedItem[]> {
+  const res = await fetch(`/api/share?id=${encodeURIComponent(id)}`).catch(() => null)
+  if (res?.status === 404) throw new ShareError("This link has expired or doesn't exist. Shared links last 90 days, so ask for a new one.")
+  if (!res?.ok) throw new ShareError("Couldn't load this list. Check your connection and try again.")
+  return decodeShare(await res.text())
+}
 
 // ---------- Decode (untrusted input) ----------
 
