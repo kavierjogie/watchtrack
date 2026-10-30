@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "functions": { "api/tmdb.ts": { "maxDuration": 10 }, "api/poster.ts": { "maxDuration": 10 }, "api/share.ts": { "maxDuration": 10 } },
-  "rewrites": [{ "source": "/((?!api/|assets/|about$|privacy$|terms$|guides(?:/|$)|.*\\..*).*)", "destination": "/index.html" }],
+  "rewrites": [{ "source": "/((?!api/|assets/|about$|privacy$|terms$|guides(?:/|$)|.*\\..*).*)", "destination": "/" }],
   "headers": [
     {
       "source": "/(.*)",
