@@ -38,6 +38,23 @@ describe('saveKitsuPosters', () => {
   })
 })
 
+describe('saveKitsuPosters when storage fails', () => {
+  it('downloads once and stops, instead of the same poster on every open', async () => {
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) })
+    vi.stubGlobal('navigator', { onLine: true })
+    vi.stubGlobal('indexedDB', undefined) // putImage rejects
+    const fetchMock = vi.fn(async () => new Response(new Blob([new Uint8Array(10)], { type: 'image/jpeg' })))
+    vi.stubGlobal('fetch', fetchMock)
+    const poster = (n: number) => ({ kind: 'remote' as const, url: `https://media.kitsu.app/anime/${n}/large.jpg` })
+    const titles = [createTitle({ title: 'A', mediaType: 'anime', poster: poster(1) }), createTitle({ title: 'B', mediaType: 'anime', poster: poster(2) })]
+    await saveKitsuPosters(titles, () => {})
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await saveKitsuPosters(titles.slice(0, 1), () => {})
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('publicPosterUrl', () => {
   it.each<[string, Poster | null, string | null]>([
     ['remote', { kind: 'remote', url: 'https://media.kitsu.app/a.jpg' }, 'https://media.kitsu.app/a.jpg'],

@@ -57,6 +57,26 @@ describe('poster copies that differ only between devices', () => {
     expect(other.toLocal.titles).toEqual([])
   })
 
+  it("another device's edit doesn't throw away the copy saved here", () => {
+    const edited = { ...remoteUrl, updatedAt: at(0), notes: 'from B' }
+    const r = mergeLibraries(doc({ titles: [copy('a')], images: [image('a')] }), doc({ titles: [edited] }), NOW)
+    expect(r.toLocal.titles[0]).toMatchObject({ notes: 'from B', poster: copy('a').poster })
+    expect(r.doc.images.map((i) => i.id)).toEqual(['a'])
+  })
+
+  it("an edit here picks up the copy Drive already has", () => {
+    const edited = { ...remoteUrl, updatedAt: at(0), notes: 'mine' }
+    const r = mergeLibraries(doc({ titles: [edited] }), doc({ titles: [copy('b')], images: [image('b')] }), NOW)
+    expect(r.toLocal.titles[0]).toMatchObject({ notes: 'mine', poster: copy('b').poster })
+    expect(r.toLocal.images.map((i) => i.id)).toEqual(['b'])
+  })
+
+  it('a poster really changed to a different image is respected', () => {
+    const changed = { ...withPoster({ kind: 'remote', url: 'https://static.tvmaze.com/new.jpg' }), updatedAt: at(0) }
+    const r = mergeLibraries(doc({ titles: [copy('a')], images: [image('a')] }), doc({ titles: [changed] }), NOW)
+    expect(r.toLocal.titles[0].poster).toEqual(changed.poster)
+  })
+
   it('an edit still beats a poster copy', () => {
     const edited = { ...withPoster({ kind: 'remote', url: URL }), updatedAt: at(0), notes: 'mine' }
     const r = mergeLibraries(doc({ titles: [edited] }), doc({ titles: [copy('b')], images: [image('b')] }), NOW)

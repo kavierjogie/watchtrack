@@ -370,12 +370,24 @@ export function searchProviders(): Provider[] {
   return ['kitsu', 'tvmaze', 'tmdb']
 }
 
+const SEARCH_TTL_MS = 5 * 60_000
+const SEARCH_CACHE_MAX = 50
+// Kitsu's answers can't be reused by the browser (max-age=0, private), so correcting a typo would ask it all over again. Answers only: a failure is retried.
+const searchCache = new Map<string, { at: number; results: MetaResult[] }>()
+
+export const clearSearchCache = () => searchCache.clear()
+
 export async function searchTitles(q: string, provider: Provider, signal?: AbortSignal): Promise<MetaResult[]> {
   const query = q.trim()
   if (!query) return []
-  if (provider === 'kitsu') return searchKitsu(query, signal)
-  if (provider === 'tvmaze') return searchTvMaze(query, signal)
-  return searchTmdb(query, signal)
+  const key = `${provider}:${query.toLowerCase()}`
+  const hit = searchCache.get(key)
+  if (hit && Date.now() - hit.at < SEARCH_TTL_MS) return hit.results
+  const results = await (provider === 'kitsu' ? searchKitsu(query, signal) : provider === 'tvmaze' ? searchTvMaze(query, signal) : searchTmdb(query, signal))
+  searchCache.delete(key)
+  searchCache.set(key, { at: Date.now(), results })
+  if (searchCache.size > SEARCH_CACHE_MAX) searchCache.delete(searchCache.keys().next().value!)
+  return results
 }
 
 // ---------- Unified search ----------

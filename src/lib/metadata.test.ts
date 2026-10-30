@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { combineResults, enrich, findPosters, MetadataError, sameTitle, searchAll, searchTitles, seasonEntries, seasonOf, showName, wholeShowMatch, type MetaResult, type Provider, type SearchState } from './metadata'
+import { clearSearchCache, combineResults, enrich, findPosters, MetadataError, sameTitle, searchAll, searchTitles, seasonEntries, seasonOf, showName, wholeShowMatch, type MetaResult, type Provider, type SearchState } from './metadata'
 import { createTitle, relinkTitle } from './titles'
 
 const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }))
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  clearSearchCache()
+})
 
 describe('metadata providers (mocked network)', () => {
   it('maps Kitsu results, genres from included categories, and strips HTML from synopsis', async () => {
@@ -261,5 +264,34 @@ describe('linking a single-season anime entry to the whole show', () => {
     expect(t.sync).toBeUndefined()
     expect(t.progress).toMatchObject({ season: 5, nextEpisode: 3, seasonEpisodeCounts: { 1: 13, 2: 25 }, totalSeasons: null, totalEpisodes: null })
     expect(t.title).toBe('My Hero Academia')
+  })
+})
+
+describe('search reuse', () => {
+  const answer = () => new Response(JSON.stringify([]), { headers: { 'Content-Type': 'application/json' } })
+
+  it('asks a provider once for a repeated search, whatever the case, and again once it is stale', async () => {
+    clearSearchCache()
+    const fetchMock = vi.fn(async () => answer())
+    vi.stubGlobal('fetch', fetchMock)
+    await searchTitles('Dune', 'tvmaze')
+    await searchTitles(' dune ', 'tvmaze')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const later = Date.now() + 6 * 60_000
+    const now = vi.spyOn(Date, 'now').mockReturnValue(later)
+    await searchTitles('dune', 'tvmaze')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    now.mockRestore()
+    vi.unstubAllGlobals()
+  })
+
+  it('retries a search that failed', async () => {
+    clearSearchCache()
+    const fetchMock = vi.fn().mockRejectedValueOnce(new Error('down')).mockImplementation(async () => answer())
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(searchTitles('dune', 'tvmaze')).rejects.toThrow()
+    await searchTitles('dune', 'tvmaze')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    vi.unstubAllGlobals()
   })
 })

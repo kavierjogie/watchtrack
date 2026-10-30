@@ -47,10 +47,17 @@ async function saveBatch(titles: Title[], onSaved: (t: Title) => void) {
   for (const [i, t] of pending.entries()) {
     if (i > 0) await new Promise((r) => setTimeout(r, SAVE_PAUSE_MS))
     const url = t.poster?.kind === 'remote' ? t.poster.url : ''
-    let poster = await savePoster(url)
-    if (poster.kind !== 'local' && t.source?.provider === 'kitsu') {
-      const current = await recoverPosterUrl(t.source, t.title)
-      if (current && current !== url) poster = await savePoster(current)
+    let poster: Poster
+    try {
+      poster = await savePoster(url)
+      if (poster.kind !== 'local' && t.source?.provider === 'kitsu') {
+        const current = await recoverPosterUrl(t.source, t.title)
+        if (current && current !== url) poster = await savePoster(current)
+      }
+    } catch {
+      // Storage is full or blocked, so the rest would fail too. Without this the same poster would download on every open and never be kept.
+      rememberFailedSave(url)
+      return
     }
     if (poster.kind !== 'local') {
       if (!navigator.onLine) return // Says nothing about the poster: try again next time.

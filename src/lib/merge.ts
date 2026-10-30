@@ -56,6 +56,15 @@ function betterPoster(remote: Title, local: Title): boolean {
 }
 
 /**
+ * An edit on a device still holding the poster's URL mustn't throw away a copy the other side already saved of that
+ * same image: it would only be downloaded again. A different URL means the poster really changed.
+ */
+function keepSavedCopy(win: Title, other: Title | undefined): Title {
+  const copy = other?.poster
+  return win.poster?.kind === 'remote' && copy?.kind === 'local' && copy.url === win.poster.url ? { ...win, poster: copy } : win
+}
+
+/**
  * Two-way merge. Per title the newer `updatedAt` wins; history and images are unions; a deletion wins over the
  * title only when it's newer than the title's last edit. Pure, so every rule is unit-tested.
  */
@@ -77,13 +86,13 @@ export function mergeLibraries(local: SyncDoc, remote: SyncDoc | null, now = Dat
     const l = localTitles.get(id)
     const rt = remoteTitles.get(id)
     const remoteNewer = !!rt && (!l || rt.updatedAt > l.updatedAt || (rt.updatedAt === l.updatedAt && betterPoster(rt, l)))
-    const win = remoteNewer ? rt! : (l ?? rt!)
+    const win = keepSavedCopy(remoteNewer ? rt! : (l ?? rt!), remoteNewer ? l : rt)
     const del = deleted.get(id)
     if (del && del >= win.updatedAt) continue
     // Edited after it was deleted somewhere else: keep the edit.
     if (del) deleted.delete(id)
     titles.push(win)
-    if (remoteNewer) toLocalTitles.push(win)
+    if (remoteNewer || win !== l) toLocalTitles.push(win)
     if (l && (!rt || l.updatedAt > rt.updatedAt)) push = true
   }
 

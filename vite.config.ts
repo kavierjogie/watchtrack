@@ -32,6 +32,8 @@ export default defineConfig({
       },
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // Only link previews ask for this, and they don't run the app: no reason for every device to download it.
+        globIgnores: ['og-image.png'],
         // vite-plugin-pwa 2.0.0 still sets the deprecated inlineDynamicImports on the worker's build.
         buildPlugins: {
           vite: [
