@@ -41,7 +41,7 @@ export function currentEpisodeCount(p: Progress): number | null {
 }
 
 /** True when another season is definitely known to exist (total seasons, or a known episode count for it). */
-export function hasKnownNextSeason(p: Progress): boolean {
+function hasKnownNextSeason(p: Progress): boolean {
   if (p.numbering !== 'seasonal' || p.season == null) return false
   return (p.totalSeasons != null && p.season < p.totalSeasons) || p.seasonEpisodeCounts[p.season + 1] != null
 }

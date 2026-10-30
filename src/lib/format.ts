@@ -121,3 +121,5 @@ export async function copyText(text: string, field: HTMLInputElement | null): Pr
     return document.execCommand('copy')
   }
 }
+
+export const errMsg = (err: unknown) => (err instanceof Error ? err.message : 'Something went wrong.')

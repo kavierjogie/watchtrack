@@ -164,7 +164,7 @@ const CATEGORY: Record<AlertKind, keyof Pick<Prefs, 'alertSeasons' | 'alertEpiso
 /** Per-title choice; by default every status except Dropped. */
 export const alertsOn = (t: Pick<Title, 'alerts' | 'status'>) => t.alerts ?? t.status !== 'dropped'
 
-export const wanted = (kind: AlertKind, t: Title, prefs = getPrefs()) => prefs.alertsOn && alertsOn(t) && prefs[CATEGORY[kind]]
+const wanted = (kind: AlertKind, t: Title, prefs = getPrefs()) => prefs.alertsOn && alertsOn(t) && prefs[CATEGORY[kind]]
 
 // ---------- Store (IndexedDB `settings` row, so no schema change and Clear all data removes it) ----------
 

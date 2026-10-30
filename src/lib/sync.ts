@@ -10,7 +10,7 @@
  * catches up the next time it's opened.
  */
 import { useSyncExternalStore } from 'react'
-import { fetchMazeEpisodes, kitsuOngoing, MetadataError, request, SOURCE_ID, tmdb, type KitsuAnime } from './metadata'
+import { fetchMazeEpisodes, kitsuOngoing, MetadataError, NUMERIC_ID, request, SOURCE_ID, tmdb, type KitsuAnime } from './metadata'
 import { detectEvents, type AlertEvent } from './alerts'
 import { position } from './progress'
 import type { MetadataSource, Release, Sequel, SyncInfo, Title } from './types'
@@ -51,7 +51,6 @@ const AUTO_MIN_GAP = 15 * 60000
 
 // ---------- Providers ----------
 
-const NUMERIC_ID = /^\d{1,10}$/
 
 export function canRefresh(t: Title): t is Title & { source: MetadataSource } {
   const s = t.source
@@ -149,7 +148,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 const aniDate = (d: AniNode['startDate']) => (d?.year ? [d.year, d.month && pad(d.month), d.month && d.day && pad(d.day)].filter(Boolean).join('-') : null)
 
 /** The next TV season, if AniList links one. Films, OVAs and spin-offs aren't "the next season". */
-export function pickSequel(edges: { relationType: string; node: AniNode }[] | undefined): Sequel | null {
+function pickSequel(edges: { relationType: string; node: AniNode }[] | undefined): Sequel | null {
   const n = edges?.find((e) => e.relationType === 'SEQUEL' && e.node?.type === 'ANIME' && ['TV', 'TV_SHORT', 'ONA'].includes(e.node.format ?? '') && e.node.status !== 'CANCELLED')?.node
   const title = n && (n.title?.english || n.title?.romaji)
   return n && title && Number.isInteger(n.id) ? { anilistId: n.id, title, status: n.status ?? 'NOT_YET_RELEASED', startDate: aniDate(n.startDate), url: n.siteUrl } : null
@@ -162,7 +161,7 @@ type AniMedia = {
   relations?: { edges: { relationType: string; node: AniNode }[] }
 }
 
-export async function fetchAnilist(id: number, signal?: AbortSignal): Promise<EpisodeInfo> {
+async function fetchAnilist(id: number, signal?: AbortSignal): Promise<EpisodeInfo> {
   await anilistTurn(signal)
   const res = await request<{ data?: { Media?: AniMedia } }>(
     'https://graphql.anilist.co',
@@ -215,7 +214,7 @@ async function fetchKitsuAnime(t: Title, id: string, signal?: AbortSignal): Prom
   return { ...(await fetchKitsu(id, signal)), anilistId }
 }
 
-export function fetchEpisodeInfo(t: Title & { source: MetadataSource }, signal?: AbortSignal): Promise<EpisodeInfo> {
+function fetchEpisodeInfo(t: Title & { source: MetadataSource }, signal?: AbortSignal): Promise<EpisodeInfo> {
   const { provider, id } = t.source
   if (provider === 'tvmaze') return fetchTvMaze(id, signal)
   if (provider === 'kitsu') return fetchKitsuAnime(t, id, signal)
@@ -403,7 +402,7 @@ export function isDue(t: Title, now = Date.now()): boolean {
 }
 
 /** Earliest dated release the provider gave for this title, as a timestamp. */
-export function nextReleaseAt(t: Title): number | null {
+function nextReleaseAt(t: Title): number | null {
   const dates = [t.sync?.nextAiring?.airdate, ...(t.sync?.upcoming ?? []).map((r) => r.airdate)].map((d) => Date.parse(d ?? '')).filter((n) => !Number.isNaN(n))
   return dates.length ? Math.min(...dates) : null
 }

@@ -52,7 +52,7 @@ export function relinkTitle(t: Title, meta: MetaResult): Title {
   }
 }
 
-export const snapshot = (t: Title): Snapshot => ({
+const snapshot = (t: Title): Snapshot => ({
   progress: t.progress,
   status: t.status,
   completedAt: t.completedAt,
@@ -69,7 +69,7 @@ export interface Change {
   history: HistoryEntry
 }
 
-export function withStatus(t: Title, status: WatchStatus, now: string): Title {
+function withStatus(t: Title, status: WatchStatus, now: string): Title {
   return {
     ...t,
     status,

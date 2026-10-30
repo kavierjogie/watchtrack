@@ -11,7 +11,7 @@
  */
 import { useSyncExternalStore } from 'react'
 import { isObj, normTitle } from './backup'
-import { enrich, kitsuToResult, mazeToResult, request, searchTitles, tmdb, tmdbToResult, type KitsuAnime, type MazeShow, type Provider, type TmdbItem } from './metadata'
+import { enrich, kitsuToResult, mazeToResult, NUMERIC_ID, request, searchTitles, tmdb, tmdbToResult, type KitsuAnime, type MazeShow, type Provider, type TmdbItem } from './metadata'
 import { savePoster } from './posters'
 import { emptyProgress } from './progress'
 import { buildProfile, candidateKey, emptyFeedback, ROLE_STRENGTH, tasteGenres, titleWeight, type Candidate, type Feedback, type FeedbackItem, type Link, type SortKey } from './recommend'
@@ -86,7 +86,7 @@ export function pruneCache(now = Date.now()) {
   })
 }
 
-export function clearMetaCache() {
+function clearMetaCache() {
   inFlight.clear()
   removeCached(() => true)
 }
@@ -97,7 +97,6 @@ const KITSU = 'https://kitsu.app/api/edge/'
 const KITSU_INIT = { headers: { Accept: 'application/vnd.api+json' } }
 /** Recaps, music videos and commercials aren't something to recommend. */
 const KITSU_SUBTYPES = new Set(['TV', 'movie', 'ONA', 'OVA'])
-const NUMERIC_ID = /^\d{1,10}$/
 
 function kitsuCandidate(a: KitsuAnime, categories?: Map<string, string>): Candidate {
   const rank = a.attributes.popularityRank

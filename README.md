@@ -150,7 +150,7 @@ src/
   pages/          Dashboard, Library, Continue, Plan, On Hold, Completed, Title, Settings
 ```
 
-IndexedDB stores: `titles`, `watchHistory`, `images` (Blobs), `settings` (reserved). Schema migrations go in the `upgrade()` callback in `db.ts`.
+IndexedDB stores: `titles`, `watchHistory`, `images` (Blobs), `settings` (alert history, Drive deletion tombstones, prefs mirrored for the service worker). Schema migrations go in the `upgrade()` callback in `db.ts`.
 
 ## Tests
 

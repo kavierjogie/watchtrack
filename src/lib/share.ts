@@ -15,8 +15,8 @@ import type { MediaType, MetadataSource, Numbering, Title, WatchStatus } from '.
  * JSON (version 1): { "v": 1, "items": SharedItem[] }. Fields added later are optional, so older links still open
  * and older versions of the app ignore what they don't know.
  */
-export const SHARE_VERSION = 1
-export const SHARE_PATH = '/shared'
+const SHARE_VERSION = 1
+const SHARE_PATH = '/shared'
 /** Longest payload we'll put in a link. Browsers cope with far more, but messaging apps and copy/paste get flaky. */
 export const MAX_PAYLOAD_CHARS = 30_000
 /** Decompressed size cap, so a hostile link can't inflate into something huge. */

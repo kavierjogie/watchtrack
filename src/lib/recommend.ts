@@ -55,12 +55,12 @@ export const candidateKey = (c: Pick<MetaResult, 'source'>) => `${c.source.provi
 // ---------- Weights (one place, so the ranking stays explainable and easy to tune) ----------
 
 /** How much a library title's status says about taste. Dropped counts against its genres. */
-export const STATUS_WEIGHT: Record<WatchStatus, number> = { completed: 3, watching: 1.5, on_hold: 1, plan: 0.5, dropped: -1.5 }
+const STATUS_WEIGHT: Record<WatchStatus, number> = { completed: 3, watching: 1.5, on_hold: 1, plan: 0.5, dropped: -1.5 }
 /** Ratings at or above this get the "you rated it N/10" wording and their own row. */
-export const TOP_RATING = 8
+const TOP_RATING = 8
 /** Weight of a "more like this" request, and how much a dismissal counts against its genres. */
-export const LIKED_WEIGHT = 2
-export const DISMISSED_WEIGHT = -0.5
+const LIKED_WEIGHT = 2
+const DISMISSED_WEIGHT = -0.5
 
 /**
  * Score = Σ weight × factor. Each factor is 0–1 (genre affinity −1–1), so a weight is the most points that factor can
@@ -74,10 +74,10 @@ export const DISMISSED_WEIGHT = -0.5
  *  - era:        release year within ~5 years of what you usually watch, fading to 0 by 20 years
  *  - popularity: provider popularity 0–1
  */
-export const W = { related: 3, genre: 3, similar: 2.5, quality: 1, format: 0.5, era: 0.5, popularity: 0.5 }
+const W = { related: 3, genre: 3, similar: 2.5, quality: 1, format: 0.5, era: 0.5, popularity: 0.5 }
 
 /** Every threshold the rules use. */
-export const TUNE = {
+const TUNE = {
   /** Shared genre labels needed before two titles count as similar (one broad genre like "Drama" isn't enough). */
   minShared: 2,
   /** Jaccard overlap for a title to join a "Because you watched" / "More like" row. */
@@ -179,7 +179,7 @@ export function genreSimilarity(a: string[], b: string[]): { sim: number; shared
 const styleOf = (mediaType: MediaType, provider?: string) => (mediaType === 'anime' || provider === 'kitsu' ? 'anime' : 'other')
 
 /** genreSimilarity between a candidate and a seed, damped by TUNE.crossStyle across anime / other. */
-export function seedSimilarity(c: Pick<MetaResult, 'genres' | 'mediaType' | 'source'>, s: Seed): { sim: number; shared: string[] } {
+function seedSimilarity(c: Pick<MetaResult, 'genres' | 'mediaType' | 'source'>, s: Seed): { sim: number; shared: string[] } {
   const { sim, shared } = genreSimilarity(tasteGenres(c.genres), s.genres)
   return { sim: styleOf(c.mediaType, c.source.provider) === styleOf(s.mediaType, s.source?.provider) ? sim : sim * TUNE.crossStyle, shared }
 }
@@ -217,7 +217,7 @@ export interface Profile {
   seeds: Seed[]
 }
 
-export const seedOf = (t: Title, weight = titleWeight(t)): Seed => ({
+const seedOf = (t: Title, weight = titleWeight(t)): Seed => ({
   id: t.id,
   title: t.title,
   mediaType: t.mediaType,
@@ -276,7 +276,7 @@ function weightedMedianYear(seeds: Seed[]): number | null {
   return null
 }
 
-export function sourceOfKey(key: string): MetaResult['source'] | null {
+function sourceOfKey(key: string): MetaResult['source'] | null {
   const m = /^(kitsu|tvmaze|tmdb):(.+)$/.exec(key)
   return m ? { provider: m[1] as 'kitsu' | 'tvmaze' | 'tmdb', id: m[2], url: '' } : null
 }
@@ -355,7 +355,7 @@ export function entryPoint(c: Candidate, byKey: Map<string, Candidate>, idx: Lib
 }
 
 /** Enough to show and judge: a real title, artwork, and genres or a provider relationship to rank it by. */
-export const isUsable = (c: Candidate, linked: Set<string>) =>
+const isUsable = (c: Candidate, linked: Set<string>) =>
   !!c.title.trim() && c.title !== 'Untitled' && !!(c.posterUrl || c.thumbUrl) && (c.genres.length > 0 || linked.has(candidateKey(c)))
 
 // ---------- Scoring ----------
@@ -524,7 +524,7 @@ function scorePool(pool: Candidate[], links: Link[], library: Title[], feedback:
  * genre match can outrank a loose "same world" link. Each lists what it shares (relationship, genres, format, decade).
  * The seed itself is never included.
  */
-export function similarMatches(focus: Seed, recs: Rec[], links: Link[], profile: Profile): Rec[] {
+function similarMatches(focus: Seed, recs: Rec[], links: Link[], profile: Profile): Rec[] {
   const roles = new Map(links.filter((l) => l.seedId === focus.id && ROLE_STRENGTH[l.role]).map((l) => [l.key, l.role]))
   const self = new Set([focus.id.replace(/^liked:/, ''), focus.source ? candidateKey({ source: focus.source }) : ''])
   const decade = (y: number | null) => (y == null ? null : Math.floor(y / 10) * 10)

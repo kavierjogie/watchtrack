@@ -2,12 +2,12 @@ import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useConfirm } from '../components/Modal'
+import { errMsg } from '../lib/format'
 import { describePosition, startNextSeason } from '../lib/progress'
 import { applyMarkWatched, applyMovieWatched, applyProgress, applySpecial, applyStatus, type Change } from '../lib/titles'
 import { STATUS_LABEL, type Title, type WatchStatus } from '../lib/types'
 import { useLibrary } from './library'
 
-const errMsg = (err: unknown) => (err instanceof Error ? err.message : 'Something went wrong.')
 
 /** All progress-changing actions, with toasts, undo and confirmations. */
 export function useWatchActions() {

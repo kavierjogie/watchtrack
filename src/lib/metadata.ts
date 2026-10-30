@@ -366,7 +366,7 @@ async function tmdbDetails(r: MetaResult): Promise<MetaResult> {
 // ---------- Public API ----------
 
 /** Every source the unified search asks. */
-export function searchProviders(): Provider[] {
+function searchProviders(): Provider[] {
   return ['kitsu', 'tvmaze', 'tmdb']
 }
 
@@ -600,7 +600,8 @@ export async function enrich(r: MetaResult): Promise<MetaResult> {
 }
 
 /** Provider ids we'll look up. Ids can come from shared links, so anything else is ignored rather than put in a URL. */
-export const SOURCE_ID: Partial<Record<Provider, RegExp>> = { kitsu: /^\d{1,10}$/, tvmaze: /^\d{1,10}$/, tmdb: /^(movie|tv)\/\d{1,10}$/ }
+export const NUMERIC_ID = /^\d{1,10}$/
+export const SOURCE_ID: Partial<Record<Provider, RegExp>> = { kitsu: NUMERIC_ID, tvmaze: NUMERIC_ID, tmdb: /^(movie|tv)\/\d{1,10}$/ }
 
 /**
  * Poster for a title that's already identified, looked up by its provider id — never by name, so a remake, season or
@@ -623,7 +624,7 @@ export async function fetchPosterUrl(source: Pick<MetadataSource, 'provider' | '
 }
 
 /** A Kitsu image that isn't one of its generated sizes. Titles saved before sizes were preferred still hold these. Same check as api/poster.ts. */
-export const isKitsuOriginal = (url: string) => {
+const isKitsuOriginal = (url: string) => {
   const { hostname, pathname } = new URL(url)
   return hostname === 'media.kitsu.app' && !/\/(tiny|small|medium|large)[.-][^/]*$/.test(pathname)
 }

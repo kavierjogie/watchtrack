@@ -21,7 +21,7 @@ const KIND: Record<AlertKind, { icon: LucideIcon; tone: string }> = {
 
 const failed = () => toast.error("Couldn't update alerts. Your browser may be blocking storage.")
 
-export function AlertItem({ a, onOpen }: { a: Alert; onOpen?: () => void }) {
+function AlertItem({ a, onOpen }: { a: Alert; onOpen?: () => void }) {
   const t = useLibrary().byId(a.titleId)
   const { icon: Icon, tone } = KIND[a.kind]
   return (

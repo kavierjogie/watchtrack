@@ -7,6 +7,7 @@ import { EmptyState, PageHeader, Section } from '../components/cards'
 import { Modal } from '../components/Modal'
 import { Poster } from '../components/Poster'
 import { candidateToTitle, dismiss, likeCandidate, loadPool, loadSimilar, restoreDismissed, setFilters, undismiss, useDiscover, withInferred, type PoolState } from '../lib/discover'
+import { errMsg } from '../lib/format'
 import { PROVIDER_LABEL } from '../lib/metadata'
 import { buildDiscover, buildProfile, buildSimilar, findTracked, indexLibrary, isPersonal, isTasteGenre, normGenre, topGenres, type Candidate, type Rec, type SortKey } from '../lib/recommend'
 import { MEDIA_LABEL, STATUS_LABEL, type Title } from '../lib/types'
@@ -17,7 +18,6 @@ const SORT_LABEL: Record<SortKey, string> = { match: 'Best match', popular: 'Mos
 const GRID = 'poster-grid [--card-min:clamp(8.5rem,22vw,11rem)]'
 const PREVIEW = 6
 
-const errMsg = (err: unknown) => (err instanceof Error ? err.message : 'Something went wrong.')
 
 /** Card-sized artwork: Kitsu/TVmaze thumbnails are big enough; TMDB's thumbnail (92px) isn't. */
 const cardPoster = (c: Candidate) => {
@@ -178,12 +178,7 @@ export function DiscoverPage() {
             <div key={i} className="space-y-3">
               <div className="skeleton h-5 w-48 rounded" />
               <div className={GRID}>
-                {Array.from({ length: PREVIEW }, (_, j) => (
-                  <div key={j} className="space-y-2">
-                    <div className="skeleton aspect-[2/3] rounded-xl" />
-                    <div className="skeleton h-3 w-3/4 rounded" />
-                  </div>
-                ))}
+                <SkeletonCards />
               </div>
             </div>
           ))}
@@ -372,12 +367,7 @@ export function SimilarTitles({ t }: { t: Title }) {
         <Section title="Similar titles">
           <p className="-mt-2 text-xs text-muted">Looking at {t.title}'s provider links and genres…</p>
           <div className={GRID} aria-busy aria-label="Loading similar titles">
-            {Array.from({ length: PREVIEW }, (_, j) => (
-              <div key={j} className="space-y-2">
-                <div className="skeleton aspect-[2/3] rounded-xl" />
-                <div className="skeleton h-3 w-3/4 rounded" />
-              </div>
-            ))}
+            <SkeletonCards />
           </div>
         </Section>
       ) : recs.length ? (
@@ -404,6 +394,14 @@ export function SimilarTitles({ t }: { t: Title }) {
     </>
   )
 }
+
+const SkeletonCards = () =>
+  Array.from({ length: PREVIEW }, (_, j) => (
+    <div key={j} className="space-y-2">
+      <div className="skeleton aspect-[2/3] rounded-xl" />
+      <div className="skeleton h-3 w-3/4 rounded" />
+    </div>
+  ))
 
 function RecSection({
   title,

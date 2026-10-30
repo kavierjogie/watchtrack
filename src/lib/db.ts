@@ -2,8 +2,8 @@ import { openDB, type DBSchema, type IDBPDatabase, type IDBPObjectStore, type St
 import type { Tombstone } from './merge'
 import type { HistoryEntry, Snapshot, StoredImage, Title } from './types'
 
-export const DB_NAME = 'watchtrack'
-export const DB_VERSION = 1
+const DB_NAME = 'watchtrack'
+const DB_VERSION = 1
 
 interface WatchDB extends DBSchema {
   titles: { key: string; value: Title; indexes: { byUpdated: string; byStatus: string } }
@@ -12,7 +12,7 @@ interface WatchDB extends DBSchema {
   settings: { key: string; value: { key: string; value: unknown } }
 }
 
-export class StorageError extends Error {
+class StorageError extends Error {
   readonly quota: boolean
   constructor(message: string, quota = false) {
     super(message)

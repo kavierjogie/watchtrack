@@ -6,7 +6,7 @@ import { ExpirationPlugin } from 'workbox-expiration'
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching'
 import { NavigationRoute, registerRoute } from 'workbox-routing'
 import { CacheFirst } from 'workbox-strategies'
-import { BACKGROUND_CHECK_TAG, notifyAlerts, recordAlerts } from './lib/alerts'
+import { BACKGROUND_CHECK_TAG, notifyAlerts, OPEN_EVENT, recordAlerts } from './lib/alerts'
 import { normalizeTitle } from './lib/backup'
 import { listTitles, updateTitle } from './lib/db'
 import { readMirroredPrefs } from './lib/prefs'
@@ -48,7 +48,7 @@ self.addEventListener('notificationclick', (event) => {
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
       const win = wins.find((w) => new URL(w.url).origin === self.location.origin)
       if (!win) return self.clients.openWindow(url)
-      win.postMessage({ type: 'watchtrack:open', url })
+      win.postMessage({ type: OPEN_EVENT, url })
       return win.focus()
     }),
   )
