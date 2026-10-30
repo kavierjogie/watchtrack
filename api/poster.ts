@@ -6,11 +6,15 @@
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']
 /** Under Vercel's 4.5 MB response limit. */
 const MAX_BYTES = 4 * 1024 * 1024
+/** A given address always holds the same image, so "too big" stays true: the CDN answers every device after the first. */
+const TOO_LARGE_CACHE = { 'Cache-Control': 'public, max-age=86400, s-maxage=2592000' }
 
 function kitsuImageUrl(raw: string | null): string | null {
   try {
     const url = new URL(raw ?? '')
-    return url.protocol === 'https:' && url.hostname === 'media.kitsu.app' && !url.port && !url.username && !url.password ? url.href : null
+    // Image paths only, and at most Kitsu's own numeric version (?1597604210): anything else could make up endless addresses to get past the CDN's cache.
+    const image = /^\/anime\/[\w./-]+\.(jpe?g|png|webp|gif|avif)$/i.test(url.pathname) && !url.pathname.includes('..') && /^(\?\d+)?$/.test(url.search)
+    return url.protocol === 'https:' && url.hostname === 'media.kitsu.app' && !url.port && !url.username && !url.password && image ? url.href : null
   } catch {
     return null
   }
@@ -35,13 +39,16 @@ export async function GET(req: Request): Promise<Response> {
     if (!res.ok) return fail(502, 'Image not available.', `upstream-${res.status}`, url)
     type = res.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() ?? ''
     if (!ALLOWED_TYPES.includes(type)) return fail(502, 'Not an image.', 'not-an-image', url)
-    if (Number(res.headers.get('Content-Length')) > MAX_BYTES) return fail(502, 'Image too large.', 'too-large', url)
+    if (Number(res.headers.get('Content-Length')) > MAX_BYTES) {
+      await res.body?.cancel() // Stop the download rather than leave it running.
+      return fail(413, 'Image too large.', 'too-large', url, TOO_LARGE_CACHE)
+    }
     body = await res.arrayBuffer()
   } catch (err) {
     if (err instanceof Error && err.name === 'TimeoutError') return fail(504, 'Kitsu took too long.', 'timeout', url)
     return fail(502, 'Kitsu could not be reached.', 'unreachable', url)
   }
-  if (body.byteLength > MAX_BYTES) return fail(502, 'Image too large.', 'too-large', url)
+  if (body.byteLength > MAX_BYTES) return fail(413, 'Image too large.', 'too-large', url, TOO_LARGE_CACHE)
   return new Response(body, {
     headers: {
       'Content-Type': type,

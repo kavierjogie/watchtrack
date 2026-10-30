@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fetchPosterUrl } from './metadata'
-import { publicPosterUrl, withPublicPosters } from './posters'
+import { publicPosterUrl, saveKitsuPosters, withPublicPosters } from './posters'
 import { decodeShare, encodeShare, sharedToTitle } from './share'
 import { createTitle } from './titles'
 import type { Poster } from './types'
@@ -27,6 +27,16 @@ const AFFECTED = [
 
 const mazeTitle = (name: string, id: number, poster: Poster) =>
   createTitle({ title: name, mediaType: 'tv', status: 'watching', poster, source: { provider: 'tvmaze', id: String(id), url: `https://www.tvmaze.com/shows/${id}` } })
+
+describe('saveKitsuPosters', () => {
+  it('leaves the downloading to a tab that is already doing it', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    vi.stubGlobal('navigator', { onLine: true, locks: { request: (_: string, __: unknown, run: (lock: null) => unknown) => Promise.resolve(run(null)) } })
+    const t = createTitle({ title: 'Frieren', mediaType: 'anime', poster: { kind: 'remote', url: 'https://media.kitsu.app/anime/1/large.jpg' } })
+    await saveKitsuPosters([t], () => {})
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})
 
 describe('publicPosterUrl', () => {
   it.each<[string, Poster | null, string | null]>([

@@ -27,6 +27,48 @@ describe('parseSyncDoc with hostile dates', () => {
   })
 })
 
+describe('poster copies that differ only between devices', () => {
+  const URL = 'https://media.kitsu.app/anime/1/large.jpg'
+  const image = (id: string) => ({ id, type: 'image/jpeg', createdAt: at(1), data: 'AA==' })
+  const withPoster = (poster: Title['poster']) => ({ ...title('A', 1), poster })
+  const remoteUrl = withPoster({ kind: 'remote', url: URL })
+  const copy = (imageId: string) => withPoster({ kind: 'local', imageId, url: URL })
+
+  it("uses the copy Drive already has instead of downloading another", () => {
+    const r = mergeLibraries(doc({ titles: [remoteUrl] }), doc({ titles: [copy('b')], images: [image('b')] }), NOW)
+    expect(r.toLocal.titles[0].poster).toEqual(copy('b').poster)
+    expect(r.toLocal.images.map((i) => i.id)).toEqual(['b'])
+    expect(r.push).toBe(false)
+  })
+
+  it('keeps a local copy over a remote URL, and uploads it', () => {
+    const r = mergeLibraries(doc({ titles: [copy('a')], images: [image('a')] }), doc({ titles: [remoteUrl] }), NOW)
+    expect(r.doc.titles[0].poster).toEqual(copy('a').poster)
+    expect(r.toLocal.titles).toEqual([])
+    expect(r.push).toBe(true)
+  })
+
+  it('two devices with different copies settle on one, so uploads stop', () => {
+    const first = mergeLibraries(doc({ titles: [copy('b')], images: [image('b')] }), doc({ titles: [copy('a')], images: [image('a')] }), NOW)
+    expect(first.toLocal.titles[0].poster).toEqual(copy('a').poster)
+    expect(first.push).toBe(false)
+    const other = mergeLibraries(doc({ titles: [copy('a')], images: [image('a')] }), doc({ titles: [copy('b')], images: [image('b')] }), NOW)
+    expect(other.doc.titles[0].poster).toEqual(copy('a').poster)
+    expect(other.toLocal.titles).toEqual([])
+  })
+
+  it('an edit still beats a poster copy', () => {
+    const edited = { ...withPoster({ kind: 'remote', url: URL }), updatedAt: at(0), notes: 'mine' }
+    const r = mergeLibraries(doc({ titles: [edited] }), doc({ titles: [copy('b')], images: [image('b')] }), NOW)
+    expect(r.doc.titles[0].notes).toBe('mine')
+  })
+
+  it('a removed poster is not brought back', () => {
+    const r = mergeLibraries(doc({ titles: [withPoster(null)] }), doc({ titles: [copy('b')], images: [image('b')] }), NOW)
+    expect(r.doc.titles[0].poster).toBeNull()
+  })
+})
+
 describe('mergeLibraries', () => {
   it('uploads everything when Drive has no copy yet', () => {
     const r = mergeLibraries(doc({ titles: [title('A', 1)] }), null, NOW)

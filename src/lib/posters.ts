@@ -1,4 +1,4 @@
-import { putImage, updateTitle, validateImage } from './db'
+import { deleteImage, putImage, updateTitle, validateImage } from './db'
 import { downloadPoster, fetchPosterUrl, isHttpUrl } from './metadata'
 import type { MetadataSource, Poster, Title } from './types'
 
@@ -34,6 +34,12 @@ export async function savePoster(url: string): Promise<Poster> {
  * tried again for a week, so it neither calls the function on every open nor keeps the others from their turn.
  */
 export async function saveKitsuPosters(titles: Title[], onSaved: (t: Title) => void) {
+  // One tab at a time: a second open tab would download all the same posters. Skips quietly if another tab is on it.
+  if (navigator.locks) await navigator.locks.request('watchtrack:save-posters', { ifAvailable: true }, (lock) => (lock ? saveBatch(titles, onSaved) : undefined))
+  else await saveBatch(titles, onSaved)
+}
+
+async function saveBatch(titles: Title[], onSaved: (t: Title) => void) {
   const failed = readFailedSaves()
   const pending = titles
     .filter((t) => t.poster?.kind === 'remote' && t.poster.url.startsWith('https://media.kitsu.app/') && !(Date.now() - failed[t.poster.url] < SAVE_RETRY_MS))
@@ -54,6 +60,7 @@ export async function saveKitsuPosters(titles: Title[], onSaved: (t: Title) => v
     // Re-checked against the stored title, in case the poster was changed while downloading.
     const saved = await updateTitle(t.id, (cur) => (cur.poster?.kind === 'remote' && cur.poster.url === url ? { ...cur, poster } : null))
     if (saved?.poster?.kind === 'local' && saved.poster.imageId === poster.imageId) onSaved(saved)
+    else await deleteImage(poster.imageId) // Lost the race, so nothing points at this copy.
   }
 }
 

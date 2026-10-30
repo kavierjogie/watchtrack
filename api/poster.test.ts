@@ -30,11 +30,22 @@ describe('poster', () => {
     'https://media.kitsu.app:8080/a.jpg',
     'http://media.kitsu.app/a.jpg',
     'http://169.254.169.254/latest/meta-data',
+    // Made-up addresses on the right host would each get past the CDN's cache.
+    'https://media.kitsu.app/anime/1/a.jpg?bust=1',
+    'https://media.kitsu.app/anime/1/a.jpg?x',
+    'https://media.kitsu.app/anime/1/a.html',
+    'https://media.kitsu.app/users/avatars/1/a.jpg',
+    'https://media.kitsu.app/anime/../secret.jpg',
     'not a url',
     '',
   ])('refuses %s without fetching it', async (url) => {
     expect((await call(url)).status).toBe(400)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each(['https://media.kitsu.app/anime/poster_images/14172/large.jpg?1597604210', 'https://media.kitsu.app/anime/47711/poster_image/b6a6e8714cee53051ba14c9d799c00aa.png'])('allows real Kitsu poster address %s', async (url) => {
+    fetchMock.mockResolvedValue(new Response(new Uint8Array(1), { headers: { 'Content-Type': 'image/jpeg' } }))
+    expect((await call(url)).status).toBe(200)
   })
 
   it('refuses anything that is not a plain image', async () => {
@@ -46,14 +57,18 @@ describe('poster', () => {
 
   it('refuses an image too big to send', async () => {
     fetchMock.mockResolvedValue(new Response(new Uint8Array(4 * 1024 * 1024 + 1), { headers: { 'Content-Type': 'image/png' } }))
-    expect((await call(IMG)).status).toBe(502)
+    const res = await call(IMG)
+    expect(res.status).toBe(413)
+    expect(res.headers.get('Cache-Control')).toContain('s-maxage=2592000') // every other device gets this from the CDN
   })
 
   it('refuses a declared oversize image without reading it, and other websites', async () => {
     const huge = new Response(new Uint8Array(1), { headers: { 'Content-Type': 'image/png', 'Content-Length': String(50 * 1024 * 1024) } })
     const read = vi.spyOn(huge, 'arrayBuffer')
     fetchMock.mockResolvedValue(huge)
-    expect((await call(IMG)).status).toBe(502)
+    const res = await call(IMG)
+    expect(res.status).toBe(413)
+    expect(res.headers.get('Cache-Control')).toContain('s-maxage=2592000')
     expect(read).not.toHaveBeenCalled()
     fetchMock.mockClear()
     const cross = await GET(new Request(`https://watchtrack.test/api/poster?url=${encodeURIComponent(IMG)}`, { headers: { 'Sec-Fetch-Site': 'cross-site' } }))
@@ -114,7 +129,7 @@ describe('poster', () => {
     fetchMock.mockImplementation(async (u: string) =>
       u.includes('missing') ? new Response('', { status: 404 }) : new Response(u, { headers: { 'Content-Type': 'image/jpeg' } }),
     )
-    const urls = Array.from({ length: 12 }, (_, i) => `https://media.kitsu.app/${i % 3 ? 'ok' : 'missing'}/${i}.jpg`)
+    const urls = Array.from({ length: 12 }, (_, i) => `https://media.kitsu.app/anime/${i % 3 ? 'ok' : 'missing'}/${i}.jpg`)
     const out = await Promise.all(urls.map(call))
     expect(out.map((r) => r.status)).toEqual(urls.map((u) => (u.includes('missing') ? 404 : 200)))
     expect(await out[1].text()).toBe(urls[1])

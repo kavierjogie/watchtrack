@@ -37,6 +37,16 @@ export interface MergeResult {
 }
 
 /**
+ * Saving a poster copy leaves updatedAt alone, so two devices can differ only in that. Take a copy Drive already has
+ * rather than download another, and if both made one, settle on the same one everywhere so they don't keep overwriting
+ * each other's upload.
+ */
+function betterPoster(remote: Title, local: Title): boolean {
+  if (remote.poster?.kind !== 'local' || !local.poster) return false
+  return local.poster.kind !== 'local' || remote.poster.imageId < local.poster.imageId
+}
+
+/**
  * Two-way merge. Per title the newer `updatedAt` wins; history and images are unions; a deletion wins over the
  * title only when it's newer than the title's last edit. Pure, so every rule is unit-tested.
  */
@@ -57,7 +67,7 @@ export function mergeLibraries(local: SyncDoc, remote: SyncDoc | null, now = Dat
   for (const id of new Set([...localTitles.keys(), ...remoteTitles.keys()])) {
     const l = localTitles.get(id)
     const rt = remoteTitles.get(id)
-    const remoteNewer = !!rt && (!l || rt.updatedAt > l.updatedAt)
+    const remoteNewer = !!rt && (!l || rt.updatedAt > l.updatedAt || (rt.updatedAt === l.updatedAt && betterPoster(rt, l)))
     const win = remoteNewer ? rt! : (l ?? rt!)
     const del = deleted.get(id)
     if (del && del >= win.updatedAt) continue

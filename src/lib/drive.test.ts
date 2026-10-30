@@ -31,6 +31,46 @@ async function sync() {
   await syncDrive()
 }
 
+describe('Google token refreshes', () => {
+  const tokenCalls = (ok: boolean) => {
+    const calls: string[] = []
+    vi.stubGlobal('fetch', async (url: string) => {
+      if (url === '/api/google-token') {
+        calls.push(url)
+        return ok ? Response.json({ access_token: 'new', expires_in: 3600 }) : Response.json({ error: 'Google refused the request.' }, { status: 400 })
+      }
+      return Response.json({ files: [] })
+    })
+    return calls
+  }
+
+  beforeEach(async () => {
+    const store = new Map([['watchtrack:drive', JSON.stringify({ refresh: 'r', fileId: 'main' })]])
+    vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) })
+    await clearAll()
+    vi.resetModules()
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('calls made together share one refresh, and the new token is reused', async () => {
+    const calls = tokenCalls(true)
+    const { listSafetyCopies } = await import('./drive')
+    await Promise.all([listSafetyCopies(), listSafetyCopies(), listSafetyCopies()])
+    await listSafetyCopies()
+    expect(calls).toHaveLength(1)
+  })
+
+  it('a failed refresh backs off instead of asking Google again on the next sync', async () => {
+    const calls = tokenCalls(false)
+    const { syncDrive } = await import('./drive')
+    await syncDrive()
+    await syncDrive()
+    await syncDrive()
+    expect(calls).toHaveLength(1)
+  })
+})
+
 describe('Drive safety copies', () => {
   beforeEach(async () => {
     const store = new Map([['watchtrack:drive', JSON.stringify({ refresh: 'r', access: 'a', expires: Date.now() + DAY })]])

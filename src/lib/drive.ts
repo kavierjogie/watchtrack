@@ -165,20 +165,35 @@ export function disconnectDrive() {
 
 async function accessToken(): Promise<string> {
   if (!state.refresh) throw new Error('Google Drive is not connected.')
-  if (!state.access || (state.expires ?? 0) < Date.now() + 60_000) await tokenCall({ refresh_token: state.refresh })
+  if (!state.access || (state.expires ?? 0) < Date.now() + 60_000) {
+    // Calls that find the token expired together share one refresh. A failed one backs off, or every edit and tab focus would ask Google again.
+    refreshing ??= tokenCall({ refresh_token: state.refresh })
+      .catch((err: unknown) => {
+        pause()
+        throw err
+      })
+      .finally(() => {
+        refreshing = null
+      })
+    await refreshing
+  }
   return state.access!
 }
+
+let refreshing: Promise<void> | null = null
 
 // Backing off when Drive is limiting or failing, so every tab focus and edit doesn't hit it again. Per tab, and reset by a reload.
 let pausedUntil = 0
 let pauseMs = MIN_PAUSE_MS
 
+function pause(asked = 0) {
+  pausedUntil = Date.now() + Math.max(asked, pauseMs)
+  pauseMs = Math.min(pauseMs * 2, MAX_PAUSE_MS)
+}
+
 function notePause(res: Response) {
-  if (res.status === 403 || res.status === 429 || res.status >= 500) {
-    const asked = Number(res.headers.get('Retry-After')) * 1000 || 0
-    pausedUntil = Date.now() + Math.max(asked, pauseMs)
-    pauseMs = Math.min(pauseMs * 2, MAX_PAUSE_MS)
-  } else if (res.ok) pauseMs = MIN_PAUSE_MS
+  if (res.status === 403 || res.status === 429 || res.status >= 500) pause(Number(res.headers.get('Retry-After')) * 1000 || 0)
+  else if (res.ok) pauseMs = MIN_PAUSE_MS
 }
 
 async function api(url: string, init: RequestInit = {}, retry = true): Promise<Response> {
