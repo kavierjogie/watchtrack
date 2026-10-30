@@ -32,6 +32,15 @@ export default defineConfig({
       },
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // vite-plugin-pwa 2.0.0 still sets the deprecated inlineDynamicImports on the worker's build.
+        buildPlugins: {
+          vite: [
+            {
+              name: 'sw-code-splitting',
+              outputOptions: ({ inlineDynamicImports: _, ...output }) => ({ ...output, codeSplitting: false }),
+            },
+          ],
+        },
       },
     }),
   ],
@@ -42,6 +51,8 @@ export default defineConfig({
       input: Object.fromEntries(
         ['index', 'about', 'privacy', 'terms', 'guides', 'guides/track-anime-and-tv-episodes', 'guides/organise-your-watchlist', 'guides/watchlist-local-storage'].map((p) => [p, `${p}.html`]),
       ),
+      // Libraries change less often than the app, so returning visitors re-download less.
+      output: { codeSplitting: { groups: [{ name: 'vendor', test: /node_modules/ }] } },
     },
   },
   test: {
