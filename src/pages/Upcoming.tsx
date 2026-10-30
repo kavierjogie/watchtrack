@@ -1,10 +1,10 @@
 import { CalendarClock, CalendarX, RefreshCw } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { EmptyState, PageHeader } from '../components/cards'
+import { EmptyState, PageHeader, PosterGridSkeleton, Section } from '../components/cards'
 import { Poster } from '../components/Poster'
 import { RELEASED, upcomingOf, useAlerts } from '../lib/alerts'
-import { formatRelease, isPast, timeAgo } from '../lib/format'
+import { formatRelease, formatShortRelease, isPast, RELEASE_BUCKETS, releaseBucket, timeAgo } from '../lib/format'
 import { canRefresh, useSyncState } from '../lib/sync'
 import type { Title } from '../lib/types'
 import { useLibrary } from '../state/library'
@@ -29,7 +29,25 @@ interface Row {
   status: string
 }
 
+/** One show's next release; `more` holds what follows it. */
+interface Card {
+  row: Row
+  more: Row[]
+}
+
 const RECENT_DAYS = 30
+
+/** One card per show, led by its earliest dated release. TBA releases sort last, so they lead only when nothing is dated. */
+function byShow(rows: Row[]): Card[] {
+  const sorted = [...rows].sort((a, b) => (a.date ? Date.parse(a.date) : Infinity) - (b.date ? Date.parse(b.date) : Infinity))
+  const cards = new Map<string, Card>()
+  for (const row of sorted) {
+    const card = cards.get(row.t.id)
+    if (card) card.more.push(row)
+    else cards.set(row.t.id, { row, more: [] })
+  }
+  return [...cards.values()]
+}
 
 /** "2027-01" → "Jan 2027": the provider's own rough window, never turned into a day. */
 const formatWindow = (w: string) => (/^\d{4}-\d{2}$/.test(w) ? new Date(`${w}-01T00:00:00Z`).toLocaleDateString(undefined, { month: 'short', year: 'numeric', timeZone: 'UTC' }) : w)
@@ -78,8 +96,11 @@ export function UpcomingPage() {
   }, [items, lib, openedAt])
 
   const shown = filter === 'released' ? released : upcoming.filter((r) => filter === 'all' || r.kind === filter)
-  const dated = filter === 'released' ? shown : shown.filter((r) => r.date).sort((a, b) => Date.parse(a.date!) - Date.parse(b.date!))
-  const tba = filter === 'released' ? [] : shown.filter((r) => !r.date)
+  const cards = filter === 'released' ? shown.map((row): Card => ({ row, more: [] })) : byShow(shown)
+  const sections: [string, Card[]][] = [
+    ...RELEASE_BUCKETS.map((b): [string, Card[]] => [b, cards.filter((c) => c.row.date && releaseBucket(c.row.date) === b)]),
+    ['Date TBA', cards.filter((c) => !c.row.date)],
+  ]
   const linked = lib.titles.some(canRefresh)
 
   return (
@@ -104,18 +125,14 @@ export function UpcomingPage() {
       </div>
 
       {lib.loading ? (
-        <div className="space-y-2" aria-busy aria-label="Loading">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="skeleton h-20 rounded-2xl" />
-          ))}
-        </div>
+        <PosterGridSkeleton />
       ) : !linked ? (
         <EmptyState
           icon={CalendarX}
           title="No shows to check yet"
           body="Release dates come from TVmaze, Kitsu/AniList and TMDB. Add a show through search so WatchTrack knows which one it is."
         />
-      ) : !dated.length && !tba.length ? (
+      ) : !cards.length ? (
         <EmptyState
           icon={CalendarClock}
           title={filter === 'released' ? 'Nothing new in the last 30 days' : 'Nothing scheduled yet'}
@@ -125,16 +142,17 @@ export function UpcomingPage() {
               : "None of your shows has a confirmed upcoming season or episode right now. WatchTrack checks each show once a day while it's open."
           }
         />
+      ) : filter === 'released' ? (
+        <Cards cards={cards} />
       ) : (
         <div className="space-y-8">
-          {dated.length > 0 && <Rows rows={dated} />}
-          {tba.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="text-sm font-semibold">
-                Date TBA <span className="font-normal text-muted">· announced, no confirmed release date</span>
-              </h2>
-              <Rows rows={tba} />
-            </section>
+          {sections.map(
+            ([title, list]) =>
+              list.length > 0 && (
+                <Section key={title} title={title}>
+                  <Cards cards={list} />
+                </Section>
+              ),
           )}
         </div>
       )}
@@ -145,28 +163,44 @@ export function UpcomingPage() {
   )
 }
 
-function Rows({ rows }: { rows: Row[] }) {
+const describe = (r: Row) => (r.name && r.name !== r.label ? `${r.label} · ${r.name}` : r.label)
+
+function Cards({ cards }: { cards: Card[] }) {
   return (
-    <ul className="card divide-y divide-line">
-      {rows.map((r) => (
-        <li key={r.key}>
-          <Link to={`/title/${r.t.id}`} className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-surface-2 sm:px-4">
-            <Poster poster={r.t.poster} source={r.t.source} title={r.t.title} mediaType={r.t.mediaType} className="w-11 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{r.t.title}</p>
-              <p className="truncate text-sm text-fg-2">
-                {r.label}
-                {r.name && r.name !== r.label && <span className="text-muted"> · {r.name}</span>}
-              </p>
-              <p className="text-xs text-muted">{r.status}</p>
+    <ul className="poster-grid">
+      {cards.map(({ row: r, more }) => (
+        <li key={r.key} className="group min-w-0">
+          <Link to={`/title/${r.t.id}`} className="block rounded-xl">
+            <div className="overflow-hidden rounded-xl shadow-card">
+              <Poster poster={r.t.poster} source={r.t.source} title={r.t.title} mediaType={r.t.mediaType} className="can-hover:group-hover:[&_img]:scale-[1.04]" />
             </div>
-            {r.date && (
-              <time dateTime={r.date} className="shrink-0 text-right text-xs">
-                <span className="block font-medium text-accent-text">{timeAgo(r.date)}</span>
-                <span className="block text-muted">{formatRelease(r.date)}</span>
-              </time>
-            )}
+            <div className="mt-2.5 space-y-0.5 px-0.5">
+              <h3 className="line-clamp-2 text-sm font-medium leading-snug transition-colors group-hover:text-accent-text">{r.t.title}</h3>
+              <p className="truncate text-xs text-fg-2" title={describe(r)}>
+                {r.label}
+              </p>
+              {r.date && (
+                <time dateTime={r.date} title={formatRelease(r.date)} className="block text-xs">
+                  <span className="block font-medium text-accent-text">{timeAgo(r.date)}</span>
+                  <span className="block text-muted">{formatShortRelease(r.date)}</span>
+                </time>
+              )}
+              {(!r.date || r.status.startsWith('Released')) && <p className="text-xs text-muted">{r.status}</p>}
+            </div>
           </Link>
+          {more.length > 0 && (
+            <details className="mt-1 px-0.5 text-xs">
+              <summary className="cursor-pointer rounded font-medium text-accent-text">+{more.length} more</summary>
+              <ul className="mt-1 space-y-1 text-muted">
+                {more.map((m) => (
+                  <li key={m.key}>
+                    <span className="text-fg-2">{m.label}</span>
+                    <span className="block">{m.date ? formatShortRelease(m.date) : 'Date TBA'}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </li>
       ))}
     </ul>
