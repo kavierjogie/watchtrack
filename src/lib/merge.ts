@@ -37,6 +37,15 @@ export interface MergeResult {
 }
 
 /**
+ * What a merge compares, in one string: if it's unchanged, a sync has nothing to send. Metadata refreshes leave it alone,
+ * as they do updatedAt. Deletions show up as missing ids, so tombstones aren't needed.
+ */
+export function syncFingerprint(titles: Title[], history: HistoryEntry[]): string {
+  const poster = (t: Title) => (t.poster?.kind === 'local' ? t.poster.imageId : (t.poster?.url ?? ''))
+  return JSON.stringify([titles.map((t) => `${t.id}|${t.updatedAt}|${poster(t)}`).sort(), history.map((h) => h.id).sort()])
+}
+
+/**
  * Saving a poster copy leaves updatedAt alone, so two devices can differ only in that. Take a copy Drive already has
  * rather than download another, and if both made one, settle on the same one everywhere so they don't keep overwriting
  * each other's upload.

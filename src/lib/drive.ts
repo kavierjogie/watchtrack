@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { base64ToBlob, createBackup, MAX_BACKUP_BYTES } from './backup'
-import { applySync, listTombstones } from './db'
-import { mergeLibraries, parseSyncDoc } from './merge'
+import { applySync, listAllHistory, listTitles, listTombstones } from './db'
+import { mergeLibraries, parseSyncDoc, syncFingerprint } from './merge'
 
 /**
  * Google Drive sync: the library is mirrored to one file in the user's own Drive "appDataFolder" (hidden, app-only),
@@ -31,6 +31,10 @@ export interface DriveState {
   lastSync?: string
   /** When the newest safety copy was made, so most syncs needn't ask Drive. */
   lastCopy?: number
+  /** After the last full sync: Drive's checksum of the file and the library as merged. Both unchanged = nothing to do. */
+  syncedVersion?: string
+  syncedLocal?: string
+  lastFullSync?: number
   error?: string
   syncing?: boolean
 }
@@ -142,12 +146,12 @@ export async function finishConnect(): Promise<boolean> {
     set({ error: err instanceof Error ? err.message : 'Connecting to Google Drive failed. Try again.' })
     return false
   }
-  set({ error: undefined, fileId: undefined })
+  set({ error: undefined, fileId: undefined, syncedVersion: undefined, syncedLocal: undefined, lastFullSync: undefined })
   return true
 }
 
 function disconnectLocal(error?: string) {
-  set({ refresh: undefined, access: undefined, expires: undefined, fileId: undefined, lastSync: undefined, lastCopy: undefined, error })
+  set({ refresh: undefined, access: undefined, expires: undefined, fileId: undefined, lastSync: undefined, lastCopy: undefined, syncedVersion: undefined, syncedLocal: undefined, lastFullSync: undefined, error })
 }
 
 /** Forget the tokens here and revoke them at Google. The Drive copy stays, so reconnecting brings everything back. */
@@ -242,23 +246,33 @@ async function pull(retried = false): Promise<string | null> {
   return readLimited(res)
 }
 
+/** Drive's checksum of the library file: a small request, against downloading a file that holds every saved poster. Null when it can't say. */
+async function remoteVersion(): Promise<string | null> {
+  if (!state.fileId) return null
+  const res = await api(`${DRIVE}/${state.fileId}?fields=md5Checksum`)
+  if (!res.ok) return null
+  return ((await res.json().catch(() => ({}))) as { md5Checksum?: string }).md5Checksum ?? null
+}
+
 function createFile(name: string, json: string) {
   const boundary = random(12)
   const meta = JSON.stringify({ name, parents: ['appDataFolder'] })
   const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`
-  return api(`${UPLOAD}?uploadType=multipart&fields=id`, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body })
+  return api(`${UPLOAD}?uploadType=multipart&fields=id,md5Checksum`, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body })
 }
 
-async function upload(json: string) {
+/** Resolves to the new file's checksum, when Drive gives one. */
+async function upload(json: string): Promise<string | null> {
   const id = state.fileId
   let res: Response
   if (id) {
-    res = await api(`${UPLOAD}/${id}?uploadType=media`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: json })
+    res = await api(`${UPLOAD}/${id}?uploadType=media&fields=md5Checksum`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: json })
   } else {
     res = await createFile(FILE_NAME, json)
     if (res.ok) set({ fileId: ((await res.clone().json()) as { id: string }).id })
   }
   if (!res.ok) throw new Error("Couldn't save your library to Google Drive.")
+  return ((await res.json().catch(() => ({}))) as { md5Checksum?: string }).md5Checksum ?? null
 }
 
 // ---------- Safety copies ----------
@@ -303,6 +317,9 @@ async function keepSafetyCopy(json: string, now = Date.now()) {
 
 let running: Promise<boolean> | null = null
 
+/** Even with nothing apparently changed, do a real sync this often, in case anything ever slips past the two checks. */
+const FULL_SYNC_EVERY_MS = 24 * 3_600_000
+
 /**
  * One full sync. Resolves true when this device's library changed (the caller reloads it). Never throws: errors are
  * shown via state.error, and nothing is deleted or overwritten when a step fails.
@@ -314,6 +331,14 @@ export function syncDrive(): Promise<boolean> {
   running ??= (async () => {
     set({ syncing: true })
     try {
+      // Read from this device on every sync, so an edit counts however it was made, even if the app closed before it synced.
+      const [titles, history] = await Promise.all([listTitles(), listAllHistory()])
+      let version = await remoteVersion()
+      if (Date.now() < pausedUntil) return false // Drive just asked us to slow down.
+      if (version && version === state.syncedVersion && syncFingerprint(titles, history) === state.syncedLocal && Date.now() - (state.lastFullSync ?? 0) < FULL_SYNC_EVERY_MS) {
+        set({ lastSync: new Date().toISOString(), error: undefined })
+        return false
+      }
       const [backup, deleted, remoteText] = await Promise.all([createBackup(), listTombstones(), pull()])
       // An unreadable Drive copy is left alone rather than overwritten.
       const remote = remoteText === null ? null : parseSyncDoc(remoteText)
@@ -322,9 +347,10 @@ export function syncDrive(): Promise<boolean> {
       if (push) {
         // Never blocks syncing: a failed copy is simply tried again on the next upload.
         if (remoteText !== null) await keepSafetyCopy(remoteText).catch(() => {})
-        await upload(JSON.stringify(doc))
+        version = await upload(JSON.stringify(doc))
       }
-      set({ lastSync: new Date().toISOString(), error: undefined })
+      // From the merge, not a fresh read: an edit made during this sync isn't in Drive yet, so it must count as a change next time.
+      set({ lastSync: new Date().toISOString(), error: undefined, syncedVersion: version ?? undefined, syncedLocal: syncFingerprint(doc.titles, doc.history), lastFullSync: Date.now() })
       return toLocal.titles.length + toLocal.history.length + toLocal.deleteIds.length > 0
     } catch (err) {
       if (state.refresh) set({ error: err instanceof Error ? err.message : 'Sync failed.' })
