@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { base64ToBlob, createBackup } from './backup'
+import { base64ToBlob, createBackup, MAX_BACKUP_BYTES } from './backup'
 import { applySync, listTombstones } from './db'
 import { mergeLibraries, parseSyncDoc } from './merge'
 
@@ -16,6 +16,11 @@ const FILE_NAME = 'watchtrack-library.json'
 const KEY = 'watchtrack:drive'
 const OAUTH_KEY = 'watchtrack:oauth'
 const redirectUri = () => `${window.location.origin}/settings`
+const TOKEN_TIMEOUT_MS = 15_000
+/** Long, because the library file can be large. Without a limit a hung request would block every later sync in this tab. */
+const DRIVE_TIMEOUT_MS = 120_000
+const MIN_PAUSE_MS = 60_000
+const MAX_PAUSE_MS = 30 * 60_000
 
 export interface DriveState {
   /** Present while connected. */
@@ -52,6 +57,15 @@ function set(patch: Partial<DriveState>) {
     // Storage blocked: stays connected for this visit only.
   }
   listeners.forEach((l) => l())
+}
+
+// Another tab connected or disconnected: pick that up, or this tab's next write would put the old tokens back.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== KEY && e.key !== null) return
+    state = { ...read(), syncing: state.syncing }
+    listeners.forEach((l) => l())
+  })
 }
 
 export function useDrive(): DriveState {
@@ -93,8 +107,13 @@ export async function connectDrive() {
 }
 
 async function tokenCall(body: Record<string, string>) {
-  const res = await fetch('/api/google-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const sent = state.refresh
+  const res = await fetch('/api/google-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS) }).catch(() => {
+    throw new Error("Couldn't reach Google.")
+  })
   const data = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; refresh_token?: string; error?: string }
+  // Disconnected while this was running: the answer must not reconnect it.
+  if (state.refresh !== sent) throw new Error('Google Drive is not connected.')
   if (data.error === 'invalid_grant') {
     disconnectLocal('Google Drive access was removed or expired. Connect again to keep syncing.')
     throw new Error(state.error)
@@ -114,9 +133,9 @@ export async function finishConnect(): Promise<boolean> {
   const saved = sessionStorage.getItem(OAUTH_KEY)
   sessionStorage.removeItem(OAUTH_KEY)
   window.history.replaceState(null, '', '/settings')
-  const { verifier, state: st } = (saved ? JSON.parse(saved) : {}) as { verifier?: string; state?: string }
   const code = params.get('code')
   try {
+    const { verifier, state: st } = (saved ? JSON.parse(saved) : {}) as { verifier?: string; state?: string }
     if (!code || !verifier || params.get('state') !== st) throw new Error(params.get('error') === 'access_denied' ? 'Google Drive was not connected.' : 'Connecting to Google Drive failed. Try again.')
     await tokenCall({ code, verifier, redirect_uri: redirectUri() })
   } catch (err) {
@@ -135,7 +154,11 @@ function disconnectLocal(error?: string) {
 export function disconnectDrive() {
   const token = state.refresh
   disconnectLocal()
-  if (token) void fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token)}`, { method: 'POST' }).catch(() => {})
+  if (!token) return
+  // A failed request leaves the token valid at Google even though it's gone from here, so the user needs to know.
+  void fetch('https://oauth2.googleapis.com/revoke', { method: 'POST', body: new URLSearchParams({ token }), signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS) }).catch(() => {
+    set({ error: "Disconnected here, but Google couldn't be reached to cancel access. You can remove WatchTrack at myaccount.google.com/permissions." })
+  })
 }
 
 // ---------- Drive API ----------
@@ -146,13 +169,38 @@ async function accessToken(): Promise<string> {
   return state.access!
 }
 
+// Backing off when Drive is limiting or failing, so every tab focus and edit doesn't hit it again. Per tab, and reset by a reload.
+let pausedUntil = 0
+let pauseMs = MIN_PAUSE_MS
+
+function notePause(res: Response) {
+  if (res.status === 403 || res.status === 429 || res.status >= 500) {
+    const asked = Number(res.headers.get('Retry-After')) * 1000 || 0
+    pausedUntil = Date.now() + Math.max(asked, pauseMs)
+    pauseMs = Math.min(pauseMs * 2, MAX_PAUSE_MS)
+  } else if (res.ok) pauseMs = MIN_PAUSE_MS
+}
+
 async function api(url: string, init: RequestInit = {}, retry = true): Promise<Response> {
-  const res = await fetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${await accessToken()}` } })
+  const token = await accessToken()
+  const res = await fetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(DRIVE_TIMEOUT_MS) }).catch((err: unknown) => {
+    throw err instanceof Error && err.name === 'TimeoutError' ? new Error('Google Drive took too long to respond.') : err
+  })
   if (res.status === 401 && retry) {
     set({ access: undefined })
     return api(url, init, false)
   }
+  notePause(res)
   return res
+}
+
+/** Whole file as text, refusing one too big to hold in memory. */
+async function readLimited(res: Response): Promise<string> {
+  const tooBig = () => new Error('The Google Drive file is too large to load.')
+  if (Number(res.headers.get('Content-Length')) > MAX_BACKUP_BYTES) throw tooBig()
+  const text = await res.text()
+  if (text.length > MAX_BACKUP_BYTES) throw tooBig()
+  return text
 }
 
 const DRIVE = 'https://www.googleapis.com/drive/v3/files'
@@ -167,16 +215,16 @@ async function findFile(): Promise<string | null> {
   return id
 }
 
-async function pull(): Promise<string | null> {
+async function pull(retried = false): Promise<string | null> {
   const id = state.fileId ?? (await findFile())
   if (!id) return null
   const res = await api(`${DRIVE}/${id}?alt=media`)
-  if (res.status === 404) {
+  if (res.status === 404 && !retried) {
     set({ fileId: undefined })
-    return (await findFile()) ? pull() : null
+    return (await findFile()) ? pull(true) : null
   }
   if (!res.ok) throw new Error("Couldn't download your library from Google Drive.")
-  return res.text()
+  return readLimited(res)
 }
 
 function createFile(name: string, json: string) {
@@ -221,7 +269,7 @@ export async function listSafetyCopies(): Promise<SafetyCopy[]> {
 export async function readSafetyCopy(id: string): Promise<string> {
   const res = await api(`${DRIVE}/${id}?alt=media`)
   if (!res.ok) throw new Error("Couldn't download that copy from Google Drive.")
-  return res.text()
+  return readLimited(res)
 }
 
 /** Saves the Drive file as it was before this sync overwrites it, once a week across all devices. */
@@ -247,7 +295,7 @@ let running: Promise<boolean> | null = null
  * other's change until it syncs again, which re-merges it). Use Drive's If-Match etag if that ever bites.
  */
 export function syncDrive(): Promise<boolean> {
-  if (!state.refresh) return Promise.resolve(false)
+  if (!state.refresh || Date.now() < pausedUntil) return Promise.resolve(false)
   running ??= (async () => {
     set({ syncing: true })
     try {

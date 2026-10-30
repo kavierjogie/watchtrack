@@ -3,15 +3,22 @@
  * Called as /api/tmdb?path=<TMDB v3 path + query>. Only the endpoints the app uses are allowed.
  */
 const ALLOWED = /^(search\/multi|trending\/movie\/week|discover\/movie|(movie|tv)\/\d{1,10}(\/recommendations)?)$/
+const ALLOWED_PARAMS = ['query', 'include_adult', 'page', 'sort_by', 'with_genres']
+const MAX_QUERY = 200
 
 export async function GET(req: Request): Promise<Response> {
+  // Other websites can't spend the shared key. A script can fake this, so the Vercel Firewall limits those.
+  if (req.headers.get('Sec-Fetch-Site') === 'cross-site') return Response.json({ error: 'Not allowed.' }, { status: 403 })
   const key = process.env.TMDB_API_KEY
   if (!key) return Response.json({ error: 'TMDB_API_KEY is not set on the server.' }, { status: 503 })
-  const raw = new URL(req.url).searchParams.get('path') ?? ''
+  const outer = new URL(req.url).searchParams
+  const raw = outer.get('path') ?? ''
   const q = raw.indexOf('?')
   const path = q < 0 ? raw : raw.slice(0, q)
-  if (!ALLOWED.test(path)) return Response.json({ error: 'Not allowed.' }, { status: 400 })
+  if (!ALLOWED.test(path) || [...outer.keys()].some((k) => k !== 'path')) return Response.json({ error: 'Not allowed.' }, { status: 400 })
   const params = new URLSearchParams(q < 0 ? '' : raw.slice(q + 1))
+  // Extra or made-up parameters would each miss the CDN cache and use up the key's rate limit.
+  if ([...params.keys()].some((k) => !ALLOWED_PARAMS.includes(k)) || (params.get('query') ?? '').length > MAX_QUERY) return Response.json({ error: 'Not allowed.' }, { status: 400 })
   // Long JWT-style tokens are "API Read Access Tokens" (Bearer); short ones are v3 API keys.
   const bearer = key.length > 40
   if (bearer) params.delete('api_key')

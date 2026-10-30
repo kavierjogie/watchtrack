@@ -1,4 +1,4 @@
-import { ALLOWED_IMAGE_TYPES, bulkWrite, listAllHistory, listImages, listTitles, newId } from './db'
+import { ALLOWED_IMAGE_TYPES, bulkWrite, listAllHistory, listImages, listTitles, MAX_IMAGE_BYTES, newId, snapshotFields } from './db'
 import { today } from './format'
 import { isHttpUrl } from './metadata'
 import type { HistoryEntry, HistoryKind, MediaType, MetadataSource, Poster, Release, Sequel, StoredImage, SyncInfo, Title, WatchStatus } from './types'
@@ -117,6 +117,8 @@ function checkTitle(t: unknown, i: number): string | null {
   const at = `Title #${i + 1}`
   if (!isObj(t)) return `${at} is not an object.`
   if (!isStr(t.id) || !t.id) return `${at} has no id.`
+  // Ids go into in-app links, and the app only ever makes UUIDs.
+  if (!/^[\w-]+$/.test(t.id)) return `${at} has an invalid id.`
   if (!isStr(t.title) || !t.title.trim()) return `${at} has no title.`
   if (!MEDIA.includes(t.mediaType as MediaType)) return `${at} ("${t.title}") has an invalid media type.`
   if (!STATUS.includes(t.status as WatchStatus)) return `${at} ("${t.title}") has an invalid status.`
@@ -176,7 +178,11 @@ export function normalizeTitle(t: Title): Title {
 const HISTORY_KINDS: HistoryKind[] = ['episode', 'special', 'movie', 'correction', 'status']
 
 /** An undo snapshot that would restore unusable progress is dropped: that entry just can't be undone. */
-const validSnapshot = (s: unknown) => isObj(s) && STATUS.includes(s.status as WatchStatus) && (s.progress === null || !checkProgress(s.progress))
+const validSnapshot = (s: unknown) =>
+  isObj(s) &&
+  STATUS.includes(s.status as WatchStatus) &&
+  (s.progress === null || !checkProgress(s.progress)) &&
+  [s.completedAt, s.lastWatchedAt, s.watchedDate].every((d) => d == null || isStr(d))
 
 function normalizeHistory(h: HistoryEntry): HistoryEntry {
   return {
@@ -185,7 +191,7 @@ function normalizeHistory(h: HistoryEntry): HistoryEntry {
     season: isCountOrNull(h.season) ? h.season : null,
     episode: isCountOrNull(h.episode) ? h.episode : null,
     label: strOr(h.label, null),
-    before: validSnapshot(h.before) ? h.before : null,
+    before: validSnapshot(h.before) ? snapshotFields(h.before!) : null,
   }
 }
 
@@ -202,6 +208,22 @@ function normalizeSync(s: unknown): Title['sync'] {
   const upcoming = Array.isArray(s.upcoming) && s.upcoming.every(isRelease) ? s.upcoming : undefined
   return { ...(s as unknown as SyncInfo), nextAiring: next, sequel, upcoming }
 }
+
+/**
+ * A timestamp from a file, as ISO, or null if it's unreadable or over a day ahead. Merging compares these as strings,
+ * so a value like "9999" would otherwise beat every real edit.
+ */
+export function safeTime(v: unknown, now = Date.now()): string | null {
+  const t = isStr(v) ? Date.parse(v) : NaN
+  return t <= now + 86_400_000 ? new Date(t).toISOString() : null
+}
+
+/** Bad values lose to any real edit rather than failing the file: one damaged record mustn't stop a whole sync. */
+const importedTitle = (t: Title): Title => ({
+  ...normalizeTitle(t),
+  updatedAt: safeTime(t.updatedAt) ?? safeTime(t.createdAt) ?? new Date(0).toISOString(),
+  rating: t.rating !== null && t.rating >= 0 && t.rating <= 10 ? t.rating : null,
+})
 
 export function parseBackup(text: string): Backup {
   let raw: unknown
@@ -229,10 +251,11 @@ export function parseBackup(text: string): Backup {
   for (const img of raw.images) {
     if (!isObj(img) || !isStr(img.id) || !isStr(img.createdAt) || !ALLOWED_IMAGE_TYPES.includes(img.type as string) || !isStr(img.data) || !BASE64.test(img.data))
       throw new Error('The backup contains an invalid image.')
+    if ((img.data.length * 3) / 4 > MAX_IMAGE_BYTES + 3) throw new Error('The backup contains an image over 5 MB.')
   }
   return {
     ...(raw as unknown as Backup),
-    titles: (raw.titles as Title[]).map(normalizeTitle),
+    titles: (raw.titles as Title[]).map(importedTitle),
     history: (raw.history as HistoryEntry[]).map(normalizeHistory),
   }
 }

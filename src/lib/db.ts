@@ -1,6 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPObjectStore, type StoreNames } from 'idb'
 import type { Tombstone } from './merge'
-import type { HistoryEntry, StoredImage, Title } from './types'
+import type { HistoryEntry, Snapshot, StoredImage, Title } from './types'
 
 export const DB_NAME = 'watchtrack'
 export const DB_VERSION = 1
@@ -163,10 +163,17 @@ export async function listAllHistory(): Promise<HistoryEntry[]> {
   return (await getDb()).getAll('watchHistory')
 }
 
+/** Only what an undo may restore. Snapshots can come from a backup, so anything else in one (id, poster, links) is ignored. */
+export function snapshotFields(s: Snapshot): Snapshot {
+  const out: Partial<Record<keyof Snapshot, unknown>> = {}
+  for (const k of ['progress', 'status', 'completedAt', 'lastWatchedAt', 'watchedDate'] as const) if (k in s) out[k] = s[k]
+  return out as unknown as Snapshot
+}
+
 /** Restore the title to the state saved in a history entry, removing that entry. */
 export async function undoHistory(title: Title, entry: HistoryEntry): Promise<Title> {
   if (!entry.before) throw new Error('This entry cannot be undone.')
-  const restored: Title = { ...title, ...entry.before, updatedAt: new Date().toISOString() }
+  const restored: Title = { ...title, ...snapshotFields(entry.before), updatedAt: new Date().toISOString() }
   await guardWrite(async () => {
     const db = await getDb()
     const tx = db.transaction(['titles', 'watchHistory', 'settings'], 'readwrite')

@@ -1,4 +1,4 @@
-import { isObj, isStr, parseBackup, type Backup, type BackupImage } from './backup'
+import { isObj, isStr, parseBackup, safeTime, type Backup, type BackupImage } from './backup'
 import type { HistoryEntry, Title } from './types'
 
 /** A deleted title or history entry. Ids are UUIDs, so both kinds share one list. */
@@ -17,9 +17,14 @@ const KEEP_TOMBSTONES_MS = 90 * 86_400_000
 
 export function parseSyncDoc(text: string): SyncDoc {
   const backup = parseBackup(text)
-  const raw = (JSON.parse(text) as { deleted?: unknown }).deleted ?? []
+  const raw = (backup as { deleted?: unknown }).deleted ?? []
   if (!Array.isArray(raw) || !raw.every((d) => isObj(d) && isStr(d.id) && isStr(d.at))) throw new Error('The Google Drive copy has an invalid deletion list.')
-  return { ...backup, deleted: raw as Tombstone[] }
+  // A deletion with an unreadable or future date would beat every later edit, so it's ignored.
+  const deleted = (raw as Tombstone[]).flatMap((d) => {
+    const at = safeTime(d.at)
+    return at ? [{ id: d.id, at }] : []
+  })
+  return { ...backup, deleted }
 }
 
 export interface MergeResult {

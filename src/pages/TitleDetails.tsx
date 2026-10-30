@@ -489,7 +489,7 @@ function SequelCard({ t, sequel, onPickSource }: { t: Title; sequel: Sequel; onP
     (x) => x.sync?.anilistId === sequel.anilistId || (x.source?.provider === 'anilist' && x.source.id === String(sequel.anilistId)) || [x.title, ...x.altTitles].some((n) => normTitle(n) === key),
   )
   const announced = sequel.status === 'NOT_YET_RELEASED'
-  const status = announced ? `Announced${sequel.startDate ? ` · starts ${sequel.startDate.length === 10 ? formatDate(sequel.startDate) : sequel.startDate}` : ''}` : (SEQUEL_STATUS[sequel.status] ?? sequel.status)
+  const status = announced ? `Announced${sequel.startDate ? ` · starts ${sequel.startDate.length === 10 ? formatDate(sequel.startDate) : sequel.startDate}` : ''}` : (Object.hasOwn(SEQUEL_STATUS, sequel.status) ? SEQUEL_STATUS[sequel.status] : sequel.status)
 
   // Watching later seasons in this one title: link the whole show so new episodes of every season are found.
   async function trackAllSeasons() {

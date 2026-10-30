@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { POST } from './google-token.js'
 
-const call = (body: unknown) => POST(new Request('https://watchtrack.test/api/google-token', { method: 'POST', body: JSON.stringify(body) }))
+const call = (body: unknown, origin = 'https://watchtrack.test') =>
+  POST(new Request('https://watchtrack.test/api/google-token', { method: 'POST', headers: { Origin: origin }, body: JSON.stringify(body) }))
 
 describe('google-token', () => {
   const fetchMock = vi.fn()
@@ -14,6 +15,11 @@ describe('google-token', () => {
   afterEach(() => {
     vi.unstubAllEnvs()
     vi.unstubAllGlobals()
+  })
+
+  it('refuses other websites without calling Google', async () => {
+    expect((await call({ refresh_token: 'r' }, 'https://evil.example')).status).toBe(403)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('rejects anything but a code exchange or a refresh, without calling Google', async () => {

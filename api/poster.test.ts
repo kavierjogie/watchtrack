@@ -49,6 +49,18 @@ describe('poster', () => {
     expect((await call(IMG)).status).toBe(502)
   })
 
+  it('refuses a declared oversize image without reading it, and other websites', async () => {
+    const huge = new Response(new Uint8Array(1), { headers: { 'Content-Type': 'image/png', 'Content-Length': String(50 * 1024 * 1024) } })
+    const read = vi.spyOn(huge, 'arrayBuffer')
+    fetchMock.mockResolvedValue(huge)
+    expect((await call(IMG)).status).toBe(502)
+    expect(read).not.toHaveBeenCalled()
+    fetchMock.mockClear()
+    const cross = await GET(new Request(`https://watchtrack.test/api/poster?url=${encodeURIComponent(IMG)}`, { headers: { 'Sec-Fetch-Site': 'cross-site' } }))
+    expect(cross.status).toBe(403)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('reports upstream failures without details', async () => {
     fetchMock.mockRejectedValueOnce(new Error('secret detail'))
     const down = await call(IMG)

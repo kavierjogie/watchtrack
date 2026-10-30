@@ -58,4 +58,44 @@ describe('Drive safety copies', () => {
     await sync()
     expect(calls.at(-1)).toBe('PATCH main')
   })
+
+  it('stops calling Drive after a 429, until the wait is over', async () => {
+    const fetchMock = vi.fn(async () => new Response('', { status: 429, headers: { 'Retry-After': '120' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.resetModules()
+    const { syncDrive } = await import('./drive')
+    await syncDrive()
+    const after = fetchMock.mock.calls.length
+    expect(after).toBeGreaterThan(0)
+    await syncDrive()
+    expect(fetchMock.mock.calls.length).toBe(after)
+  })
+
+  it('refuses a Drive file too large to load, leaving Drive alone', async () => {
+    const calls: string[] = []
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit = {}) => {
+      if (init.method) calls.push(init.method)
+      if (url.includes('?spaces=')) return Response.json({ files: [{ id: 'main' }] })
+      return new Response('{}', { headers: { 'Content-Length': String(201 * 1024 * 1024) } })
+    })
+    vi.resetModules()
+    const { syncDrive } = await import('./drive')
+    expect(await syncDrive()).toBe(false)
+    expect(calls).toEqual([])
+  })
+
+  it('does not put tokens back when a refresh finishes after disconnecting', async () => {
+    const store = new Map([['watchtrack:drive', JSON.stringify({ refresh: 'r' })]])
+    vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) })
+    vi.resetModules()
+    const { disconnectDrive, syncDrive } = await import('./drive')
+    let answer!: (r: Response) => void
+    vi.stubGlobal('fetch', (url: string) => (url === '/api/google-token' ? new Promise((r) => (answer = r)) : Promise.resolve(new Response(''))))
+    const running = syncDrive()
+    await vi.waitFor(() => expect(answer).toBeDefined())
+    disconnectDrive()
+    answer(Response.json({ access_token: 'late', expires_in: 3600 }))
+    await running
+    expect(store.get('watchtrack:drive')).not.toContain('late')
+  })
 })

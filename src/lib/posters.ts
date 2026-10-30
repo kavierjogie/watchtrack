@@ -3,6 +3,9 @@ import { downloadPoster, fetchPosterUrl, isHttpUrl } from './metadata'
 import type { MetadataSource, Poster, Title } from './types'
 
 export const MAX_POSTER_URL = 2000
+const MAX_SAVES_PER_OPEN = 20
+const SAVE_PAUSE_MS = 250
+const MAX_LOOKUPS = 2
 
 /**
  * The URL a poster can be shown from on any device: the remote URL, or where a local copy was downloaded from.
@@ -23,12 +26,15 @@ export async function savePoster(url: string): Promise<Poster> {
 /**
  * Titles added before Kitsu posters could be saved still only have the remote URL: save a copy now, one at a time.
  * A failure just leaves the URL in place, to try again next time the app opens. updatedAt is left alone: nothing the
- * user did changed, and Drive sync uploads the new image anyway.
+ * user did changed, and Drive sync uploads the new image anyway. Capped per app open, with a pause, because each one
+ * goes through our shared function and an imported file can hold any number of these URLs.
+ * ponytail: posters that always fail stay first in line and use up the cap; rotate the start if that ever shows up.
  */
 export async function saveKitsuPosters(titles: Title[], onSaved: (t: Title) => void) {
-  for (const t of titles) {
+  const pending = titles.filter((t) => t.poster?.kind === 'remote' && t.poster.url.startsWith('https://media.kitsu.app/')).slice(0, MAX_SAVES_PER_OPEN)
+  for (const [i, t] of pending.entries()) {
+    if (i > 0) await new Promise((r) => setTimeout(r, SAVE_PAUSE_MS))
     const url = t.poster?.kind === 'remote' ? t.poster.url : ''
-    if (!url.startsWith('https://media.kitsu.app/')) continue
     const poster = await savePoster(url)
     if (poster.kind !== 'local') continue
     // Re-checked against the stored title, in case the poster was changed while downloading.
@@ -40,12 +46,28 @@ export async function saveKitsuPosters(titles: Title[], onSaved: (t: Title) => v
 // One lookup per title per session, however many cards show it or how often they render.
 const lookups = new Map<string, Promise<string | null>>()
 
+// If an image host goes down every card looks its poster up at once, so only a few run at a time.
+let activeLookups = 0
+const waitingLookups: (() => void)[] = []
+
+async function limitLookup<T>(fn: () => Promise<T>): Promise<T> {
+  if (activeLookups >= MAX_LOOKUPS) await new Promise<void>((r) => waitingLookups.push(r))
+  else activeLookups++
+  try {
+    return await fn()
+  } finally {
+    const next = waitingLookups.shift()
+    if (next) next() // Hands this slot on.
+    else activeLookups--
+  }
+}
+
 /** Look a poster up by provider id (never by name). Null when there's none or the provider can't be reached. */
 export function recoverPosterUrl(source: Pick<MetadataSource, 'provider' | 'id'>, title: string): Promise<string | null> {
   const key = `${source.provider}:${source.id}`
   let p = lookups.get(key)
   if (!p) {
-    p = fetchPosterUrl(source).then(
+    p = limitLookup(() => fetchPosterUrl(source)).then(
       (url) => {
         if (!url) logPosterIssue(title, source.provider, null, 'provider has no poster for this id')
         return url

@@ -8,6 +8,8 @@
 const str = (v: unknown, max = 2048): v is string => typeof v === 'string' && v.length > 0 && v.length <= max
 
 export async function POST(req: Request): Promise<Response> {
+  // Only this site's pages. Stops other websites using this endpoint; a script can fake the header, so the Vercel Firewall limits those.
+  if (req.headers.get('Origin') !== new URL(req.url).origin) return Response.json({ error: 'Not allowed.' }, { status: 403 })
   const id = process.env.VITE_GOOGLE_CLIENT_ID
   const secret = process.env.GOOGLE_CLIENT_SECRET
   if (!id || !secret) return Response.json({ error: 'Google Drive sync is not configured on the server.' }, { status: 503 })

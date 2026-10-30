@@ -303,4 +303,32 @@ describe('backup import hardening', () => {
     const good = { status: 'watching', progress: t.progress, completedAt: null, lastWatchedAt: null, watchedDate: null }
     expect(parseBackup(json(good)).history[0].before).toEqual(good)
   })
+
+  it('keeps an undo snapshot from changing anything but progress and dates', async () => {
+    const t = createTitle({ title: 'A', mediaType: 'tv' })
+    const before = { status: 'plan', progress: t.progress, id: 'other-title', title: 'Hacked', poster: { kind: 'remote', url: 'https://tracker.example/x.gif' } }
+    const json = JSON.stringify({ format: 'watchtrack-backup', version: 1, titles: [t], history: [{ id: 'h', titleId: t.id, at: '2026-01-01', kind: 'status', before }], images: [] })
+    expect(parseBackup(json).history[0].before).toEqual({ status: 'plan', progress: t.progress })
+    // Records already stored are covered too.
+    const restored = await undoHistory(t, { id: 'h', titleId: t.id, at: '2026-01-01', kind: 'status', before } as never)
+    expect(restored).toMatchObject({ id: t.id, title: 'A', status: 'plan' })
+    expect(restored.poster).toBe(t.poster)
+  })
+
+  it('handles hostile values: oversize images, bad ids, ratings and dates', () => {
+    const img = { id: 'i', createdAt: '2026-01-01', type: 'image/png', data: 'A'.repeat(7 * 1024 * 1024) }
+    expect(() => parseBackup(file({}, { images: [img] }))).toThrow(/over 5 MB/)
+    expect(() => parseBackup(file({ id: '../../settings' }))).toThrow(/invalid id/)
+    const [t] = parseBackup(file({ rating: 1e308, updatedAt: '9999', createdAt: '2026-01-01T00:00:00.000Z' })).titles
+    expect(t.rating).toBeNull()
+    expect(t.updatedAt).toBe('2026-01-01T00:00:00.000Z')
+    expect(parseBackup(file({ updatedAt: 'z', createdAt: 'z' })).titles[0].updatedAt).toBe(new Date(0).toISOString())
+  })
+
+  it('treats __proto__ in a backup as plain data', () => {
+    const t = createTitle({ title: 'A', mediaType: 'tv' })
+    const json = JSON.stringify({ format: 'watchtrack-backup', version: 1, titles: [t], history: [], images: [] }).replace('"title":"A"', '"__proto__":{"polluted":true},"title":"A"')
+    parseBackup(json)
+    expect(({} as { polluted?: boolean }).polluted).toBeUndefined()
+  })
 })

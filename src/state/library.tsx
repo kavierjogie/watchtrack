@@ -128,13 +128,16 @@ export function useLibrary(): LibraryState {
 function useDriveAutoSync(reload: () => Promise<void>) {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
+    let lastRun = 0
     const run = () => {
       clearTimeout(timer)
+      lastRun = Date.now()
       if (driveConnected() && navigator.onLine) void syncDrive().then((changed) => {
         if (changed) void reload()
       })
     }
-    const visible = () => document.visibilityState === 'visible' && run()
+    // Each sync downloads the whole file, so flicking between tabs mustn't start one every time.
+    const visible = () => document.visibilityState === 'visible' && Date.now() - lastRun >= 60_000 && run()
     run()
     document.addEventListener('visibilitychange', visible)
     window.addEventListener('online', run)

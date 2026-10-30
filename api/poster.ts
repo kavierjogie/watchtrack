@@ -17,6 +17,7 @@ function kitsuImageUrl(raw: string | null): string | null {
 }
 
 export async function GET(req: Request): Promise<Response> {
+  if (req.headers.get('Sec-Fetch-Site') === 'cross-site') return Response.json({ error: 'Not allowed.' }, { status: 403 })
   const url = kitsuImageUrl(new URL(req.url).searchParams.get('url'))
   if (!url) return Response.json({ error: 'Not allowed.' }, { status: 400 })
   let res: Response
@@ -29,6 +30,7 @@ export async function GET(req: Request): Promise<Response> {
   if (!res.ok) return Response.json({ error: 'Image not available.' }, { status: res.status === 404 ? 404 : 502 })
   const type = res.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() ?? ''
   if (!ALLOWED_TYPES.includes(type)) return Response.json({ error: 'Not an image.' }, { status: 502 })
+  if (Number(res.headers.get('Content-Length')) > MAX_BYTES) return Response.json({ error: 'Image too large.' }, { status: 502 })
   const body = await res.arrayBuffer()
   if (body.byteLength > MAX_BYTES) return Response.json({ error: 'Image too large.' }, { status: 502 })
   return new Response(body, {

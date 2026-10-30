@@ -10,6 +10,23 @@ const title = (name: string, updatedDaysAgo: number, id = name): Title => ({ ...
 const entry = (id: string, titleId: string): HistoryEntry => ({ id, titleId, at: at(1), kind: 'episode' }) as HistoryEntry
 const doc = (part: Partial<SyncDoc>): SyncDoc => ({ format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: at(0), titles: [], history: [], images: [], deleted: [], ...part })
 
+describe('parseSyncDoc with hostile dates', () => {
+  it('ignores deletions with unreadable or future dates, and keeps real ones', () => {
+    const real = new Date(Date.now() - 86_400_000).toISOString()
+    const text = JSON.stringify(doc({ titles: [title('A', 1)], deleted: [{ id: 'A', at: 'z' }, { id: 'B', at: '9999-01-01T00:00:00.000Z' }, { id: 'C', at: real }] }))
+    expect(parseSyncDoc(text).deleted).toEqual([{ id: 'C', at: real }])
+  })
+
+  it('makes a far-future edit lose to a real one', () => {
+    const local = title('A', 1)
+    const remote = parseSyncDoc(JSON.stringify(doc({ titles: [{ ...title('A', 3), notes: 'forged', createdAt: at(30), updatedAt: '9999' }] })))
+    const r = mergeLibraries(doc({ titles: [local] }), remote, Date.now())
+    expect(r.doc.titles[0].notes).toBe(local.notes)
+    expect(r.toLocal.titles).toEqual([])
+    expect(r.push).toBe(true)
+  })
+})
+
 describe('mergeLibraries', () => {
   it('uploads everything when Drive has no copy yet', () => {
     const r = mergeLibraries(doc({ titles: [title('A', 1)] }), null, NOW)
