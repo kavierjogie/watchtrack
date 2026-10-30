@@ -129,7 +129,7 @@ Search is only used to fill in title details and posters. Only the search text i
 | --- | --- | --- | --- |
 | [Kitsu](https://kitsu.docs.apiary.io) | Anime (and anime movies) | None | Public JSON:API, CORS-enabled. |
 | [TVmaze](https://www.tvmaze.com/api) | TV series, per-season episode counts | None | CORS-enabled; data is CC BY-SA, so a source link is shown on each title. |
-| [TMDB](https://developer.themoviedb.org) | Movies + extra TV results | Server (`TMDB_API_KEY`) | Requests go through `/api/tmdb`, which adds the key server-side and only allows the endpoints the app uses. Attribution is shown in Settings. |
+| [TMDB](https://developer.themoviedb.org) | Movies + extra TV results | Server (`TMDB_API_KEY`) | Requests go through `/api/tmdb`, which adds the Read Access Token server-side, only allows the exact requests the app makes, and lets Vercel's CDN share answers between users. Add a per-IP rate limit on `/api/*` in the Vercel Firewall. Attribution is shown in Settings. |
 
 No keys are bundled in the source. Kitsu and TVmaze are called straight from the browser; TMDB goes through the proxy so its key never reaches the client. Older versions stored a user-supplied TMDB key in localStorage; it is deleted automatically on first load. Rate-limit, offline and network errors show a message and leave the form usable. Poster images from these hosts are cached by the service worker so saved titles keep their artwork offline.
 

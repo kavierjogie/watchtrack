@@ -307,8 +307,13 @@ export interface TmdbItem {
   vote_count?: number
 }
 
+/** One spelling per search, so everyone typing it shares a CDN entry. api/tmdb.ts refuses anything else. */
+const tmdbQuery = (q: string) => q.normalize('NFC').toLowerCase().replace(/\p{Cc}/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 200).trim()
+
 async function searchTmdb(q: string, signal?: AbortSignal): Promise<MetaResult[]> {
-  const data = await tmdb<{ results: TmdbItem[] }>(`search/multi?include_adult=false&query=${encodeURIComponent(q)}`, { signal })
+  const query = tmdbQuery(q)
+  if (query.length < 2) return []
+  const data = await tmdb<{ results: TmdbItem[] }>(`search/multi?include_adult=false&query=${encodeURIComponent(query)}`, { signal })
   return data.results
     .filter((r) => r.media_type === 'movie' || r.media_type === 'tv')
     .map((r) => tmdbToResult(r))

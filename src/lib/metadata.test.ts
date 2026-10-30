@@ -160,6 +160,8 @@ describe('unified search', () => {
 
   it('shows results from the providers that answered when another fails', async () => {
     vi.stubGlobal('fetch', vi.fn((url: string) => (url.includes('kitsu') ? Promise.reject(new TypeError('Failed to fetch')) : url.startsWith('/api/tmdb') ? json({ results: [] }) : json([mazeRow]))))
+    await searchAll('  Breaking   BAD ', new AbortController().signal, () => {})
+    expect(vi.mocked(fetch).mock.calls.map((c) => String(c[0]))).toContain(`/api/tmdb?path=${encodeURIComponent('search/multi?include_adult=false&query=breaking%20bad')}`)
     const updates: SearchState[] = []
     await searchAll('breaking bad', new AbortController().signal, (s) => updates.push(s))
     const last = updates.at(-1)!
