@@ -2,6 +2,7 @@ import { MotionConfig } from 'framer-motion'
 import { Component, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
+import { InAppBrowserBanner } from './components/InAppBrowserBanner'
 import { Layout } from './components/Layout'
 import { ConfirmProvider } from './components/Modal'
 import { FEEDBACK_MAILTO } from './lib/format'
@@ -18,10 +19,10 @@ import { TransferPage } from './pages/Transfer'
 import { LibraryProvider } from './state/library'
 
 /** Last line of defence: a render error shows a way out instead of a blank page. Saved data is never touched. */
-class CrashScreen extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false }
-  static getDerivedStateFromError() {
-    return { failed: true }
+class CrashScreen extends Component<{ children: ReactNode }, { failed: boolean; message: string }> {
+  state = { failed: false, message: '' }
+  static getDerivedStateFromError(error: unknown) {
+    return { failed: true, message: error instanceof Error ? error.message : String(error) }
   }
   render() {
     if (!this.state.failed) return this.props.children
@@ -29,6 +30,7 @@ class CrashScreen extends Component<{ children: ReactNode }, { failed: boolean }
       <main className="mx-auto max-w-md space-y-4 px-6 py-20 text-center">
         <h1 className="text-xl font-semibold">Something went wrong</h1>
         <p className="text-sm text-muted">WatchTrack hit an unexpected error. Your library is still saved on this device.</p>
+        {this.state.message && <p className="font-mono text-xs wrap-anywhere text-muted">{this.state.message}</p>}
         <div className="flex justify-center gap-2">
           <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
             Reload
@@ -67,6 +69,7 @@ export default function App() {
         <BrowserRouter>
           <LibraryProvider>
             <ConfirmProvider>
+              <InAppBrowserBanner />
               <Routes>
                 <Route element={<Layout />}>
                   <Route index element={<Dashboard />} />

@@ -540,7 +540,7 @@ function MetadataSearch({ onPick, picked, initialQuery = '', relink = false }: {
   return (
     <div className="mb-5 space-y-3 rounded-2xl bg-surface-2 p-3">
       <p className="text-sm font-medium">
-        {relink ? 'Link to a different source' : 'Find artwork & details'} <span className="font-normal text-muted">(optional)</span>
+        {relink ? 'Link to a different source' : 'Find artwork & details'}
       </p>
       {relink && <p className="text-xs text-muted">Linked to one season only? Pick the whole show (TVmaze or TMDB) so new episodes of later seasons are found.</p>}
       {/* Not a <form>: it sits inside the dialog next to the main form. */}
@@ -551,6 +551,10 @@ function MetadataSearch({ onPick, picked, initialQuery = '', relink = false }: {
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
         )}
         <input
+          // The real attribute, not React's autoFocus: showModal() runs after this mounts and would move focus to the close button.
+          ref={(el) => {
+            if (!relink) el?.setAttribute('autofocus', '')
+          }}
           className="input pl-9"
           value={q}
           onChange={(e) => {

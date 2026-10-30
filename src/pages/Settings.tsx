@@ -9,6 +9,7 @@ import { applyImport, MAX_BACKUP_BYTES, parseBackup, planImport, saveBackup, typ
 import { clearAll } from '../lib/db'
 import { resetDiscover } from '../lib/discover'
 import { connectDrive, disconnectDrive, driveConfigured, driveConnected, finishConnect, listSafetyCopies, markDirty, readSafetyCopy, syncDrive, useDrive, type SafetyCopy } from '../lib/drive'
+import { inAppBrowser } from '../components/InAppBrowserBanner'
 import { FEEDBACK_MAILTO, formatBytes, timeAgo } from '../lib/format'
 import { setPrefs, usePrefs, type Prefs } from '../lib/prefs'
 import { canRefresh, useSyncState } from '../lib/sync'
@@ -441,9 +442,13 @@ function DriveSync({ onRestore }: { onRestore: (text: string) => void }) {
             Save your library to your own Google Drive and get it back on any device. WatchTrack can only see its own hidden app folder, not your files, and the
             developer never sees your data.
           </p>
-          <button type="button" className="btn-primary" onClick={() => void connectDrive()}>
-            <Cloud className="size-4" aria-hidden /> Connect Google Drive
-          </button>
+          {inAppBrowser ? (
+            <p className="text-warn">Google sign-in doesn't work inside this app's browser. Open WatchTrack in your phone's browser first.</p>
+          ) : (
+            <button type="button" className="btn-primary" onClick={() => void connectDrive()}>
+              <Cloud className="size-4" aria-hidden /> Connect Google Drive
+            </button>
+          )}
         </>
       )}
       {drive.error && (

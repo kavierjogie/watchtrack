@@ -20,6 +20,8 @@ export interface Prefs {
   browserNotify: boolean
   /** ISO time after which the Dashboard may nudge for a backup again ('' = whenever the library is big enough). */
   backupNudgeAfter: string
+  /** The iPhone "Add to Home Screen" card on the Dashboard was closed. */
+  installTipDismissed: boolean
 }
 
 const KEY = 'watchtrack:prefs'
@@ -36,6 +38,7 @@ const DEFAULTS: Prefs = {
   alertDates: true,
   browserNotify: false,
   backupNudgeAfter: '',
+  installTipDismissed: false,
 }
 
 let cache: Prefs | null = null

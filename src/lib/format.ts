@@ -66,5 +66,8 @@ export function formatBytes(n: number): string {
   return `${(n / 1024 ** 3).toFixed(2)} GB`
 }
 
+/** Browsers built into other apps (Instagram, Facebook, Android WebViews). They keep their own storage and Google blocks sign-in there. */
+export const isInAppBrowser = (userAgent: string) => /Instagram|FBAN|FBAV|FB_IAB|; wv\)/.test(userAgent)
+
 /** Where "Send feedback" links go (Settings, crash screen). Public: it's in the page source. */
 export const FEEDBACK_MAILTO = 'mailto:kavier.jogie14@gmail.com?subject=WatchTrack%20feedback'

@@ -1,11 +1,12 @@
-import { CircleCheck, CirclePause, Clapperboard, Cloud, Compass, Download, Library, ListPlus, Play, Plus, Share2, Sparkles, Tv, X } from 'lucide-react'
+import { CircleCheck, CirclePause, Clapperboard, Cloud, Compass, Download, Library, ListPlus, Play, Plus, Share2, Smartphone, Sparkles, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ContinueCard, EmptyState, PosterGridSkeleton, Section, SeeAll, StatCard, TitleCard } from '../components/cards'
+import { inAppBrowser } from '../components/InAppBrowserBanner'
 import { TitleMenu } from '../components/TitleMenu'
 import { daysSince } from '../lib/format'
 import { connectDrive, driveConfigured, useDrive } from '../lib/drive'
-import { backupNudgeDue, snoozeBackupNudge, usePrefs } from '../lib/prefs'
+import { backupNudgeDue, setPrefs, snoozeBackupNudge, usePrefs } from '../lib/prefs'
 import { byContinue, lastActivity } from '../lib/titles'
 import { useLibrary } from '../state/library'
 import { exportBackup } from './Settings'
@@ -19,7 +20,7 @@ function greeting(now = new Date()) {
 
 export function Dashboard() {
   const { titles, loading, episodesLogged } = useLibrary()
-  const { backupNudgeAfter } = usePrefs()
+  const { backupNudgeAfter, installTipDismissed } = usePrefs()
   const drive = useDrive()
 
   if (loading)
@@ -46,17 +47,17 @@ export function Dashboard() {
           <Link to="?add=1" className="btn-primary">
             <Plus className="size-4" aria-hidden /> Add your first title
           </Link>
-          {/* Plain links: these are static pages outside the app's router. */}
-          <a href="/about" className="btn-secondary">
+          <Link to="/discover" className="btn-secondary">
+            <Compass className="size-4" aria-hidden /> Browse popular
+          </Link>
+          {/* Plain link: a static page outside the app's router. */}
+          <a href="/about" className="btn-ghost">
             How it works
-          </a>
-          <a href="/guides" className="btn-ghost">
-            Guides
           </a>
         </Hero>
         <div className="grid gap-3 sm:grid-cols-3">
           {[
-            { icon: Plus, title: 'Add titles', body: 'Search Kitsu and TVmaze for artwork and episode counts, or enter them by hand.' },
+            { icon: Plus, title: 'Add titles', body: 'Search for any show or movie, or enter one by hand.' },
             { icon: Play, title: 'Log episodes', body: 'One tap marks the next episode watched. Undo is always one tap away.' },
             { icon: Share2, title: 'Share & sync', body: 'Send friends a read-only watchlist link, and sync your library to Google Drive.' },
           ].map(({ icon: Icon, title, body }) => (
@@ -67,7 +68,6 @@ export function Dashboard() {
             </div>
           ))}
         </div>
-        <EmptyState icon={Tv} title="Your library is empty" body="Titles you add show up here with your progress, stats and what to watch next." />
       </div>
     )
   }
@@ -93,7 +93,7 @@ export function Dashboard() {
         </Link>
       </Hero>
 
-      {!drive.refresh && backupNudgeDue(titles.length, backupNudgeAfter) && <BackupNudge />}
+      {!drive.refresh && backupNudgeDue(titles.length, backupNudgeAfter) ? <BackupNudge /> : iosBrowser && !inAppBrowser && !installTipDismissed && <InstallTip />}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Watching" value={count('watching')} icon={Play} to="/continue" />
@@ -196,19 +196,36 @@ function Hero({ title, subtitle, children }: { title: string; subtitle: string; 
 // iOS Safari clears site storage after ~7 days unused unless the site is on the Home Screen.
 const iosBrowser = /iPhone|iPad|iPod/.test(navigator.userAgent) && !(navigator as { standalone?: boolean }).standalone
 
+/** Shown from the first title: a week away is enough to lose the library on iPhone, long before the backup nudge's 5 titles. */
+function InstallTip() {
+  return (
+    <div role="status" className="card flex items-start gap-3 p-4">
+      <Smartphone className="mt-0.5 size-5 shrink-0 text-accent-text" aria-hidden />
+      <div className="min-w-0 flex-1 space-y-1 text-sm">
+        <p className="font-medium">Add WatchTrack to your Home Screen</p>
+        <p className="text-muted">Tap Share → Add to Home Screen. Otherwise Safari can clear your library after a week away.</p>
+      </div>
+      <button type="button" className="btn-ghost size-9 shrink-0 p-0" aria-label="Dismiss" onClick={() => setPrefs({ installTipDismissed: true })}>
+        <X className="size-4" aria-hidden />
+      </button>
+    </div>
+  )
+}
+
 /** Data only lives in this browser until Drive sync is on, so suggest it (or a backup file) before there's something to lose. */
 function BackupNudge() {
+  const canConnect = driveConfigured && !inAppBrowser
   return (
     <div role="status" className="card flex items-start gap-3 border-warn/40 p-4">
       <Cloud className="mt-0.5 size-5 shrink-0 text-warn" aria-hidden />
       <div className="min-w-0 flex-1 space-y-2 text-sm">
         <p className="font-medium">Your library lives only in this browser</p>
         <p className="text-muted">
-          Clearing browser data deletes it. {driveConfigured ? 'Connect Google Drive to keep it safe and use it on any device, or download a backup file.' : 'Download a backup file to keep it safe.'}
+          Clearing browser data deletes it. {canConnect ? 'Connect Google Drive to keep it safe and use it on any device, or download a backup file.' : 'Download a backup file to keep it safe.'}
           {iosBrowser && " On iPhone, also tap Share → Add to Home Screen so Safari doesn't clear it after a week away."}
         </p>
         <div className="flex flex-wrap gap-2">
-          {driveConfigured && (
+          {canConnect && (
             <button type="button" className="btn-primary min-h-9 px-3 text-xs" onClick={() => void connectDrive()}>
               Connect Google Drive
             </button>

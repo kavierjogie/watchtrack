@@ -10,6 +10,9 @@ import { Modal } from './Modal'
 
 type Link = { url: string } | { error: string }
 
+/** Longer links get cut off when sent in an Instagram DM, and a cut link can't be opened. */
+const INSTAGRAM_DM_LIMIT = 1000
+
 /** Copy via the Clipboard API, falling back to selecting the field (insecure contexts, older browsers). */
 export async function copyText(text: string, field: HTMLInputElement | null): Promise<boolean> {
   try {
@@ -163,6 +166,13 @@ export function ShareDialog({ onClose, only }: { onClose: () => void; only?: str
               onFocus={(e) => e.target.select()}
             />
           </label>
+        )}
+
+        {url && url.length > INSTAGRAM_DM_LIMIT && (
+          <p className="flex gap-2 rounded-xl border border-warn/40 bg-warn/10 px-3 py-2 text-warn" role="status">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+            This link is too long for Instagram DMs. Send it on WhatsApp or pick fewer titles.
+          </p>
         )}
 
         <p className="text-xs text-muted">Anyone with this link can see the titles in it. The list is stored inside the link itself, not uploaded anywhere.</p>

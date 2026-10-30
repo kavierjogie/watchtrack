@@ -162,3 +162,4 @@ IndexedDB stores: `titles`, `watchHistory`, `images` (Blobs), `settings` (reserv
 - **"Episodes logged"** on the dashboard counts episodes marked watched in the app; imported positions aren't counted as history.
 - **Ratings are 1–10.**
 - Status "Dropped" is available in addition to the requested lists.
+- **In-app browsers** (Instagram, Facebook, Android WebViews) get a banner pointing to the real browser, because their storage is separate and Google blocks sign-in there. Share links over 1,000 characters warn that Instagram DMs will cut them off.
