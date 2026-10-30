@@ -1,5 +1,5 @@
 import { Bell, BellRing, Check, Cloud, Download, HardDrive, Mail, RefreshCw, Shield, Smartphone, Trash2, Upload } from 'lucide-react'
-import { alertsOn, notifySupported, showSystemNotification } from '../lib/alerts'
+import { alertsOn, notifySupported, setBackgroundChecks, showSystemNotification } from '../lib/alerts'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -46,7 +46,7 @@ function NewEpisodes() {
     <div className="space-y-2 text-sm text-muted">
       <p>
         New seasons and episodes are checked automatically when you open the app (each show at most once a day; ended shows weekly). Your progress is never
-        changed. The browser can't check while the app is closed.
+        changed.
       </p>
       <button type="button" className="btn-secondary" disabled={cycle} onClick={() => void refreshAll()}>
         <RefreshCw className={`size-4 ${cycle ? 'animate-spin' : ''}`} aria-hidden /> {cycle ? 'Checking…' : 'Check for new episodes now'}
@@ -73,6 +73,12 @@ function AlertSettings() {
   const supported = notifySupported()
   const [permission, setPermission] = useState(() => (supported ? Notification.permission : 'denied'))
   const shows = lib.titles.filter(canRefresh).sort((a, b) => a.title.localeCompare(b.title))
+  const notifying = prefs.browserNotify && permission === 'granted'
+  const [background, setBackground] = useState(false)
+
+  useEffect(() => {
+    void setBackgroundChecks(notifying).then(setBackground)
+  }, [notifying])
 
   useEffect(() => {
     // Linked from the alerts page; after Layout's scroll-to-top on navigation.
@@ -115,17 +121,17 @@ function AlertSettings() {
         ) : (
           <>
             <Toggle
-              label="Notify me when WatchTrack is in the background"
+              label="Notify me when WatchTrack isn't on screen"
               hint={
                 permission === 'denied'
                   ? 'Blocked by your browser. Allow notifications for this site in its settings to use this.'
                   : 'Your browser will ask for permission. Used only for these alerts.'
               }
-              checked={prefs.browserNotify && permission === 'granted'}
+              checked={notifying}
               disabled={!prefs.alertsOn || permission === 'denied'}
               onChange={(on) => void enableBrowser(on)}
             />
-            {prefs.browserNotify && permission === 'granted' && (
+            {notifying && (
               <button type="button" className="btn-secondary" onClick={() => void test()}>
                 <BellRing className="size-4" aria-hidden /> Send a test notification
               </button>
@@ -133,9 +139,11 @@ function AlertSettings() {
           </>
         )}
         <p className="text-xs text-muted">
-          Checks run only while WatchTrack is open (including in a background tab or installed app window) — each show at most once a day, and again soon after a known
-          release date passes. Browsers can't check while it's closed: that would need a server sending push messages, which WatchTrack doesn't have because your data
-          never leaves this device.
+          Each show is checked at most once a day, and again soon after a known release date passes.{' '}
+          {background
+            ? 'Checks also run in the background while WatchTrack is closed, about once a day. Your browser decides when.'
+            : 'Checks only run while WatchTrack is open. Install the app in Chrome or Edge for background checks, or add dates to your calendar from Upcoming.'}{' '}
+          Your library stays on this device either way.
         </p>
       </div>
 

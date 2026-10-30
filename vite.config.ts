@@ -10,6 +10,9 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       includeAssets: ['icon.svg', 'favicon.svg', 'apple-touch-icon.png', 'badge-96.png'],
       manifest: {
         name: 'WatchTrack',
@@ -27,29 +30,8 @@ export default defineConfig({
           { src: 'pwa-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: {
-        // App shell only. Personal data stays in IndexedDB, never in the SW cache.
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
-        navigateFallback: '/index.html',
-        // Static public pages are real HTML files (precached), not app routes.
-        navigateFallbackDenylist: [/^\/api\//, /^\/about/, /^\/guides/, /^\/privacy/, /^\/terms/],
-        // Opens the right title when a WatchTrack alert notification is clicked.
-        importScripts: ['sw-notifications.js'],
-        runtimeCaching: [
-          {
-            // Public poster artwork from metadata providers, so saved titles show posters offline.
-            // Fetched with CORS: browsers count each opaque (no-CORS) response as about 7 MB, which made 600 posters look like 4 GB.
-            // Kitsu doesn't send CORS headers, so its images aren't cached here; api/poster.ts lets titles save a copy instead.
-            urlPattern: ({ url }) => ['static.tvmaze.com', 'image.tmdb.org'].includes(url.hostname),
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'poster-art', // sw-notifications.js deletes the old opaque 'posters' cache.
-              fetchOptions: { mode: 'cors', credentials: 'omit' },
-              expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 180 },
-              cacheableResponse: { statuses: [200] },
-            },
-          },
-        ],
       },
     }),
   ],

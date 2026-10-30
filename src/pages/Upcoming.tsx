@@ -1,10 +1,12 @@
-import { CalendarClock, CalendarX, RefreshCw } from 'lucide-react'
+import { CalendarClock, CalendarPlus, CalendarX, RefreshCw } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { EmptyState, PageHeader, PosterGridSkeleton, Section } from '../components/cards'
 import { Poster } from '../components/Poster'
-import { RELEASED, upcomingOf, useAlerts } from '../lib/alerts'
+import { RELEASED, releaseLabel, upcomingOf, useAlerts } from '../lib/alerts'
 import { formatRelease, formatShortRelease, isPast, RELEASE_BUCKETS, releaseBucket, timeAgo } from '../lib/format'
+import { buildIcs } from '../lib/ics'
 import { canRefresh, useSyncState } from '../lib/sync'
 import type { Title } from '../lib/types'
 import { useLibrary } from '../state/library'
@@ -37,6 +39,18 @@ interface Card {
 
 const RECENT_DAYS = 30
 
+function downloadCalendar(titles: Title[]) {
+  const ics = buildIcs(titles)
+  if (!ics) return
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'watchtrack-upcoming.ics'
+  a.click()
+  URL.revokeObjectURL(url)
+  toast.success('Calendar file saved', { description: 'Open it to add the dates to your calendar. Export again later to pick up changes.' })
+}
+
 /** One card per show, led by its earliest dated release. TBA releases sort last, so they lead only when nothing is dated. */
 function byShow(rows: Row[]): Card[] {
   const sorted = [...rows].sort((a, b) => (a.date ? Date.parse(a.date) : Infinity) - (b.date ? Date.parse(b.date) : Infinity))
@@ -68,16 +82,7 @@ export function UpcomingPage() {
       for (const r of upcomingOf(t)) {
         // Past its date: waiting for the provider to confirm it's out (the next refresh checks), so not "upcoming".
         if (r.airdate && isPast(r.airdate)) continue
-        const label =
-          r.kind === 'season'
-            ? r.season != null
-              ? `Season ${r.season}`
-              : 'Next season'
-            : r.episode == null
-              ? 'Next episode'
-              : seasonal && r.season != null
-                ? `S${r.season} · E${r.episode}`
-                : `Episode ${r.episode}`
+        const label = releaseLabel(r, seasonal)
         const status = r.kind === 'episode' ? 'Upcoming episode' : r.airdate ? 'Premiere date confirmed' : r.window ? `Announced · expected ${formatWindow(r.window)}` : 'Announced · date TBA'
         rows.push({ key: `${t.id}:${r.kind}:${r.season}:${r.episode}:${r.name}`, t, kind: r.kind, label, name: r.name, date: r.airdate, status })
       }
@@ -110,9 +115,16 @@ export function UpcomingPage() {
         subtitle="Confirmed seasons and episodes for shows in your library"
         action={
           linked && (
-            <button type="button" className="btn-secondary" disabled={cycle} onClick={() => void refreshAll()}>
-              <RefreshCw className={`size-4 ${cycle ? 'animate-spin' : ''}`} aria-hidden /> {cycle ? 'Checking…' : 'Check now'}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {upcoming.some((r) => r.date) && (
+                <button type="button" className="btn-secondary" onClick={() => downloadCalendar(lib.titles)}>
+                  <CalendarPlus className="size-4" aria-hidden /> Add to calendar
+                </button>
+              )}
+              <button type="button" className="btn-secondary" disabled={cycle} onClick={() => void refreshAll()}>
+                <RefreshCw className={`size-4 ${cycle ? 'animate-spin' : ''}`} aria-hidden /> {cycle ? 'Checking…' : 'Check now'}
+              </button>
+            </div>
           )
         }
       />

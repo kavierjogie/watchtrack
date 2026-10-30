@@ -6,8 +6,9 @@
  * "…:released:s5e3-4") — and ids are remembered after the alert is dismissed or pruned, so refreshing, reopening the
  * app or importing a backup never alerts twice. A title's first refresh only learns what already exists.
  *
- * Checks only run while the app is open. A scheduled server job could run the same refresh + detectEvents and send
- * Web Push; only the store and showSystemNotification below are browser-specific.
+ * Checks run while the app is open and, where the browser supports Periodic Background Sync, in the service worker
+ * (sw.ts). A scheduled server job could run the same refresh + detectEvents and send Web Push; only the store and
+ * showSystemNotification below are browser-specific.
  */
 import { useSyncExternalStore } from 'react'
 import { getDb, guardWrite } from './db'
@@ -215,9 +216,8 @@ export async function loadAlerts(): Promise<void> {
 }
 
 /** Save refresh events not seen before. Resolves to the new alerts that should be shown (not muted). */
-export async function recordAlerts(found: { title: Title; events: AlertEvent[] }[], now = new Date().toISOString()): Promise<Alert[]> {
+export async function recordAlerts(found: { title: Title; events: AlertEvent[] }[], now = new Date().toISOString(), prefs = getPrefs()): Promise<Alert[]> {
   if (!found.some((f) => f.events.length)) return []
-  const prefs = getPrefs()
   let fresh: Alert[] = []
   await mutate((s) => {
     const seen = new Set(s.seen)
@@ -253,17 +253,18 @@ export function useAlerts(): Snap {
   )
 }
 
-// ---------- Browser notifications (only while the app is open; see Settings for why) ----------
+// ---------- Browser notifications ----------
 
 export const OPEN_EVENT = 'watchtrack:open'
-export const notifySupported = () => typeof window !== 'undefined' && 'Notification' in window
+export const notifySupported = () => 'Notification' in globalThis
 
 /** Uses the service worker when there is one (needed on Android, and its click handler reopens the app). */
 export async function showSystemNotification(title: string, body: string, url: string, tag?: string): Promise<boolean> {
   if (!notifySupported() || Notification.permission !== 'granted') return false
   const opts: NotificationOptions = { body, icon: '/pwa-192.png', badge: '/badge-96.png', tag, data: { url } }
   try {
-    const reg = await navigator.serviceWorker?.getRegistration()
+    // Inside the service worker itself there's no navigator.serviceWorker, only its own registration.
+    const reg = 'registration' in globalThis ? (globalThis as unknown as { registration: ServiceWorkerRegistration }).registration : await navigator.serviceWorker?.getRegistration()
     if (reg) {
       await reg.showNotification(title, opts)
       return true
@@ -281,6 +282,40 @@ export async function showSystemNotification(title: string, body: string, url: s
 }
 
 export const alertUrl = (a: Pick<AlertEvent, 'titleId'>) => `/title/${encodeURIComponent(a.titleId)}`
+
+/** System notifications for new alerts: one each, or two and a summary when there are more than three. */
+export async function notifyAlerts(fresh: Alert[]): Promise<void> {
+  const shown = fresh.length > 3 ? fresh.slice(0, 2) : fresh
+  for (const a of shown) await showSystemNotification(`${ALERT_HEADING[a.kind]} · ${a.showTitle}`, describeAlert(a), alertUrl(a), a.id)
+  if (fresh.length > 3) await showSystemNotification(`${fresh.length - 2} more WatchTrack alerts`, 'Open WatchTrack to see them all.', '/notifications', 'watchtrack-more')
+}
+
+export const BACKGROUND_CHECK_TAG = 'watchtrack-check'
+const BACKGROUND_CHECK_EVERY = 12 * 60 * 60 * 1000
+
+/**
+ * Ask the browser to wake the service worker for checks, or stop it. Resolves to whether they're scheduled: only
+ * Chromium browsers support this, and only for an installed app, so it's often false.
+ */
+export async function setBackgroundChecks(on: boolean): Promise<boolean> {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration()
+    const sync = (reg as (ServiceWorkerRegistration & { periodicSync?: { register(tag: string, o: { minInterval: number }): Promise<void>; unregister(tag: string): Promise<void> } }) | undefined)?.periodicSync
+    if (!sync) return false
+    if (!on) await sync.unregister(BACKGROUND_CHECK_TAG)
+    else await sync.register(BACKGROUND_CHECK_TAG, { minInterval: BACKGROUND_CHECK_EVERY })
+    return on
+  } catch {
+    return false // refused: not installed, or the browser's site settings block it
+  }
+}
+
+/** "Season 3", "S2 · E5" or "Episode 1102": how a release is named on the Upcoming page and in calendar exports. */
+export function releaseLabel(r: Release, seasonal: boolean): string {
+  if (r.kind === 'season') return r.season != null ? `Season ${r.season}` : 'Next season'
+  if (r.episode == null) return 'Next episode'
+  return seasonal && r.season != null ? `S${r.season} · E${r.episode}` : `Episode ${r.episode}`
+}
 
 /** Upcoming releases for the Upcoming page: the provider's own list plus an announced anime sequel. */
 export function upcomingOf(t: Title): (Release & { window: string | null })[] {

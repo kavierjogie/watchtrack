@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ALERT_HEADING, alertUrl, describeAlert, loadAlerts, recordAlerts, showSystemNotification, type Alert } from '../lib/alerts'
-import { getPrefs } from '../lib/prefs'
-import { autoSyncAllowed, refreshTitle, syncLibrary, type RefreshResult } from '../lib/sync'
+import { ALERT_HEADING, alertUrl, describeAlert, loadAlerts, notifyAlerts, notifySupported, recordAlerts, setBackgroundChecks, type Alert } from '../lib/alerts'
+import { getPrefs, mirrorAlertPrefs } from '../lib/prefs'
+import { autoSyncAllowed, foundEvents, refreshTitle, syncLibrary, type RefreshResult } from '../lib/sync'
 import type { Title } from '../lib/types'
 import { useLibrary } from './library'
 
@@ -18,15 +18,13 @@ const OPEN_INTERVAL = 30 * 60000
 async function deliver(results: RefreshResult[], go: (url: string) => void): Promise<number> {
   let fresh: Alert[] = []
   try {
-    fresh = await recordAlerts(results.flatMap((r) => (r.status === 'updated' || r.status === 'unchanged' ? [{ title: r.title, events: r.events }] : [])))
+    fresh = await recordAlerts(foundEvents(results))
   } catch {
     return 0 // storage blocked: the refresh itself is saved; alerts just can't be kept
   }
   if (!fresh.length) return 0
   if (document.visibilityState === 'hidden' && getPrefs().browserNotify) {
-    const shown = fresh.length > 3 ? fresh.slice(0, 2) : fresh
-    for (const a of shown) await showSystemNotification(`${ALERT_HEADING[a.kind]} · ${a.showTitle}`, describeAlert(a), alertUrl(a), a.id)
-    if (fresh.length > 3) await showSystemNotification(`${fresh.length - 2} more WatchTrack alerts`, 'Open WatchTrack to see them all.', '/notifications', 'watchtrack-more')
+    await notifyAlerts(fresh)
   } else if (fresh.length === 1) {
     const [a] = fresh
     toast(`${ALERT_HEADING[a.kind]} · ${a.showTitle}`, { description: describeAlert(a), action: { label: 'View', onClick: () => go(alertUrl(a)) } })
@@ -42,7 +40,7 @@ async function deliver(results: RefreshResult[], go: (url: string) => void): Pro
 /**
  * Background refresh: shortly after the library loads, whenever the app comes back to the foreground or online, and
  * every half hour while it stays open. Quiet unless something new turned up — failures (often just offline) are
- * retried on a later open. Nothing runs while the app is closed.
+ * retried on a later open. Checks while the app is closed are the service worker's (sw.ts).
  */
 export function useAutoSync() {
   const lib = useLibrary()
@@ -51,6 +49,12 @@ export function useAutoSync() {
   useLayoutEffect(() => {
     latest.current = { lib, navigate }
   })
+
+  useEffect(() => {
+    // Existing users, and a permission or install change since last time.
+    void mirrorAlertPrefs()
+    void setBackgroundChecks(getPrefs().browserNotify && notifySupported() && Notification.permission === 'granted')
+  }, [])
 
   useEffect(() => {
     if (lib.loading) return

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { alertUrl, describeAlert, detectEvents, recordAlerts, showSystemNotification, upcomingOf, useAlerts, type AlertEvent } from './alerts'
 import { parseBackup } from './backup'
 import { clearAll, getDb } from './db'
-import { setPrefs } from './prefs'
+import { mirrorAlertPrefs, readMirroredPrefs, setPrefs } from './prefs'
 import { isDue, refreshTitle, type Patch, type RefreshResult } from './sync'
 import { createTitle } from './titles'
 import type { Sequel, Title } from './types'
@@ -209,6 +209,16 @@ describe('alert store: dedupe, preferences, backups', () => {
     expect(await recordAlerts([{ title: show({ id: 't1' }), events: [ev('d', 'date_changed')] }])).toEqual([])
     const items = ((await (await getDb()).get('settings', 'alerts'))!.value as { items: { id: string; muted: boolean }[] }).items
     expect(items.filter((a) => a.muted).map((a) => a.id).sort()).toEqual(['d', 'x', 'y'])
+  })
+
+  it('a background check follows the prefs copied to IndexedDB, since a service worker has no localStorage', async () => {
+    setPrefs({ alertDates: false, browserNotify: true })
+    await mirrorAlertPrefs()
+    const copy = (await readMirroredPrefs())!
+    expect(copy.browserNotify).toBe(true)
+    setPrefs({ alertDates: true }) // what this page reads no longer matches; the passed copy must win
+    expect(await recordAlerts([{ title: show({ id: 't1' }), events: [ev('d', 'date_changed')] }], undefined, copy)).toEqual([])
+    expect(await recordAlerts([{ title: show({ id: 't1' }), events: [ev('e')] }], undefined, copy)).toHaveLength(1)
   })
 
   it('older backups (no sync / alerts / upcoming) import; junk new fields are dropped; first refresh after import is silent', async () => {

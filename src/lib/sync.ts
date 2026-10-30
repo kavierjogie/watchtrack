@@ -6,7 +6,8 @@
  * A failed, empty or partial answer therefore can't erase anything. Both the automatic refresh (on open / return
  * to the app) and the manual "Refresh episodes" button go through refreshTitle → mergeEpisodeInfo.
  *
- * Browsers can't run this while the app is closed; it catches up the next time it's opened.
+ * While the app is closed it only runs where the browser supports Periodic Background Sync (sw.ts); otherwise it
+ * catches up the next time it's opened.
  */
 import { useSyncExternalStore } from 'react'
 import { fetchMazeEpisodes, kitsuOngoing, MetadataError, request, SOURCE_ID, tmdb, type KitsuAnime } from './metadata'
@@ -304,6 +305,9 @@ export type RefreshResult =
   | { status: 'unchanged'; title: Title; events: AlertEvent[] }
   | { status: 'failed'; title: Title; error: string }
   | { status: 'skipped'; title: Title }
+
+/** The alert events each successful refresh turned up, ready for recordAlerts. */
+export const foundEvents = (results: RefreshResult[]) => results.flatMap((r) => (r.status === 'updated' || r.status === 'unchanged' ? [{ title: r.title, events: r.events }] : []))
 
 /** Persist with a read-modify-write on the *current* stored title (library.patch / db.updateTitle). */
 export type Patch = (id: string, fn: (t: Title) => Title | null) => Promise<Title | undefined>

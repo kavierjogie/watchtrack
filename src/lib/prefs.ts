@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { getDb } from './db'
 import type { MediaType, WatchStatus } from './types'
 
 /** Small UI preferences only — personal tracking data lives in IndexedDB. */
@@ -15,7 +16,7 @@ export interface Prefs {
   alertSeasons: boolean
   alertEpisodes: boolean
   alertDates: boolean
-  /** System notifications while the app is in the background. Off until the user turns it on and grants permission. */
+  /** System notifications while the app is in the background or closed. Off until the user turns it on and grants permission. */
   browserNotify: boolean
   /** ISO time after which the Dashboard may nudge for a backup again ('' = whenever the library is big enough). */
   backupNudgeAfter: string
@@ -63,7 +64,27 @@ export function setPrefs(patch: Partial<Prefs>) {
   } catch {
     // Storage blocked: preferences just won't persist.
   }
+  if (Object.keys(patch).some((k) => (ALERT_KEYS as string[]).includes(k))) void mirrorAlertPrefs()
   listeners.forEach((l) => l())
+}
+
+const ALERT_KEYS = ['alertsOn', 'alertSeasons', 'alertEpisodes', 'alertDates', 'browserNotify'] satisfies (keyof Prefs)[]
+const MIRROR_ROW = 'alert-prefs'
+
+/** The service worker has no localStorage, so the settings a background check needs are copied to IndexedDB. */
+export async function mirrorAlertPrefs(): Promise<void> {
+  try {
+    const prefs = getPrefs()
+    await (await getDb()).put('settings', { key: MIRROR_ROW, value: Object.fromEntries(ALERT_KEYS.map((k) => [k, prefs[k]])) })
+  } catch {
+    // Storage blocked: background checks stay off, because the worker finds no copy.
+  }
+}
+
+/** For the service worker. null = the app hasn't saved a copy yet, so nothing has been turned on. */
+export async function readMirroredPrefs(): Promise<Prefs | null> {
+  const row = await (await getDb()).get('settings', MIRROR_ROW)
+  return row ? { ...DEFAULTS, ...(row.value as Partial<Prefs>) } : null
 }
 
 export function usePrefs(): Prefs {
