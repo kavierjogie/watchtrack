@@ -1,4 +1,4 @@
-import { CircleCheck, CirclePause, Clapperboard, Cloud, Compass, Library, ListPlus, Play, Plus, Share2, Sparkles, Tv, X } from 'lucide-react'
+import { CircleCheck, CirclePause, Clapperboard, Cloud, Compass, Download, Library, ListPlus, Play, Plus, Share2, Sparkles, Tv, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ContinueCard, EmptyState, PosterGridSkeleton, Section, SeeAll, StatCard, TitleCard } from '../components/cards'
@@ -8,6 +8,7 @@ import { connectDrive, driveConfigured, useDrive } from '../lib/drive'
 import { backupNudgeDue, snoozeBackupNudge, usePrefs } from '../lib/prefs'
 import { byContinue, lastActivity } from '../lib/titles'
 import { useLibrary } from '../state/library'
+import { exportBackup } from './Settings'
 
 const byActivity = <T extends Parameters<typeof lastActivity>[0]>(a: T, b: T) => lastActivity(b).localeCompare(lastActivity(a))
 
@@ -92,7 +93,7 @@ export function Dashboard() {
         </Link>
       </Hero>
 
-      {driveConfigured && !drive.refresh && backupNudgeDue(titles.length, backupNudgeAfter) && <BackupNudge />}
+      {!drive.refresh && backupNudgeDue(titles.length, backupNudgeAfter) && <BackupNudge />}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Watching" value={count('watching')} icon={Play} to="/continue" />
@@ -195,7 +196,7 @@ function Hero({ title, subtitle, children }: { title: string; subtitle: string; 
 // iOS Safari clears site storage after ~7 days unused unless the site is on the Home Screen.
 const iosBrowser = /iPhone|iPad|iPod/.test(navigator.userAgent) && !(navigator as { standalone?: boolean }).standalone
 
-/** Data only lives in this browser until Drive sync is on, so suggest it before there's something to lose. */
+/** Data only lives in this browser until Drive sync is on, so suggest it (or a backup file) before there's something to lose. */
 function BackupNudge() {
   return (
     <div role="status" className="card flex items-start gap-3 border-warn/40 p-4">
@@ -203,12 +204,27 @@ function BackupNudge() {
       <div className="min-w-0 flex-1 space-y-2 text-sm">
         <p className="font-medium">Your library lives only in this browser</p>
         <p className="text-muted">
-          Clearing browser data deletes it. Connect Google Drive to keep it safe and use it on any device.
+          Clearing browser data deletes it. {driveConfigured ? 'Connect Google Drive to keep it safe and use it on any device, or download a backup file.' : 'Download a backup file to keep it safe.'}
           {iosBrowser && " On iPhone, also tap Share → Add to Home Screen so Safari doesn't clear it after a week away."}
         </p>
-        <button type="button" className="btn-secondary min-h-9 px-3 text-xs" onClick={() => void connectDrive()}>
-          Connect Google Drive
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {driveConfigured && (
+            <button type="button" className="btn-primary min-h-9 px-3 text-xs" onClick={() => void connectDrive()}>
+              Connect Google Drive
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn-secondary min-h-9 px-3 text-xs"
+            onClick={() =>
+              void exportBackup().then((saved) => {
+                if (saved) snoozeBackupNudge()
+              })
+            }
+          >
+            <Download className="size-4" aria-hidden /> Download backup
+          </button>
+        </div>
       </div>
       <button type="button" className="btn-ghost size-9 shrink-0 p-0" aria-label="Remind me later" onClick={() => snoozeBackupNudge()}>
         <X className="size-4" aria-hidden />

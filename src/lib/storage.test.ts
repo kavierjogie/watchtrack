@@ -1,7 +1,8 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { applyImport, createBackup, parseBackup, planImport, resolveImport } from './backup'
-import { clearAll, deleteTitle, getImage, getTitle, listHistory, listTitles, putImage, saveTitle, undoHistory } from './db'
+import { applyImport, createBackup, parseBackup, planImport, resolveImport, type Backup } from './backup'
+import { clearAll, deleteTitle, getImage, getTitle, listHistory, listTitles, listTombstones, putImage, saveTitle, undoHistory } from './db'
+import { mergeLibraries, type Tombstone } from './merge'
 import { setLastWatched } from './progress'
 import { toSharedItem } from './share'
 import { applyMarkWatched, applyMovieWatched, applyProgress, createTitle } from './titles'
@@ -108,6 +109,52 @@ describe('backup export / import', () => {
     const back = await getTitle(t.id)
     expect(back?.poster).toEqual(t.poster)
     expect(toSharedItem(back!).poster).toBe(url)
+  })
+
+  describe('restoring while Drive sync is on', () => {
+    const merged = async (remote: Backup, deleted: Tombstone[] = []) => mergeLibraries({ ...(await createBackup()), deleted: await listTombstones() }, { ...remote, deleted })
+
+    it('beats a newer Drive version and an earlier deletion', async () => {
+      const t = { ...createTitle({ title: 'Loki', mediaType: 'tv' }), notes: 'from backup', updatedAt: '2020-01-01T00:00:00.000Z' }
+      await saveTitle(t)
+      const backup = await createBackup()
+      const remote = { ...backup, titles: [{ ...t, notes: 'from drive', updatedAt: '2021-01-01T00:00:00.000Z' }] }
+
+      await applyImport(planImport(backup, await listTitles()), 'merge', 'overwrite', true)
+      expect((await merged(remote)).doc.titles.map((x) => x.notes)).toEqual(['from backup'])
+
+      const res = await merged({ ...backup, titles: [] }, [{ id: t.id, at: '2021-01-01T00:00:00.000Z' }])
+      expect(res.doc.titles.map((x) => x.id)).toEqual([t.id])
+      expect(res.toLocal.deleteIds).toEqual([])
+    })
+
+    it('Replace keeps removed titles from coming back', async () => {
+      const a = createTitle({ title: 'Loki', mediaType: 'tv' })
+      const b = createTitle({ title: 'Wednesday', mediaType: 'tv', status: 'watching' })
+      await saveTitle(a)
+      const backup = await createBackup()
+      const c = applyMarkWatched(b)!
+      await saveTitle(c.title, c.history)
+      const remote = await createBackup()
+
+      await applyImport(planImport(backup, await listTitles()), 'replace', 'skip', true)
+      const res = await merged(remote)
+      expect(res.doc.titles.map((t) => t.id)).toEqual([a.id])
+      expect(res.doc.history).toEqual([])
+      expect(res.toLocal.titles.filter((t) => t.id === b.id)).toEqual([])
+      expect(res.push).toBe(true)
+    })
+
+    it('without sync, import leaves dates and deletions alone', async () => {
+      const t = { ...createTitle({ title: 'Loki', mediaType: 'tv' }), updatedAt: '2020-01-01T00:00:00.000Z' }
+      const other = createTitle({ title: 'Wednesday', mediaType: 'tv' })
+      await saveTitle(t)
+      const backup = await createBackup()
+      await saveTitle(other)
+      await applyImport(planImport(backup, await listTitles()), 'replace', 'skip')
+      expect((await getTitle(t.id))?.updatedAt).toBe(t.updatedAt)
+      expect(await listTombstones()).toEqual([])
+    })
   })
 
   it('detects duplicates by id and by title', async () => {

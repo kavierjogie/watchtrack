@@ -41,7 +41,7 @@ export function TransferPage() {
           body={
             <>
               <p>{state.error}</p>
-              <p className="mt-2">It was probably cut off when it was copied or sent. Create a new link on your other device and copy it in full.</p>
+              <p className="mt-2">It was probably cut off when it was copied or sent. On your other device, export a backup file in Settings or turn on Google Drive sync instead.</p>
             </>
           }
           action={

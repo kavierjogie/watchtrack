@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { BACKUP_FORMAT, BACKUP_VERSION, type Backup } from './backup'
 import { packFragment } from './share'
 import { createTitle } from './titles'
-import { decodeTransfer, encodeTransfer } from './transfer'
+import { decodeTransfer } from './transfer'
 
 const backup = (n: number): Backup => ({
   format: BACKUP_FORMAT,
@@ -14,15 +14,11 @@ const backup = (n: number): Backup => ({
 })
 
 describe('transfer links', () => {
-  it('round-trips the whole library, notes included, without uploaded images', async () => {
+  it('still opens links made before creating them was removed', async () => {
     const b = backup(3)
-    const out = await decodeTransfer(`#${await encodeTransfer(b)}`)
+    const out = await decodeTransfer(`#${await packFragment(JSON.stringify({ ...b, images: [] }))}`)
     expect(out.titles.map((t) => [t.id, t.title, t.notes])).toEqual(b.titles.map((t) => [t.id, t.title, 'private note']))
     expect(out.images).toEqual([])
-  })
-
-  it('refuses a library too big for one link', async () => {
-    await expect(encodeTransfer(backup(1500))).rejects.toThrow(/too big for a link/)
   })
 
   it('rejects damaged and non-library payloads', async () => {

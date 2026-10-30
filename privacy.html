@@ -54,19 +54,20 @@
       <p>If you choose <strong>Connect Google Drive</strong> in Settings:</p>
       <ul>
         <li>
-          WatchTrack asks Google for one permission, <code>drive.appdata</code>. It lets the app create and read its own file in a hidden app folder in
+          WatchTrack asks Google for one permission, <code>drive.appdata</code>. It lets the app create, read and delete its own files in a hidden app folder in
           <em>your</em> Google Drive. It does not give access to any of your other files, folders, documents or photos.
         </li>
         <li>
-          That file contains your WatchTrack library (the same data listed above). It's used only to keep your library safe and the same across your devices.
+          Those files contain your WatchTrack library (the same data listed above): the current copy, plus up to 4 weekly safety copies you can restore from in
+          Settings. They're used only to keep your library safe and the same across your devices, and they count towards your Drive storage.
         </li>
         <li>
           The sign-in token Google issues is stored in your browser. WatchTrack's server is used only to exchange that token with Google (Google requires a
           secret key that can't be put in a web page). It does not store, log or read your token or your library.
         </li>
-        <li>The developer has no access to your Google account, your Drive or the synced file.</li>
+        <li>The developer has no access to your Google account, your Drive or these files.</li>
         <li>
-          <strong>Disconnect</strong> in Settings stops syncing and revokes WatchTrack's access. To delete the synced file too, open
+          <strong>Disconnect</strong> in Settings stops syncing and revokes WatchTrack's access. To delete the synced files too, open
           <a href="https://drive.google.com/drive/settings">Google Drive settings → Manage apps</a>, find WatchTrack and choose <strong>Delete hidden app data</strong>.
           You can also remove access at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.
         </li>
@@ -93,8 +94,12 @@
           <strong>Hosting:</strong> the site and its small server functions run on Vercel. Like any website, Vercel and the services above see your IP address.
         </li>
         <li>
-          <strong>Links you create:</strong> share links and transfer links carry their contents inside the link itself (after the <code>#</code>, which browsers
-          don't send to servers). Anyone you give a link to can read it. Transfer links include notes, so send them only to yourself.
+          <strong>Links you create:</strong> share links carry their contents inside the link itself (after the <code>#</code>, which browsers don't send to
+          servers). Anyone you give a link to can read it. Older transfer links work the same way and include notes.
+        </li>
+        <li>
+          <strong>Backup files:</strong> a backup is saved to your device, or wherever you choose to share it. It contains your whole library, including notes, so
+          keep it somewhere private.
         </li>
         <li><strong>Notifications:</strong> optional, shown by your own browser. Nothing goes to a push server.</li>
       </ul>
@@ -103,7 +108,7 @@
       <ul>
         <li>See everything WatchTrack stores about you in the app itself: it's your library.</li>
         <li>Delete it any time with <strong>Settings → Clear all data</strong>, and remove the Google Drive copy as described above.</li>
-        <li>Move it to another device with Google Drive sync or a transfer link.</li>
+        <li>Move it to another device with Google Drive sync or a backup file.</li>
       </ul>
 
       <h2 id="children">Children</h2>

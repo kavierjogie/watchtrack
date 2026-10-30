@@ -1,4 +1,5 @@
 import { ALLOWED_IMAGE_TYPES, bulkWrite, listAllHistory, listImages, listTitles, newId } from './db'
+import { today } from './format'
 import { isHttpUrl } from './metadata'
 import type { HistoryEntry, HistoryKind, MediaType, MetadataSource, Poster, Release, Sequel, StoredImage, SyncInfo, Title, WatchStatus } from './types'
 
@@ -65,6 +66,28 @@ export async function createBackup(): Promise<Backup> {
       images.map(async (i) => ({ id: i.id, type: i.type, createdAt: i.createdAt, data: await blobToBase64(i.blob) })),
     ),
   }
+}
+
+/** Saves a backup file: the share sheet on phones (installed apps can't always download), a download otherwise. Null if cancelled. */
+export async function saveBackup(): Promise<Backup | null> {
+  const backup = await createBackup()
+  const file = new File([JSON.stringify(backup)], `watchtrack-backup-${today()}.json`, { type: 'application/json' })
+  if (window.matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] })
+      return backup
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return null
+      // Refused (a slow backup can outlast the tap that allowed sharing): download instead.
+    }
+  }
+  const url = URL.createObjectURL(file)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = file.name
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  return backup
 }
 
 // ---------- Validation ----------
@@ -283,8 +306,16 @@ export function resolveImport(plan: ImportPlan, mode: ImportMode, dup: Duplicate
   return { titles, history, images: storedImages }
 }
 
-export async function applyImport(plan: ImportPlan, mode: ImportMode, dup: DuplicateStrategy) {
+/**
+ * `syncing` (Drive connected): a restore is a new edit, so it's stamped to beat newer Drive versions and old deletions
+ * in merge.ts, and Replace records what it removed. Otherwise the next sync would undo the restore.
+ */
+export async function applyImport(plan: ImportPlan, mode: ImportMode, dup: DuplicateStrategy, syncing = false) {
   const data = resolveImport(plan, mode, dup)
-  await bulkWrite(data, mode === 'replace')
+  if (syncing) {
+    const updatedAt = new Date().toISOString()
+    data.titles = data.titles.map((t) => ({ ...t, updatedAt }))
+  }
+  await bulkWrite(data, mode === 'replace', syncing)
   return data
 }

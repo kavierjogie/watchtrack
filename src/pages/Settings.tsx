@@ -1,23 +1,42 @@
-import { ArrowRightLeft, Bell, BellRing, Check, Cloud, Copy, HardDrive, Mail, RefreshCw, Share2, Shield, Smartphone, Trash2, Upload } from 'lucide-react'
-import qrcode from 'qrcode-generator'
+import { Bell, BellRing, Check, Cloud, Download, HardDrive, Mail, RefreshCw, Shield, Smartphone, Trash2, Upload } from 'lucide-react'
 import { alertsOn, notifySupported, showSystemNotification } from '../lib/alerts'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { PageHeader } from '../components/cards'
 import { Modal, useConfirm } from '../components/Modal'
-import { copyText } from '../components/ShareDialog'
-import { applyImport, MAX_BACKUP_BYTES, parseBackup, planImport, type DuplicateStrategy, type ImportMode, type ImportPlan } from '../lib/backup'
+import { applyImport, MAX_BACKUP_BYTES, parseBackup, planImport, saveBackup, type DuplicateStrategy, type ImportMode, type ImportPlan } from '../lib/backup'
 import { clearAll } from '../lib/db'
 import { resetDiscover } from '../lib/discover'
-import { connectDrive, disconnectDrive, driveConfigured, driveConnected, finishConnect, markDirty, syncDrive, useDrive } from '../lib/drive'
+import { connectDrive, disconnectDrive, driveConfigured, driveConnected, finishConnect, listSafetyCopies, markDirty, readSafetyCopy, syncDrive, useDrive, type SafetyCopy } from '../lib/drive'
 import { FEEDBACK_MAILTO, formatBytes, timeAgo } from '../lib/format'
 import { setPrefs, usePrefs, type Prefs } from '../lib/prefs'
 import { canRefresh, useSyncState } from '../lib/sync'
-import { encodeTransfer, MAX_QR_PAYLOAD, transferUrl } from '../lib/transfer'
 import { MEDIA_LABEL, STATUS_LABEL, type MediaType, type WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
 import { useRefreshEpisodes } from '../state/useSync'
+
+/** Resolves true once the file is saved; false if cancelled or it failed (already reported). */
+export async function exportBackup(): Promise<boolean> {
+  try {
+    const backup = await saveBackup()
+    if (backup) toast.success('Backup saved', { description: `${backup.titles.length} titles, ${backup.history.length} history entries, ${backup.images.length} images` })
+    return !!backup
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : "Couldn't save the backup.")
+    return false
+  }
+}
+
+/** For confirm dialogs on actions that can't be undone. Shows its own result, since toasts sit behind open dialogs. */
+function BackupFirstButton() {
+  const [saved, setSaved] = useState(false)
+  return (
+    <button type="button" className="btn-secondary" onClick={() => void exportBackup().then(setSaved)}>
+      {saved ? <Check className="size-4" aria-hidden /> : <Download className="size-4" aria-hidden />} {saved ? 'Backup saved' : 'Download a backup first'}
+    </button>
+  )
+}
 
 /** Manual library-wide refresh. The same check runs on its own when the app is opened. */
 function NewEpisodes() {
@@ -185,11 +204,13 @@ export function SettingsPage() {
     })()
   }, [lib.titles])
 
+  const openBackup = (text: string) => setPlan(planImport(parseBackup(text), lib.titles))
+
   const onFile = async (file: File | undefined) => {
     if (!file) return
     try {
       if (file.size > MAX_BACKUP_BYTES) throw new Error(`This file is ${formatBytes(file.size)}, too large to be a WatchTrack backup.`)
-      setPlan(planImport(parseBackup(await file.text()), lib.titles))
+      openBackup(await file.text())
     } catch (err) {
       toast.error('Import failed', { description: err instanceof Error ? err.message : 'Invalid file.' })
     } finally {
@@ -206,6 +227,7 @@ export function SettingsPage() {
             This permanently deletes all <strong className="text-fg">{lib.titles.length} titles</strong>, their watch history and uploaded posters from this browser.
           </p>
           <p>It can't be undone.{driveConnected() ? ' Google Drive is disconnected too; the copy in your Drive is kept.' : ''}</p>
+          <BackupFirstButton />
         </>
       ),
       confirmLabel: 'Delete everything',
@@ -230,7 +252,7 @@ export function SettingsPage() {
           <p>Everything you track is stored in this browser's local database (IndexedDB). There's no WatchTrack account or server.</p>
           <ul className="list-disc space-y-1 pl-5">
             <li>Clearing site data / browsing history for this site deletes your library, unless Google Drive sync is on.</li>
-            <li>Other browsers and devices have their own copy. Turn on Google Drive sync, or use a transfer link below, to move between them.</li>
+            <li>Other browsers and devices have their own copy. Turn on Google Drive sync, or export a backup file and import it there, to move between them.</li>
           </ul>
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
@@ -239,17 +261,22 @@ export function SettingsPage() {
           <Stat label="Storage used" value={usage ? formatBytes(usage.used) : 'Unavailable'} />
           <Stat label="Protected from cleanup" value={usage ? (usage.persisted ? 'Yes' : 'Best effort') : '—'} />
         </div>
-        <DriveSync />
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn-secondary" onClick={() => fileRef.current?.click()}>
-            <Upload className="size-4" aria-hidden /> Import backup file
-          </button>
-          <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
+        <DriveSync onRestore={openBackup} />
+        <div className="space-y-3 rounded-xl bg-surface-2 p-4 text-sm">
+          <p className="flex items-center gap-2 font-medium">
+            <Download className="size-4 text-accent-text" aria-hidden /> Backup file
+          </p>
+          <p className="text-muted">Save your whole library as a file, including notes and uploaded posters. Import it here or on another device, and choose to merge or replace.</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-secondary" disabled={lib.titles.length === 0} onClick={() => void exportBackup()}>
+              <Download className="size-4" aria-hidden /> Export backup
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => fileRef.current?.click()}>
+              <Upload className="size-4" aria-hidden /> Import backup file
+            </button>
+            <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
+          </div>
         </div>
-      </Card>
-
-      <Card title="Move to another device" icon={<ArrowRightLeft className="size-5 text-accent-text" aria-hidden />}>
-        <TransferLink />
       </Card>
 
       <Card id="alerts" title="WatchTrack Alerts" icon={<Bell className="size-5 text-accent-text" aria-hidden />}>
@@ -356,7 +383,7 @@ export function SettingsPage() {
 }
 
 /** Google Drive sync controls (lib/drive.ts). Hidden when the deployment has no Google client configured. */
-function DriveSync() {
+function DriveSync({ onRestore }: { onRestore: (text: string) => void }) {
   const drive = useDrive()
   const { reload } = useLibrary()
 
@@ -397,6 +424,7 @@ function DriveSync() {
               Disconnect
             </button>
           </div>
+          <SafetyCopies onRestore={onRestore} />
         </>
       ) : (
         <>
@@ -418,81 +446,47 @@ function DriveSync() {
   )
 }
 
-/** One-off copy of the whole library to another device, carried inside a link (see lib/transfer.ts). */
-function TransferLink() {
-  const lib = useLibrary()
-  const [link, setLink] = useState<{ url: string; qr: string | null } | null>(null)
-  const [copied, setCopied] = useState(false)
-  const field = useRef<HTMLInputElement>(null)
+/** Weekly versions of the Drive file (lib/drive.ts), restored through the same import dialog as a backup file. */
+function SafetyCopies({ onRestore }: { onRestore: (text: string) => void }) {
+  const [copies, setCopies] = useState<SafetyCopy[] | null>(null)
+  const [failed, setFailed] = useState(false)
 
-  const create = async () => {
-    try {
-      const payload = await encodeTransfer()
-      const url = transferUrl(payload)
-      let qr: string | null = null
-      if (payload.length <= MAX_QR_PAYLOAD) {
-        const code = qrcode(0, 'L')
-        code.addData(url)
-        code.make()
-        qr = code.createDataURL(4, 4)
-      }
-      setLink({ url, qr })
-      setCopied(false)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't create the link.")
-    }
+  const load = (open: boolean) => {
+    if (!open || copies) return
+    setFailed(false)
+    listSafetyCopies().then(setCopies, () => setFailed(true))
   }
 
-  const copy = async () => {
-    if (!link) return
-    if (await copyText(link.url, field.current)) {
-      setCopied(true)
-      toast.success('Link copied', { description: 'Open it on your other device.' })
-    } else toast.error("Couldn't copy the link", { description: 'Select the link and copy it manually.' })
-  }
-
-  const share = async () => {
-    if (!link) return
-    if (!navigator.share) return copy()
+  const restore = async (id: string) => {
     try {
-      await navigator.share({ title: 'My WatchTrack library', url: link.url })
+      onRestore(await readSafetyCopy(id))
     } catch (err) {
-      if ((err as Error).name !== 'AbortError') await copy()
+      toast.error(err instanceof Error ? err.message : "Couldn't open that copy.")
     }
   }
 
   return (
-    <div className="space-y-3 text-sm text-muted">
-      <p>
-        Copy your whole library to a new phone or browser. Open the link there and choose to merge or replace. Posters you uploaded yourself stay on this device.
-      </p>
-      {!link ? (
-        <button type="button" className="btn-secondary" disabled={lib.titles.length === 0} onClick={() => void create()}>
-          <ArrowRightLeft className="size-4" aria-hidden /> Create transfer link
-        </button>
-      ) : (
-        <>
-          {link.qr ? (
-            <div className="flex flex-wrap items-center gap-4">
-              <img src={link.qr} alt="QR code for the transfer link" className="size-44 rounded-xl bg-white p-1 [image-rendering:pixelated]" />
-              <p className="max-w-xs">Scan with your other phone's camera, or copy the link below.</p>
-            </div>
-          ) : (
-            <p>Too much for a QR code: send the link to yourself (email, notes or chat) and open it on the other device.</p>
-          )}
-          <input ref={field} className="input font-mono text-xs!" readOnly value={link.url} onFocus={(e) => e.target.select()} aria-label="Transfer link" />
+    <details onToggle={(e) => load(e.currentTarget.open)}>
+      <summary className="cursor-pointer font-medium">Restore an earlier copy</summary>
+      <div className="mt-2 space-y-2 text-muted">
+        <p>A copy of your library is saved each week in the same hidden Drive folder, and the latest 4 are kept. You choose to merge or replace before anything changes.</p>
+        {failed ? (
+          <p className="text-warn" role="alert">Couldn't read your Google Drive. Close this and open it again to retry.</p>
+        ) : !copies ? (
+          <p>Loading…</p>
+        ) : copies.length === 0 ? (
+          <p>No earlier copies yet. The first is saved the next time your library changes.</p>
+        ) : (
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn-secondary" onClick={() => void copy()}>
-              {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />} {copied ? 'Copied' : 'Copy link'}
-            </button>
-            <button type="button" className="btn-secondary" onClick={() => void share()}>
-              <Share2 className="size-4" aria-hidden /> Share
-            </button>
+            {copies.map((c) => (
+              <button key={c.id} type="button" className="btn-secondary" onClick={() => void restore(c.id)}>
+                {new Date(c.createdTime).toLocaleDateString()}
+              </button>
+            ))}
           </div>
-        </>
-      )}
-      <p className="text-xs">This link contains your whole library, including notes. Send it only to yourself.</p>
-    </div>
+        )}
+      </div>
+    </details>
   )
 }
 
@@ -542,7 +536,7 @@ function InstallHelp() {
       <p>
         <strong className="text-fg">Android (Chrome):</strong> tap ⋮ → <em>Install app</em> or <em>Add to Home screen</em>.
       </p>
-      <p>The installed app works offline and uses the same browser storage — it's still not synced to other devices, so keep backups.</p>
+      <p>The installed app works offline and uses the same browser storage — it's still not synced to other devices, so turn on Google Drive sync or keep backup files.</p>
     </div>
   )
 }
@@ -560,9 +554,13 @@ export function ImportDialog({ plan, onClose }: { plan: ImportPlan; onClose: () 
       const yes = await confirm({
         title: 'Replace your library?',
         body: (
-          <p>
-            Your current {lib.titles.length} titles and their history will be deleted and replaced with the {b.titles.length} titles in this backup.
-          </p>
+          <>
+            <p>
+              Your current {lib.titles.length} titles and their history will be deleted and replaced with the {b.titles.length} titles in this backup.
+              {driveConnected() ? ' This also applies to your other devices synced with Google Drive.' : ''}
+            </p>
+            <BackupFirstButton />
+          </>
         ),
         confirmLabel: 'Replace',
         danger: true,
@@ -571,7 +569,7 @@ export function ImportDialog({ plan, onClose }: { plan: ImportPlan; onClose: () 
     }
     setBusy(true)
     try {
-      const res = await applyImport(plan, mode, dup)
+      const res = await applyImport(plan, mode, dup, driveConnected())
       await lib.reload()
       markDirty()
       toast.success('Backup imported', { description: `${res.titles.length} titles written` })

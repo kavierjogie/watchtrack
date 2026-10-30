@@ -4,7 +4,8 @@ import { applySync, listTombstones } from './db'
 import { mergeLibraries, parseSyncDoc } from './merge'
 
 /**
- * Google Drive sync: the library is mirrored to one file in the user's own Drive "appDataFolder" (hidden, app-only).
+ * Google Drive sync: the library is mirrored to one file in the user's own Drive "appDataFolder" (hidden, app-only),
+ * with a few weekly safety copies beside it.
  * No WatchTrack server stores anything; api/google-token.ts only swaps OAuth codes for tokens.
  * Flow: pull the Drive copy → merge (merge.ts) → write changes locally → upload if Drive was missing something.
  */
@@ -23,6 +24,8 @@ export interface DriveState {
   expires?: number
   fileId?: string
   lastSync?: string
+  /** When the newest safety copy was made, so most syncs needn't ask Drive. */
+  lastCopy?: number
   error?: string
   syncing?: boolean
 }
@@ -125,7 +128,7 @@ export async function finishConnect(): Promise<boolean> {
 }
 
 function disconnectLocal(error?: string) {
-  set({ refresh: undefined, access: undefined, expires: undefined, fileId: undefined, lastSync: undefined, error })
+  set({ refresh: undefined, access: undefined, expires: undefined, fileId: undefined, lastSync: undefined, lastCopy: undefined, error })
 }
 
 /** Forget the tokens here and revoke them at Google. The Drive copy stays, so reconnecting brings everything back. */
@@ -176,19 +179,61 @@ async function pull(): Promise<string | null> {
   return res.text()
 }
 
+function createFile(name: string, json: string) {
+  const boundary = random(12)
+  const meta = JSON.stringify({ name, parents: ['appDataFolder'] })
+  const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`
+  return api(`${UPLOAD}?uploadType=multipart&fields=id`, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body })
+}
+
 async function upload(json: string) {
   const id = state.fileId
   let res: Response
   if (id) {
     res = await api(`${UPLOAD}/${id}?uploadType=media`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: json })
   } else {
-    const boundary = random(12)
-    const meta = JSON.stringify({ name: FILE_NAME, parents: ['appDataFolder'] })
-    const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${json}\r\n--${boundary}--`
-    res = await api(`${UPLOAD}?uploadType=multipart&fields=id`, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body })
+    res = await createFile(FILE_NAME, json)
     if (res.ok) set({ fileId: ((await res.clone().json()) as { id: string }).id })
   }
   if (!res.ok) throw new Error("Couldn't save your library to Google Drive.")
+}
+
+// ---------- Safety copies ----------
+
+// A mistaken delete syncs everywhere, so a few older versions of the Drive file are kept beside it.
+const COPY_PREFIX = 'watchtrack-safety-'
+const COPY_EVERY_MS = 7 * 86_400_000
+const COPIES_KEPT = 4
+
+export interface SafetyCopy {
+  id: string
+  createdTime: string
+}
+
+/** Newest first. */
+export async function listSafetyCopies(): Promise<SafetyCopy[]> {
+  const q = encodeURIComponent(`name contains '${COPY_PREFIX}'`)
+  const res = await api(`${DRIVE}?spaces=appDataFolder&q=${q}&orderBy=createdTime%20desc&fields=files(id,createdTime)`)
+  if (!res.ok) throw new Error("Couldn't read your Google Drive.")
+  return ((await res.json()) as { files?: SafetyCopy[] }).files ?? []
+}
+
+export async function readSafetyCopy(id: string): Promise<string> {
+  const res = await api(`${DRIVE}/${id}?alt=media`)
+  if (!res.ok) throw new Error("Couldn't download that copy from Google Drive.")
+  return res.text()
+}
+
+/** Saves the Drive file as it was before this sync overwrites it, once a week across all devices. */
+async function keepSafetyCopy(json: string, now = Date.now()) {
+  if (state.lastCopy && now - state.lastCopy < COPY_EVERY_MS) return
+  const copies = await listSafetyCopies()
+  const newest = copies[0] ? Date.parse(copies[0].createdTime) : 0
+  if (now - newest < COPY_EVERY_MS) return set({ lastCopy: newest })
+  const res = await createFile(`${COPY_PREFIX}${new Date(now).toISOString().slice(0, 10)}.json`, json)
+  if (!res.ok) throw new Error("Couldn't save a safety copy.")
+  set({ lastCopy: now })
+  await Promise.all(copies.slice(COPIES_KEPT - 1).map((c) => api(`${DRIVE}/${c.id}`, { method: 'DELETE' })))
 }
 
 // ---------- Sync ----------
@@ -211,7 +256,11 @@ export function syncDrive(): Promise<boolean> {
       const remote = remoteText === null ? null : parseSyncDoc(remoteText)
       const { doc, toLocal, push } = mergeLibraries({ ...backup, deleted }, remote)
       await applySync({ ...toLocal, images: toLocal.images.map((i) => ({ id: i.id, type: i.type, createdAt: i.createdAt, blob: base64ToBlob(i.data, i.type) })) })
-      if (push) await upload(JSON.stringify(doc))
+      if (push) {
+        // Never blocks syncing: a failed copy is simply tried again on the next upload.
+        if (remoteText !== null) await keepSafetyCopy(remoteText).catch(() => {})
+        await upload(JSON.stringify(doc))
+      }
       set({ lastSync: new Date().toISOString(), error: undefined })
       return toLocal.titles.length + toLocal.history.length + toLocal.deleteIds.length > 0
     } catch (err) {

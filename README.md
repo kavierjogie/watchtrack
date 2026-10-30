@@ -87,12 +87,14 @@ The logic lives in `src/lib/progress.ts` (pure functions) and is covered by `src
 - Data is in **this browser on this device**. Another browser, phone or computer has a separate copy. Installing the PWA doesn't change that.
 - **Clearing site data / browsing data for this site deletes your library**, unless Google Drive sync is on. The app asks the browser for persistent storage, but that isn't a guarantee.
 - **Google Drive sync** (Settings, optional) mirrors the library to the user's own Drive. See below.
-- **Move to another device** (Settings) makes a transfer link, `/transfer#…`, carrying the whole library minus uploaded posters, plus a QR code when it's small enough. Opening it shows the import preview. Code: `src/lib/transfer.ts`.
-- **Import backup file** still reads backup files made by older versions. It validates the file, shows a preview with duplicates, and lets you **merge** (keep mine / use backup's / keep both) or **replace**. Exporting files was removed in favour of sync and transfer links.
+- **Export backup** (Settings, the Dashboard reminder, and the Clear all data and Replace dialogs) saves the whole library as a JSON file: through the share sheet on phones that allow it (mainly iPhone), otherwise as a download.
+- **Import backup file** validates the file, shows a preview with duplicates, and lets you **merge** (keep mine / use backup's / keep both) or **replace**. While Drive is connected, imported titles count as new edits and Replace records what it removed, so the next sync doesn't undo the restore.
+- **Old transfer links** (`/transfer#…`) still open in the import preview, but can no longer be created: they couldn't hold big libraries. Code: `src/lib/transfer.ts`.
 
 ### Google Drive sync
 
 - One file, `watchtrack-library.json`, in the user's Drive **appDataFolder** (hidden, only this app can read it). Scope `drive.appdata` is non-sensitive, so Google's app verification isn't needed. The developer has no access to it.
+- **Safety copies:** before an upload overwrites the file, at most once a week, the old version is saved as `watchtrack-safety-YYYY-MM-DD.json` (newest 4 kept). Settings restores them through the import preview. A failed copy never blocks syncing.
 - Sign-in is OAuth with PKCE via a plain redirect (no Google scripts, so the CSP is unchanged). `api/google-token.ts` adds the client secret and swaps the code or refresh token for an access token; it stores nothing. The refresh token is kept in the browser's localStorage.
 - Each sync: download → merge (`src/lib/merge.ts`: newest `updatedAt` per title wins; history and posters are unions; deletions are tombstones kept 90 days) → write locally → upload if Drive was missing anything. Runs on open, on returning to the tab, when back online, and 5 s after an edit. Code: `src/lib/drive.ts`.
 - **Setup (once):**
@@ -104,7 +106,7 @@ The logic lives in `src/lib/progress.ts` (pure functions) and is covered by `src
 
 ### Backup file format (`version: 1`)
 
-Also the format of the Drive file (plus a `deleted` list) and of transfer links (without `images`).
+Also the format of the Drive file and its safety copies (plus a `deleted` list) and of old transfer links (without `images`).
 
 ```jsonc
 {

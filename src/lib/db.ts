@@ -225,11 +225,17 @@ export async function clearAll(): Promise<void> {
   await tx.done
 }
 
-export async function bulkWrite(data: { titles: Title[]; history: HistoryEntry[]; images: StoredImage[] }, replace: boolean) {
+/** `recordDeletions`: Replace leaves tombstones for what it removes, so Drive sync doesn't bring it back. */
+export async function bulkWrite(data: { titles: Title[]; history: HistoryEntry[]; images: StoredImage[] }, replace: boolean, recordDeletions = false) {
   await guardWrite(async () => {
     const db = await getDb()
-    const tx = db.transaction(['titles', 'watchHistory', 'images'], 'readwrite')
+    const tx = db.transaction(['titles', 'watchHistory', 'images', 'settings'], 'readwrite')
     if (replace) {
+      if (recordDeletions) {
+        const [titleIds, historyIds] = await Promise.all([tx.objectStore('titles').getAllKeys(), tx.objectStore('watchHistory').getAllKeys()])
+        const kept = new Set([...data.titles, ...data.history].map((r) => r.id))
+        await addTombstones(tx.objectStore('settings'), [...titleIds, ...historyIds].filter((id) => !kept.has(id)))
+      }
       await Promise.all([tx.objectStore('titles').clear(), tx.objectStore('watchHistory').clear(), tx.objectStore('images').clear()])
     }
     await Promise.all([
