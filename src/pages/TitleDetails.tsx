@@ -71,10 +71,13 @@ function Details({ t }: { t: Title }) {
   }, [t.id, lib.historyVersion])
 
   const closeEditor = () =>
-    setParams((p) => {
-      p.delete('edit')
-      return p
-    })
+    setParams(
+      (p) => {
+        p.delete('edit')
+        return p
+      },
+      { replace: true },
+    )
 
   const saveNotes = async () => {
     setDraft(null)
@@ -206,10 +209,13 @@ function Details({ t }: { t: Title }) {
                   type="button"
                   className="btn-secondary"
                   onClick={() =>
-                    setParams((q) => {
-                      q.set('edit', 'progress')
-                      return q
-                    })
+                    setParams(
+                      (q) => {
+                        q.set('edit', 'progress')
+                        return q
+                      },
+                      { replace: true },
+                    )
                   }
                 >
                   <Pencil className="size-4" aria-hidden /> {pos?.state === 'unknown' ? 'Set episode' : 'Change progress'}

@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { withPublicPosters } from '../lib/posters'
 import { encodeShare, shareUrl } from '../lib/share'
-import { STATUS } from '../lib/backup'
-import { MEDIA_LABEL, STATUS_LABEL, type Title, type WatchStatus } from '../lib/types'
+import { MEDIA, STATUS } from '../lib/backup'
+import { MEDIA_LABEL, STATUS_LABEL, type Title } from '../lib/types'
 import { useLibrary } from '../state/library'
 import { Modal } from './Modal'
 
@@ -79,8 +79,9 @@ export function ShareDialog({ onClose, only }: { onClose: () => void; only?: str
       if (!n.delete(id)) n.add(id)
       return n
     })
-  const selectStatus = (status: WatchStatus | 'all') => setSelected(new Set(titles.filter((t) => status === 'all' || t.status === status).map((t) => t.id)))
+  const selectWhere = (match: (t: Title) => boolean) => setSelected(new Set(titles.filter(match).map((t) => t.id)))
   const statuses = STATUS.filter((s) => titles.some((t) => t.status === s))
+  const types = MEDIA.filter((m) => titles.some((t) => t.mediaType === m))
 
   return (
     <Modal
@@ -107,11 +108,16 @@ export function ShareDialog({ onClose, only }: { onClose: () => void; only?: str
         <div>
           <p className="label">Quick select</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="chip" onClick={() => selectStatus('all')}>
+            <button type="button" className="chip" onClick={() => selectWhere(() => true)}>
               All
             </button>
+            {types.map((m) => (
+              <button key={m} type="button" className="chip" onClick={() => selectWhere((t) => t.mediaType === m)}>
+                {MEDIA_LABEL[m]}
+              </button>
+            ))}
             {statuses.map((s) => (
-              <button key={s} type="button" className="chip" onClick={() => selectStatus(s)}>
+              <button key={s} type="button" className="chip" onClick={() => selectWhere((t) => t.status === s)}>
                 {STATUS_LABEL[s]}
               </button>
             ))}

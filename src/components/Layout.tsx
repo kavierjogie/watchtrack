@@ -69,7 +69,8 @@ export function PageMeta({ pathname }: { pathname: string }) {
 
 export function Layout() {
   const [params, setParams] = useSearchParams()
-  const { pathname } = useLocation()
+  const { pathname, key } = useLocation()
+  const navigate = useNavigate()
   const { error, titles } = useLibrary()
   const add = params.get('add')
   useAutoSync()
@@ -89,18 +90,20 @@ export function Layout() {
       p.set('add', '1')
       return p
     })
-  const closeAdd = () =>
-    setParams((p) => {
-      p.delete('add')
-      p.delete('q')
-      return p
-    })
+  /** Undo the history entry that opened a dialog, so Back doesn't reopen it. A link that landed straight on the dialog has no entry to return to. */
+  const closeDialog = (...keys: string[]) => {
+    if (key !== 'default') return navigate(-1)
+    setParams(
+      (p) => {
+        keys.forEach((k) => p.delete(k))
+        return p
+      },
+      { replace: true },
+    )
+  }
+  const closeAdd = () => closeDialog('add', 'q')
   const share = params.has('share') && titles.length > 0
-  const closeShare = () =>
-    setParams((p) => {
-      p.delete('share')
-      return p
-    })
+  const closeShare = () => closeDialog('share')
 
   return (
     // minmax(0,1fr): a plain 1fr track grows to its content's min-content width (e.g. the horizontal poster rail), pushing the page past the viewport.
