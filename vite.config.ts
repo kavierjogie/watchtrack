@@ -38,12 +38,15 @@ export default defineConfig({
         runtimeCaching: [
           {
             // Public poster artwork from metadata providers, so saved titles show posters offline.
-            urlPattern: ({ url }) => ['media.kitsu.app', 'static.tvmaze.com', 'image.tmdb.org'].includes(url.hostname),
+            // Fetched with CORS: browsers count each opaque (no-CORS) response as about 7 MB, which made 600 posters look like 4 GB.
+            // Kitsu doesn't send CORS headers, so its images just load from the network.
+            urlPattern: ({ url }) => ['static.tvmaze.com', 'image.tmdb.org'].includes(url.hostname),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'posters',
+              cacheName: 'poster-art', // sw-notifications.js deletes the old opaque 'posters' cache.
+              fetchOptions: { mode: 'cors', credentials: 'omit' },
               expiration: { maxEntries: 600, maxAgeSeconds: 60 * 60 * 24 * 180 },
-              cacheableResponse: { statuses: [0, 200] },
+              cacheableResponse: { statuses: [200] },
             },
           },
         ],

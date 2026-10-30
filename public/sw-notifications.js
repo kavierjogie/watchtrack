@@ -1,4 +1,7 @@
 // Loaded into the generated service worker (vite.config.ts → workbox.importScripts).
+// Frees the old poster cache, whose opaque responses inflated "Storage used" by gigabytes.
+self.addEventListener('activate', (event) => event.waitUntil(caches.delete('posters')))
+
 // Clicking a WatchTrack alert focuses an open window and asks it to show the title, or opens a new one there.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
