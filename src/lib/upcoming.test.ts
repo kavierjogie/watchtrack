@@ -44,6 +44,16 @@ describe('upcomingEpisodes', () => {
     expect(codes([show(list, {}, { skipped: [{ season: 2, from: 3, to: 3 }] })])).toEqual(['S02 E04'])
   })
 
+  it('always lists the next airing the Caught up card announces, even with the position past it', () => {
+    // Black Clover: 174 aired, 175 due, position wrongly at 176.
+    const list = [ep(null, 175, '2026-11-01T14:00:00Z'), ep(null, 176, '2026-11-08T14:00:00Z')]
+    const sync = { upcoming: list, nextAiring: { season: null, episode: 175, airdate: '2026-11-01T14:00:00Z' } } as unknown as Title['sync']
+    const absolute = { numbering: 'absolute', season: null } as const
+    expect(codes([show(list, { sync }, { ...absolute, nextEpisode: 176 })])).toEqual(['Episode 175', 'Episode 176'])
+    // Later episodes still follow the position.
+    expect(codes([show(list, { sync }, { ...absolute, nextEpisode: 177 })])).toEqual(['Episode 175'])
+  })
+
   it('uses running numbers for absolute numbering', () => {
     expect(codes([show([ep(null, 1100, '2026-11-01'), ep(null, 1101, '2026-11-08')], {}, { numbering: 'absolute', season: null, nextEpisode: 1101 })])).toEqual(['Episode 1101'])
   })

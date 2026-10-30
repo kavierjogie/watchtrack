@@ -48,7 +48,9 @@ export function upcomingEpisodes(titles: Title[], now = Date.now()): UpcomingEpi
     const episodes = dated.filter((r) => r.kind === 'episode')
     const premieres = dated.filter((r) => r.kind === 'season' && !episodes.some((e) => (r.season != null && e.season === r.season) || localDay(e.airdate) === localDay(r.airdate)))
     for (const r of [...episodes, ...premieres]) {
-      if (alreadyDealtWith(p, r.season, r.episode ?? (r.kind === 'season' ? 1 : null))) continue
+      // The next airing can't have been watched yet, whatever the position says (e.g. a mistaken "last watched"), and the Caught up card announces it.
+      const announced = r.kind === 'episode' && r.season === t.sync?.nextAiring?.season && r.episode === t.sync?.nextAiring?.episode
+      if (!announced && alreadyDealtWith(p, r.season, r.episode ?? (r.kind === 'season' ? 1 : null))) continue
       const key = `${titleKey(t)}:${r.kind}:${r.season ?? ''}:${r.episode ?? localDay(r.airdate)}`
       if (seen.has(key)) continue // the same show added twice, e.g. from two providers
       seen.add(key)
