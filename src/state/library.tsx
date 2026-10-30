@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { normalizeTitle } from '../lib/backup'
 import * as db from '../lib/db'
 import { driveConnected, markDirty, onDirty, syncDrive } from '../lib/drive'
+import { saveKitsuPosters } from '../lib/posters'
 import type { Change } from '../lib/titles'
 import type { Title } from '../lib/types'
 
@@ -54,6 +55,17 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   useDriveAutoSync(reload)
 
   const upsert = (t: Title) => setTitles((prev) => (prev.some((p) => p.id === t.id) ? prev.map((p) => (p.id === t.id ? t : p)) : [...prev, t]))
+
+  // Once per app open, after the library first loads.
+  const postersSaved = useRef(false)
+  useEffect(() => {
+    if (loading || postersSaved.current || !navigator.onLine) return
+    postersSaved.current = true
+    void saveKitsuPosters(titles, (t) => {
+      upsert(normalizeTitle(t))
+      markDirty()
+    }).catch(() => {})
+  }, [loading, titles])
 
   const value = useMemo<LibraryState>(() => {
     const index = new Map(titles.map((t) => [t.id, t]))

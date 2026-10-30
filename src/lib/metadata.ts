@@ -608,7 +608,9 @@ export async function fetchPosterUrl(source: Pick<MetadataSource, 'provider' | '
 export async function downloadPoster(url: string): Promise<Blob | null> {
   try {
     // Saving waits on this, so don't let a slow image host hold the form; the remote URL is the fallback.
-    const res = await fetch(url, { mode: 'cors', signal: AbortSignal.timeout(10000) })
+    // Kitsu's image host sends no CORS headers, so its posters come through api/poster.ts.
+    const from = new URL(url).hostname === 'media.kitsu.app' ? `/api/poster?url=${encodeURIComponent(url)}` : url
+    const res = await fetch(from, { mode: 'cors', signal: AbortSignal.timeout(10000) })
     if (!res.ok) return null
     const blob = await res.blob()
     return blob.type.startsWith('image/') ? blob : null

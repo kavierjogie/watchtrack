@@ -2,7 +2,7 @@
 
 A private, offline-first tracker for anime, TV series and movies. Its one job: **always know the exact next episode to watch**, even after months away.
 
-- No account, no database server. The only server code is stateless: a TMDB proxy (`api/tmdb.ts`) and the Google OAuth token exchange for optional Drive sync (`api/google-token.ts`).
+- No account, no database server. The only server code is stateless: a TMDB proxy (`api/tmdb.ts`), a Kitsu poster proxy so those images can be saved for offline use (`api/poster.ts`, which only allows `media.kitsu.app`), and the Google OAuth token exchange for optional Drive sync (`api/google-token.ts`).
 - Visits are counted with cookie-free Vercel Web Analytics. `src/main.tsx` strips query strings, `#` fragments and title ids before anything is sent.
 - Everything is stored in your browser (IndexedDB) on the device you use.
 - Installable as an app (PWA) and works offline once loaded.

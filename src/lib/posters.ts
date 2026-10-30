@@ -1,4 +1,4 @@
-import { putImage, validateImage } from './db'
+import { putImage, updateTitle, validateImage } from './db'
 import { downloadPoster, fetchPosterUrl, isHttpUrl } from './metadata'
 import type { MetadataSource, Poster, Title } from './types'
 
@@ -18,6 +18,23 @@ export async function savePoster(url: string): Promise<Poster> {
   const blob = await downloadPoster(url)
   if (blob && !validateImage(blob)) return { kind: 'local', imageId: await putImage(blob), url }
   return { kind: 'remote', url }
+}
+
+/**
+ * Titles added before Kitsu posters could be saved still only have the remote URL: save a copy now, one at a time.
+ * A failure just leaves the URL in place, to try again next time the app opens. updatedAt is left alone: nothing the
+ * user did changed, and Drive sync uploads the new image anyway.
+ */
+export async function saveKitsuPosters(titles: Title[], onSaved: (t: Title) => void) {
+  for (const t of titles) {
+    const url = t.poster?.kind === 'remote' ? t.poster.url : ''
+    if (!url.startsWith('https://media.kitsu.app/')) continue
+    const poster = await savePoster(url)
+    if (poster.kind !== 'local') continue
+    // Re-checked against the stored title, in case the poster was changed while downloading.
+    const saved = await updateTitle(t.id, (cur) => (cur.poster?.kind === 'remote' && cur.poster.url === url ? { ...cur, poster } : null))
+    if (saved?.poster?.kind === 'local' && saved.poster.imageId === poster.imageId) onSaved(saved)
+  }
 }
 
 // One lookup per title per session, however many cards show it or how often they render.

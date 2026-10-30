@@ -1,8 +1,9 @@
 import 'fake-indexeddb/auto'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { applyImport, createBackup, parseBackup, planImport, resolveImport, type Backup } from './backup'
 import { clearAll, deleteTitle, getImage, getTitle, listHistory, listTitles, listTombstones, putImage, saveTitle, undoHistory } from './db'
 import { mergeLibraries, type Tombstone } from './merge'
+import { saveKitsuPosters } from './posters'
 import { setLastWatched } from './progress'
 import { toSharedItem } from './share'
 import { applyMarkWatched, applyMovieWatched, applyProgress, createTitle } from './titles'
@@ -69,6 +70,43 @@ describe('IndexedDB persistence', () => {
 
   it('rejects invalid image types', async () => {
     await expect(putImage(new Blob(['x'], { type: 'text/plain' }))).rejects.toThrow(/JPEG/)
+  })
+})
+
+describe('saving Kitsu posters for existing titles', () => {
+  const KITSU = 'https://media.kitsu.app/anime/1/poster_image/a.jpg'
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('saves a copy through /api/poster, leaving other titles and updatedAt alone', async () => {
+    const fetchMock = vi.fn(async () => new Response(png()))
+    vi.stubGlobal('fetch', fetchMock)
+    const kitsu = createTitle({ title: 'Spy x Family', mediaType: 'anime', poster: { kind: 'remote', url: KITSU } })
+    const other = createTitle({ title: 'Loki', mediaType: 'tv', poster: { kind: 'remote', url: 'https://static.tvmaze.com/a.jpg' } })
+    await saveTitle(kitsu)
+    await saveTitle(other)
+    const saved: string[] = []
+    await saveKitsuPosters([kitsu, other], (t) => saved.push(t.id))
+
+    expect(saved).toEqual([kitsu.id])
+    expect(fetchMock.mock.calls).toEqual([[`/api/poster?url=${encodeURIComponent(KITSU)}`, expect.anything()]])
+    const back = await getTitle(kitsu.id)
+    expect(back?.poster).toMatchObject({ kind: 'local', url: KITSU })
+    expect(back?.updatedAt).toBe(kitsu.updatedAt)
+    expect((await getTitle(other.id))?.poster).toEqual(other.poster)
+  })
+
+  it('keeps the URL when the download fails, and a poster changed meanwhile', async () => {
+    const t = createTitle({ title: 'Spy x Family', mediaType: 'anime', poster: { kind: 'remote', url: KITSU } })
+    await saveTitle(t)
+    vi.stubGlobal('fetch', async () => new Response('<html>', { headers: { 'Content-Type': 'text/html' } }))
+    await saveKitsuPosters([t], () => expect.unreachable())
+    expect((await getTitle(t.id))?.poster).toEqual(t.poster)
+
+    vi.stubGlobal('fetch', async () => new Response(png()))
+    const changed = { kind: 'remote', url: 'https://image.tmdb.org/new.jpg' } as const
+    await saveTitle({ ...t, poster: changed })
+    await saveKitsuPosters([t], () => expect.unreachable())
+    expect((await getTitle(t.id))?.poster).toEqual(changed)
   })
 })
 

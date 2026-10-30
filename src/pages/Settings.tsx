@@ -343,7 +343,8 @@ export function SettingsPage() {
             <li>Your library, history, notes and posters are stored only in this browser. WatchTrack's developer can't see them.</li>
             <li>
               To find titles, posters and new episodes, the app sends title names and IDs (never your library or progress) to the data sources below. TMDB requests
-              go through WatchTrack's server (hosted on Vercel) to keep its API key private. As with any website, these services see your IP address.
+              go through WatchTrack's server (hosted on Vercel) to keep its API key private, and Kitsu poster images go through it so they can be saved for offline
+              use. As with any website, these services see your IP address.
             </li>
             <li>Share links put the list you chose in the link itself; only people you send it to can see it.</li>
             <li>Notifications are optional and shown by your own browser — nothing is sent to a push server.</li>

@@ -39,7 +39,7 @@ export default defineConfig({
           {
             // Public poster artwork from metadata providers, so saved titles show posters offline.
             // Fetched with CORS: browsers count each opaque (no-CORS) response as about 7 MB, which made 600 posters look like 4 GB.
-            // Kitsu doesn't send CORS headers, so its images just load from the network.
+            // Kitsu doesn't send CORS headers, so its images aren't cached here; api/poster.ts lets titles save a copy instead.
             urlPattern: ({ url }) => ['static.tvmaze.com', 'image.tmdb.org'].includes(url.hostname),
             handler: 'CacheFirst',
             options: {
