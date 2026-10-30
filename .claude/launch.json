@@ -2,6 +2,6 @@
   "version": "0.0.1",
   "configurations": [
     { "name": "dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 5173 },
-    { "name": "prod-preview", "runtimeExecutable": "npm", "runtimeArgs": ["run", "preview"], "port": 4173 },    { "name": "brag-demo", "runtimeExecutable": "npx", "runtimeArgs": ["vite", "--config", "brag-output-2026-10-28-170516/work/vite.demo.config.mts"], "port": 5181 }
+    { "name": "prod-preview", "runtimeExecutable": "npm", "runtimeArgs": ["run", "preview"], "port": 4173 },    { "name": "brag-demo", "runtimeExecutable": "npx", "runtimeArgs": ["vite", "--config", "brag-output-2026-10-30-213527/work/vite.demo.config.mts"], "port": 5181 }
   ]
 }
