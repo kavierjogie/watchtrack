@@ -107,7 +107,8 @@ const pickImage = (img: unknown, sizes: string[]): string | null => {
 
 type PosterPair = Pick<MetaResult, 'posterUrl' | 'thumbUrl'>
 const kitsuPoster = (img: unknown): PosterPair => ({
-  posterUrl: pickImage(img, ['original', 'large', 'medium', 'small']),
+  // large (550×780, ~60 KB) before original: originals run to 15 MB, too big to save a copy of or to show on a card.
+  posterUrl: pickImage(img, ['large', 'original', 'medium', 'small']),
   thumbUrl: pickImage(img, ['small', 'medium', 'large', 'original']),
 })
 const mazePoster = (img: unknown): PosterPair => ({ posterUrl: pickImage(img, ['original', 'medium']), thumbUrl: pickImage(img, ['medium', 'original']) })

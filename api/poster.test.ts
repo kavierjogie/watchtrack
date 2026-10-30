@@ -69,4 +69,62 @@ describe('poster', () => {
     fetchMock.mockResolvedValueOnce(new Response('', { status: 404 }))
     expect((await call(IMG)).status).toBe(404)
   })
+
+  it('lets the CDN answer repeats of a missing image, but never of an outage', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 404 }))
+    expect((await call(IMG)).headers.get('Cache-Control')).toContain('s-maxage=3600')
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 500 }))
+    const down = await call(IMG)
+    expect(down.status).toBe(502)
+    expect(down.headers.get('Cache-Control')).toBeNull()
+  })
+
+  it('caches a good image at the CDN', async () => {
+    fetchMock.mockResolvedValue(new Response(new Uint8Array(1), { headers: { 'Content-Type': 'image/jpeg' } }))
+    expect((await call(IMG)).headers.get('Cache-Control')).toContain('s-maxage=2592000')
+  })
+
+  it('refuses a request with no url at all', async () => {
+    expect((await GET(new Request('https://watchtrack.test/api/poster'))).status).toBe(400)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('reports a slow Kitsu as a timeout, however far the response got', async () => {
+    const timeout = () => new DOMException('slow', 'TimeoutError')
+    fetchMock.mockRejectedValueOnce(timeout())
+    expect((await call(IMG)).status).toBe(504)
+    const stalled = new Response(new ReadableStream({ start: (c) => c.error(timeout()) }), { headers: { 'Content-Type': 'image/jpeg' } })
+    fetchMock.mockResolvedValueOnce(stalled)
+    expect((await call(IMG)).status).toBe(504)
+  })
+
+  it('reports a body that breaks off instead of throwing', async () => {
+    const broken = new Response(new ReadableStream({ start: (c) => c.error(new TypeError('terminated')) }), { headers: { 'Content-Type': 'image/jpeg' } })
+    fetchMock.mockResolvedValueOnce(broken)
+    expect((await call(IMG)).status).toBe(502)
+  })
+
+  it('gives its fetch a deadline', async () => {
+    fetchMock.mockResolvedValue(new Response(new Uint8Array(1), { headers: { 'Content-Type': 'image/jpeg' } }))
+    await call(IMG)
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('keeps concurrent requests apart when some fail', async () => {
+    fetchMock.mockImplementation(async (u: string) =>
+      u.includes('missing') ? new Response('', { status: 404 }) : new Response(u, { headers: { 'Content-Type': 'image/jpeg' } }),
+    )
+    const urls = Array.from({ length: 12 }, (_, i) => `https://media.kitsu.app/${i % 3 ? 'ok' : 'missing'}/${i}.jpg`)
+    const out = await Promise.all(urls.map(call))
+    expect(out.map((r) => r.status)).toEqual(urls.map((u) => (u.includes('missing') ? 404 : 200)))
+    expect(await out[1].text()).toBe(urls[1])
+  })
+
+  it('logs why it refused, not what the caller sent', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await call('https://evil.example/secret')
+    expect(warn.mock.calls[0][0]).toContain('bad-url')
+    expect(warn.mock.calls[0][0]).not.toContain('evil')
+    warn.mockRestore()
+  })
 })

@@ -75,6 +75,11 @@ describe('IndexedDB persistence', () => {
 
 describe('saving Kitsu posters for existing titles', () => {
   const KITSU = 'https://media.kitsu.app/anime/1/poster_image/a.jpg'
+  beforeEach(() => {
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) })
+    vi.stubGlobal('navigator', { onLine: true })
+  })
   afterEach(() => vi.unstubAllGlobals())
 
   it('saves a copy through /api/poster, leaving other titles and updatedAt alone', async () => {
@@ -107,6 +112,60 @@ describe('saving Kitsu posters for existing titles', () => {
     await saveTitle({ ...t, poster: changed })
     await saveKitsuPosters([t], () => expect.unreachable())
     expect((await getTitle(t.id))?.poster).toEqual(changed)
+  })
+
+  const SOURCE = { provider: 'kitsu', id: '77', url: 'https://kitsu.app/anime/x' } as const
+  const LARGE = 'https://media.kitsu.app/anime/77/poster_image/large.jpeg'
+
+  it('swaps an unsaveable URL for the one Kitsu lists now, once', async () => {
+    const t = createTitle({ title: 'Chainsaw Man', mediaType: 'anime', source: SOURCE, poster: { kind: 'remote', url: KITSU } })
+    await saveTitle(t)
+    const fetchMock = vi.fn(async (u: string) =>
+      u.includes('kitsu.app/api/edge')
+        ? new Response(JSON.stringify({ data: { attributes: { posterImage: { large: LARGE, original: KITSU } } } }))
+        : u.includes(encodeURIComponent(LARGE))
+          ? new Response(png())
+          : Response.json({ error: 'Image too large.' }, { status: 502 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const saved: string[] = []
+    await saveKitsuPosters([t], (s) => saved.push(s.id))
+    expect(saved).toEqual([t.id])
+    expect((await getTitle(t.id))?.poster).toMatchObject({ kind: 'local', url: LARGE })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(localStorage.getItem('watchtrack:poster-save-failed')).toBeNull()
+  })
+
+  it('leaves a poster that can not be saved alone for a week, without blocking the rest', async () => {
+    const bad = createTitle({ title: 'Gone', mediaType: 'anime', poster: { kind: 'remote', url: KITSU } })
+    const good = createTitle({ title: 'Fine', mediaType: 'anime', poster: { kind: 'remote', url: LARGE } })
+    await saveTitle(bad)
+    await saveTitle(good)
+    const fetchMock = vi.fn(async (u: string) => (u.includes(encodeURIComponent(KITSU)) ? new Response('', { status: 404 }) : new Response(png())))
+    vi.stubGlobal('fetch', fetchMock)
+    const saved: string[] = []
+    await saveKitsuPosters([bad], (s) => saved.push(s.id))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await saveKitsuPosters([bad, good], (s) => saved.push(s.id))
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(saved).toEqual([good.id])
+
+    const now = Date.now()
+    const later = vi.spyOn(Date, 'now').mockReturnValue(now + 8 * 24 * 60 * 60 * 1000)
+    await saveKitsuPosters([bad], () => expect.unreachable())
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    later.mockRestore()
+  })
+
+  it('does not hold a failure against a poster when the device went offline', async () => {
+    const t = createTitle({ title: 'Offline', mediaType: 'anime', poster: { kind: 'remote', url: KITSU } })
+    await saveTitle(t)
+    vi.stubGlobal('fetch', async () => {
+      throw new TypeError('offline')
+    })
+    vi.stubGlobal('navigator', { onLine: false })
+    await saveKitsuPosters([t], () => expect.unreachable())
+    expect(localStorage.getItem('watchtrack:poster-save-failed')).toBeNull()
   })
 })
 

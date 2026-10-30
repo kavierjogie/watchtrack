@@ -105,6 +105,11 @@ describe('fetchPosterUrl normalises every provider', () => {
     expect(await fetchPosterUrl({ provider: 'kitsu', id: '1' })).toBe('https://media.kitsu.app/l.jpg')
   })
 
+  it('Kitsu: prefers large over an original that can run to 15 MB', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => json({ data: { id: '1', attributes: { posterImage: { original: 'https://media.kitsu.app/o.jpg', large: 'https://media.kitsu.app/l.jpg' } } } })))
+    expect(await fetchPosterUrl({ provider: 'kitsu', id: '1' })).toBe('https://media.kitsu.app/l.jpg')
+  })
+
   it('TVmaze: null image → null', async () => {
     vi.stubGlobal('fetch', vi.fn(() => json({ id: 5, image: null })))
     expect(await fetchPosterUrl({ provider: 'tvmaze', id: '5' })).toBeNull()
