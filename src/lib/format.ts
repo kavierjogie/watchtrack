@@ -32,30 +32,68 @@ export function formatRelease(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-/** formatRelease without the year or time, for poster-width cards. */
-export function formatShortRelease(iso: string): string {
-  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+/** formatRelease without the time, and without the year unless it's another year. */
+export function formatShortRelease(iso: string, now = Date.now()): string {
+  const dateOnly = isDateOnly(iso)
   const d = new Date(dateOnly ? `${iso}T00:00:00Z` : iso)
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: dateOnly ? 'UTC' : undefined })
+  if (Number.isNaN(d.getTime())) return iso
+  const year = localDay(iso).slice(0, 4) === localDay(new Date(now).toISOString()).slice(0, 4) ? undefined : 'numeric'
+  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year, timeZone: dateOnly ? 'UTC' : undefined })
 }
 
-export const RELEASE_BUCKETS = ['This week', 'Next week', 'Later this month', 'Later'] as const
+/** Local time of a release, or null when the provider only gave a day. */
+export const formatReleaseTime = (iso: string) => (isDateOnly(iso) ? null : new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))
+
+export const isDateOnly = (iso: string) => /^\d{4}-\d{2}-\d{2}$/.test(iso)
+
+const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+/** The calendar day (YYYY-MM-DD) a release falls on for this viewer. Date-only values are that day everywhere, never shifted. */
+export const localDay = (iso: string) => (isDateOnly(iso) ? iso : dayKey(new Date(iso)))
+
+/** The viewer's calendar day `offset` days from now. Built from local parts, so daylight saving can't skip a day. */
+export function dayFrom(now: number, offset = 0): string {
+  const n = new Date(now)
+  return dayKey(new Date(n.getFullYear(), n.getMonth(), n.getDate() + offset))
+}
+
+/** "in 3 hours" later today, otherwise whole calendar days ("tomorrow", "in 2 days"). */
+export const countdown = (iso: string, now = Date.now()) => timeAgo(!isDateOnly(iso) && localDay(iso) === dayFrom(now) ? iso : localDay(iso), now)
+
+export const RELEASE_BUCKETS = ['Today', 'Tomorrow', 'This Week', 'Next Week', 'Later'] as const
 export type ReleaseBucket = (typeof RELEASE_BUCKETS)[number]
 
-/** Which part of the calendar a future release falls in. Date-only values are calendar days in the viewer's own time zone. */
+// ponytail: weeks always start on Monday, use Intl.Locale weekInfo if a Sunday week is ever needed
+const daysToSunday = (now: number) => 6 - ((new Date(now).getDay() + 6) % 7)
+
+/** Which part of the calendar a future release falls in, by the viewer's own calendar days. */
 export function releaseBucket(iso: string, now = Date.now()): ReleaseBucket {
-  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T00:00:00` : iso)
-  const n = new Date(now)
-  // ponytail: weeks always start on Monday, use Intl.Locale weekInfo if a Sunday week is ever needed
-  const monday = n.getDate() - ((n.getDay() + 6) % 7)
-  if (d < new Date(n.getFullYear(), n.getMonth(), monday + 7)) return 'This week'
-  if (d < new Date(n.getFullYear(), n.getMonth(), monday + 14)) return 'Next week'
-  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() ? 'Later this month' : 'Later'
+  const day = localDay(iso)
+  if (day <= dayFrom(now)) return 'Today'
+  if (day === dayFrom(now, 1)) return 'Tomorrow'
+  const sunday = daysToSunday(now)
+  if (day <= dayFrom(now, sunday)) return 'This Week'
+  return day <= dayFrom(now, sunday + 7) ? 'Next Week' : 'Later'
+}
+
+const SHORT_DAY = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+const utcDay = (day: string) => new Date(`${day}T00:00:00Z`)
+
+/** The dates a bucket covers, for its heading: "Fri, 30 Oct" or "Mon, 2 – Sun, 8 Nov". */
+export function bucketDates(bucket: ReleaseBucket, now = Date.now()): string {
+  const sunday = daysToSunday(now)
+  const range = (from: number, to: number) => (from >= to ? SHORT_DAY.format(utcDay(dayFrom(now, to))) : SHORT_DAY.formatRange(utcDay(dayFrom(now, from)), utcDay(dayFrom(now, to))))
+  if (bucket === 'Today') return range(0, 0)
+  if (bucket === 'Tomorrow') return range(1, 1)
+  if (bucket === 'This Week') return range(2, sunday)
+  if (bucket === 'Next Week') return range(Math.max(2, sunday + 1), sunday + 7)
+  return `From ${range(sunday + 8, sunday + 8)}`
 }
 
 export const daysSince =(iso: string | null, now = Date.now()) => (iso ? Math.floor((now - new Date(iso).getTime()) / 86400000) : Infinity)
 
-export const isPast = (iso: string, now = Date.now()) => Date.parse(iso) < now
+/** A date-only release has no known time, so it isn't past until the viewer's whole day is over. */
+export const isPast = (iso: string, now = Date.now()) => (isDateOnly(iso) ? iso < dayFrom(now) : Date.parse(iso) < now)
 
 export const today = () => new Date().toISOString().slice(0, 10)
 

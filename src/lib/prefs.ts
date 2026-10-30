@@ -22,6 +22,7 @@ export interface Prefs {
   backupNudgeAfter: string
   /** The iPhone "Add to Home Screen" card on the Dashboard was closed. */
   installTipDismissed: boolean
+  upcomingView: 'list' | 'calendar'
 }
 
 const KEY = 'watchtrack:prefs'
@@ -39,6 +40,7 @@ const DEFAULTS: Prefs = {
   browserNotify: false,
   backupNudgeAfter: '',
   installTipDismissed: false,
+  upcomingView: 'list',
 }
 
 let cache: Prefs | null = null

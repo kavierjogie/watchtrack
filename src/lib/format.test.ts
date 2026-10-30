@@ -50,26 +50,22 @@ describe('releaseBucket', () => {
   const now = new Date(2026, 9, 7, 12).getTime()
 
   it('splits weeks on Monday', () => {
-    expect(releaseBucket('2026-10-11', now)).toBe('This week')
-    expect(releaseBucket('2026-10-12', now)).toBe('Next week')
-    expect(releaseBucket('2026-10-18', now)).toBe('Next week')
-  })
-
-  it('separates the rest of this month from later', () => {
-    expect(releaseBucket('2026-10-19', now)).toBe('Later this month')
-    expect(releaseBucket('2026-11-01', now)).toBe('Later')
+    expect(releaseBucket('2026-10-11', now)).toBe('This Week')
+    expect(releaseBucket('2026-10-12', now)).toBe('Next Week')
+    expect(releaseBucket('2026-10-18', now)).toBe('Next Week')
+    expect(releaseBucket('2026-10-19', now)).toBe('Later')
     expect(releaseBucket('2027-10-19', now)).toBe('Later')
   })
 
   it('handles timestamps', () => {
-    expect(releaseBucket(new Date(2026, 9, 11, 23, 30).toISOString(), now)).toBe('This week')
-    expect(releaseBucket(new Date(2026, 9, 12, 0, 30).toISOString(), now)).toBe('Next week')
+    expect(releaseBucket(new Date(2026, 9, 11, 23, 30).toISOString(), now)).toBe('This Week')
+    expect(releaseBucket(new Date(2026, 9, 12, 0, 30).toISOString(), now)).toBe('Next Week')
   })
 
   it('keeps next week ahead of the month boundary', () => {
     const endOfMonth = new Date(2026, 9, 30, 12).getTime() // Friday
-    expect(releaseBucket('2026-11-01', endOfMonth)).toBe('This week')
-    expect(releaseBucket('2026-11-08', endOfMonth)).toBe('Next week')
+    expect(releaseBucket('2026-11-01', endOfMonth)).toBe('This Week')
+    expect(releaseBucket('2026-11-08', endOfMonth)).toBe('Next Week')
     expect(releaseBucket('2026-11-09', endOfMonth)).toBe('Later')
   })
 })

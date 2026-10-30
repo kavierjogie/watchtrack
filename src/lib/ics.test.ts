@@ -5,7 +5,7 @@ import type { Release, Title } from './types'
 const NOW = Date.UTC(2026, 9, 30, 12)
 const ep = (episode: number, airdate: string | null, name: string | null = null): Release => ({ kind: 'episode', season: 2, episode, name, airdate })
 const show = (upcoming: Release[], over: Partial<Title> = {}) =>
-  ({ id: 'abc', title: 'Show', status: 'watching', progress: { numbering: 'seasonal' }, sync: { upcoming }, ...over }) as unknown as Title
+  ({ id: 'abc', title: 'Show', status: 'watching', progress: { numbering: 'seasonal', season: 2, nextEpisode: 1, skipped: [] }, sync: { upcoming }, ...over }) as unknown as Title
 
 const unfold = (ics: string) => ics.replace(/\r\n /g, '')
 

@@ -36,7 +36,7 @@ export interface Alert extends AlertEvent {
   createdAt: string
   read: boolean
   dismissed: boolean
-  /** Found while alerts were off for this title or kind: never notified, but still listed as a release on the Upcoming page. */
+  /** Found while alerts were off for this title or kind: recorded so it's never notified later, but not shown. */
   muted: boolean
 }
 
@@ -48,8 +48,6 @@ export const ALERT_HEADING: Record<AlertKind, string> = {
   episode_released: 'New episode released',
   season_available: 'New season available',
 }
-
-export const RELEASED: AlertKind[] = ['episode_released', 'season_available']
 
 // ---------- Detection (pure) ----------
 
