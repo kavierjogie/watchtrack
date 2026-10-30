@@ -134,9 +134,6 @@ const ROLE_REASON: Record<string, (t: string) => string> = {
 }
 const roleReason = (role: string, t: string) => (ROLE_REASON[role] ?? ((x: string) => `Related to ${x}`))(t)
 
-/** Statuses after which the next entry of a series is a sensible pick. */
-const STARTED = new Set<WatchStatus>(['completed', 'watching'])
-
 /**
  * How much a library title says about taste. Completed and highly rated count most; a show barely started counts
  * little; a low rating or a drop counts against its genres.
@@ -340,8 +337,8 @@ export function dedupe<T extends MetaResult>(list: T[]): T[] {
 }
 
 /**
- * Which entry of a series to suggest, from Kitsu's relationship data only. A later season is kept when you've
- * watched or are watching the entry before it, skipped when that entry is planned or dropped, and otherwise swapped
+ * Which entry of a series to suggest, from Kitsu's relationship data only. A later season is skipped when an entry
+ * before it is in the library (alerts and Upcoming announce new seasons of those), and otherwise swapped
  * for the earliest entry the pool can vouch for (nobody should start at season 3). An earlier entry known only by
  * reference can't be confirmed as the start (it may have its own prequel), so the later season is skipped instead.
  * Titles without relationship data, and standalones, pass through unchanged. Returns null to skip.
@@ -349,8 +346,7 @@ export function dedupe<T extends MetaResult>(list: T[]): T[] {
 export function entryPoint(c: Candidate, byKey: Map<string, Candidate>, idx: LibraryIndex): Candidate | null {
   let cur = c
   for (let hop = 0; hop < 6 && cur.earlier; hop++) {
-    const tracked = findTracked(cur.earlier, idx)
-    if (tracked) return STARTED.has(tracked.status) ? cur : null
+    if (findTracked(cur.earlier, idx)) return null
     const prev = byKey.get(candidateKey(cur.earlier))
     if (!prev) return null
     cur = prev
@@ -506,9 +502,10 @@ const SORTS: Record<SortKey, (a: Rec, b: Rec) => number> = {
  */
 function scorePool(pool: Candidate[], links: Link[], library: Title[], feedback: Feedback, profile: Profile, salt: number): Rec[] {
   const idx = indexLibrary(library)
-  const byId = new Map(library.map((t) => [t.id, t]))
-  // A sequel only makes sense after its seed: drop "sequel" links from planned, dropped or merely "liked" titles.
-  const usable = links.filter((l) => l.role !== 'sequel' || STARTED.has(byId.get(l.seedId)?.status as WatchStatus))
+  const ids = new Set(library.map((t) => t.id))
+  // The next season of a library title isn't a recommendation; related lists carry no `earlier` for entryPoint to see.
+  const sequels = new Set(links.filter((l) => l.role === 'sequel' && ids.has(l.seedId)).map((l) => l.key))
+  const usable = links.filter((l) => l.role !== 'sequel')
   const linked = new Set(usable.map((l) => l.key))
   const byKey = new Map(pool.map((c) => [candidateKey(c), c]))
   const entries = pool.flatMap((c) => entryPoint(c, byKey, idx) ?? [])
@@ -516,7 +513,7 @@ function scorePool(pool: Candidate[], links: Link[], library: Title[], feedback:
   const out: Rec[] = []
   for (const c of dedupe(entries)) {
     const key = candidateKey(c)
-    if (feedback.dismissed[key] || !isUsable(c, linked)) continue
+    if (feedback.dismissed[key] || sequels.has(key) || !isUsable(c, linked)) continue
     out.push({ ...scoreCandidate(c, profile, usable), tracked: findTracked(c, idx) })
   }
   return out.sort((a, b) => SORTS.match(a, b) || tie(salt)(a, b))

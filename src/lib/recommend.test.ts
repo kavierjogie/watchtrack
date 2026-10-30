@@ -315,10 +315,11 @@ describe('sequels and seasons (Kitsu relationship data only)', () => {
     expect(entryPoint(s3, byKey, indexLibrary([]))).toBe(s1)
   })
 
-  it('suggests the next entry after a completed one, and nothing after a planned or dropped one', () => {
+  it('suggests no later entry once an earlier one is in the library, whatever its status', () => {
     const done = indexLibrary([lib('Show', [], { source: s1.source })])
-    expect(entryPoint(s2, byKey, done)).toBe(s2)
-    expect(entryPoint(s3, byKey, done)).toBe(s2)
+    expect(entryPoint(s2, byKey, done)).toBeNull()
+    expect(entryPoint(s3, byKey, done)).toBeNull()
+    expect(entryPoint(s2, byKey, indexLibrary([lib('Show', [], { status: 'watching', source: s1.source })]))).toBeNull()
     expect(entryPoint(s2, byKey, indexLibrary([lib('Show', [], { status: 'plan', source: s1.source })]))).toBeNull()
     expect(entryPoint(s2, byKey, indexLibrary([lib('Show', [], { status: 'dropped', source: s1.source })]))).toBeNull()
   })
@@ -333,8 +334,16 @@ describe('sequels and seasons (Kitsu relationship data only)', () => {
   it('skips a later entry when the entry before it is only known by reference (it may not be the start)', () => {
     const lone = cand('Lone 3', ['Action', 'Drama'], { earlier: cand('Lone 2', []) })
     expect(entryPoint(lone, new Map(), indexLibrary([]))).toBeNull()
-    // …unless that entry is tracked: then the library decides.
-    expect(entryPoint(lone, new Map(), indexLibrary([lib('Lone 2', [], { source: lone.earlier!.source })]))).toBe(lone)
+    expect(entryPoint(lone, new Map(), indexLibrary([lib('Lone 2', [], { source: lone.earlier!.source })]))).toBeNull()
+  })
+
+  it('hides the next season of a completed title, found by relationship data or a sequel link', () => {
+    const done = lib('Hero', ['Action', 'Drama'], { source: { provider: 'kitsu', id: 'hero', url: '' } })
+    const byEarlier = cand('Hero Season 2', ['Action', 'Drama'], { earlier: cand('Hero', [], { source: done.source! }) })
+    const byLink = cand('Hero Season 2 again', ['Action', 'Drama'])
+    const other = cand('Other', ['Action', 'Drama'])
+    const links: Link[] = [{ key: candidateKey(byLink), seedId: done.id, role: 'sequel' }]
+    expect(allKeys(buildDiscover([byEarlier, byLink, other], links, [done], emptyFeedback(), OPTS).sections)).toEqual([candidateKey(other)])
   })
 
   it('ignores "sequel" links from titles the user has only planned', () => {
