@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GET } from './poster.js'
 
 const call = (url: string) => GET(new Request(`https://watchtrack.test/api/poster?url=${encodeURIComponent(url)}`))
-const IMG = 'https://media.kitsu.app/anime/1/poster_image/a.jpg'
+const IMG = 'https://media.kitsu.app/anime/1/poster_image/large-a.jpg'
 
 describe('poster', () => {
   const fetchMock = vi.fn()
@@ -31,8 +31,8 @@ describe('poster', () => {
     'http://media.kitsu.app/a.jpg',
     'http://169.254.169.254/latest/meta-data',
     // Made-up addresses on the right host would each get past the CDN's cache.
-    'https://media.kitsu.app/anime/1/a.jpg?bust=1',
-    'https://media.kitsu.app/anime/1/a.jpg?x',
+    'https://media.kitsu.app/anime/1/large-a.jpg?bust=1',
+    'https://media.kitsu.app/anime/1/large-a.jpg?x',
     'https://media.kitsu.app/anime/1/a.html',
     'https://media.kitsu.app/users/avatars/1/a.jpg',
     'https://media.kitsu.app/anime/../secret.jpg',
@@ -43,7 +43,7 @@ describe('poster', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it.each(['https://media.kitsu.app/anime/poster_images/14172/large.jpg?1597604210', 'https://media.kitsu.app/anime/47711/poster_image/b6a6e8714cee53051ba14c9d799c00aa.png'])('allows real Kitsu poster address %s', async (url) => {
+  it.each(['https://media.kitsu.app/anime/poster_images/14172/large.jpg?1597604210', 'https://media.kitsu.app/anime/47711/poster_image/medium-4978105f.jpeg'])('allows real Kitsu poster address %s', async (url) => {
     fetchMock.mockResolvedValue(new Response(new Uint8Array(1), { headers: { 'Content-Type': 'image/jpeg' } }))
     expect((await call(url)).status).toBe(200)
   })
@@ -94,9 +94,19 @@ describe('poster', () => {
     expect(down.headers.get('Cache-Control')).toBeNull()
   })
 
-  it('caches a good image at the CDN', async () => {
+  it('caches a good image at the CDN and in the browser', async () => {
     fetchMock.mockResolvedValue(new Response(new Uint8Array(1), { headers: { 'Content-Type': 'image/jpeg' } }))
-    expect((await call(IMG)).headers.get('Cache-Control')).toContain('s-maxage=2592000')
+    const cache = (await call(IMG)).headers.get('Cache-Control')
+    expect(cache).toContain('s-maxage=2592000')
+    expect(cache).toContain(' max-age=2592000')
+  })
+
+  // Addresses seen in production: these averaged 1.1 MB each.
+  it.each(['https://media.kitsu.app/anime/poster_images/14172/original.jpg', 'https://media.kitsu.app/anime/47711/poster_image/b6a6e8714cee53051ba14c9d799c00aa.png'])('refuses original %s without fetching it', async (url) => {
+    const res = await call(url)
+    expect(res.status).toBe(413)
+    expect(res.headers.get('Cache-Control')).toContain('s-maxage=2592000')
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('refuses a request with no url at all', async () => {
@@ -129,7 +139,7 @@ describe('poster', () => {
     fetchMock.mockImplementation(async (u: string) =>
       u.includes('missing') ? new Response('', { status: 404 }) : new Response(u, { headers: { 'Content-Type': 'image/jpeg' } }),
     )
-    const urls = Array.from({ length: 12 }, (_, i) => `https://media.kitsu.app/anime/${i % 3 ? 'ok' : 'missing'}/${i}.jpg`)
+    const urls = Array.from({ length: 12 }, (_, i) => `https://media.kitsu.app/anime/${i % 3 ? 'ok' : 'missing'}/large-${i}.jpg`)
     const out = await Promise.all(urls.map(call))
     expect(out.map((r) => r.status)).toEqual(urls.map((u) => (u.includes('missing') ? 404 : 200)))
     expect(await out[1].text()).toBe(urls[1])

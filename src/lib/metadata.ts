@@ -622,9 +622,16 @@ export async function fetchPosterUrl(source: Pick<MetadataSource, 'provider' | '
   return tmdbPoster((await tmdb<{ poster_path?: string | null }>(id)).poster_path).posterUrl
 }
 
+/** A Kitsu image that isn't one of its generated sizes. Titles saved before sizes were preferred still hold these. Same check as api/poster.ts. */
+export const isKitsuOriginal = (url: string) => {
+  const { hostname, pathname } = new URL(url)
+  return hostname === 'media.kitsu.app' && !/\/(tiny|small|medium|large)[.-][^/]*$/.test(pathname)
+}
+
 /** Try to download a poster so it works offline. Returns null if the host blocks it (CORS) or it fails. */
 export async function downloadPoster(url: string): Promise<Blob | null> {
   try {
+    if (isKitsuOriginal(url)) return null // api/poster.ts would refuse it.
     // Saving waits on this, so don't let a slow image host hold the form; the remote URL is the fallback.
     // Kitsu's image host sends no CORS headers, so its posters come through api/poster.ts.
     const from = new URL(url).hostname === 'media.kitsu.app' ? `/api/poster?url=${encodeURIComponent(url)}` : url

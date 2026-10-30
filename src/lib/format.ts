@@ -109,3 +109,15 @@ export const isInAppBrowser = (userAgent: string) => /Instagram|FBAN|FBAV|FB_IAB
 
 /** Where "Send feedback" links go (Settings, crash screen). Public: it's in the page source. */
 export const FEEDBACK_MAILTO = 'mailto:kavier.jogie14@gmail.com?subject=WatchTrack%20feedback'
+
+/** Copy via the Clipboard API, falling back to selecting the field (insecure contexts, older browsers). */
+export async function copyText(text: string, field: HTMLInputElement | null): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    if (!field) return false
+    field.select()
+    return document.execCommand('copy')
+  }
+}

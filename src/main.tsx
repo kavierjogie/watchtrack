@@ -8,6 +8,19 @@ import { applyTheme, getPrefs } from './lib/prefs'
 // Apply theme before first paint to avoid a flash.
 applyTheme(getPrefs().theme)
 
+// A tab left open across a deploy asks for page chunks that no longer exist: reload onto the new build. At most once a
+// minute, so a chunk that's really broken reaches the crash screen instead of looping.
+window.addEventListener('vite:preloadError', (event) => {
+  try {
+    if (Date.now() - Number(sessionStorage.getItem('watchtrack:chunk-reload')) < 60_000) return
+    sessionStorage.setItem('watchtrack:chunk-reload', String(Date.now()))
+  } catch {
+    return // Can't remember the reload, so can't rule out a loop.
+  }
+  event.preventDefault()
+  window.location.reload()
+})
+
 // Ask the browser not to evict IndexedDB under storage pressure. Chrome/Safari decide silently; Firefox asks once.
 void navigator.storage?.persist?.().catch(() => {})
 

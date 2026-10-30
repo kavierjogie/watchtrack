@@ -8,6 +8,8 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'im
 const MAX_BYTES = 4 * 1024 * 1024
 /** A given address always holds the same image, so "too big" stays true: the CDN answers every device after the first. */
 const TOO_LARGE_CACHE = { 'Cache-Control': 'public, max-age=86400, s-maxage=2592000' }
+/** Same check as isKitsuOriginal in src/lib/metadata.ts. Originals average 1.1 MB and run past 4 MB, against about 50 KB for the sizes Kitsu generates. */
+const isOriginal = (url: string) => !/\/(tiny|small|medium|large)[.-][^/]*$/.test(new URL(url).pathname)
 
 function kitsuImageUrl(raw: string | null): string | null {
   try {
@@ -30,6 +32,8 @@ export async function GET(req: Request): Promise<Response> {
   if (req.headers.get('Sec-Fetch-Site') === 'cross-site') return fail(403, 'Not allowed.', 'cross-site')
   const url = kitsuImageUrl(new URL(req.url).searchParams.get('url'))
   if (!url) return fail(400, 'Not allowed.', 'bad-url')
+  // No app card needs one, so don't relay it. The client then looks up the current size by provider id.
+  if (isOriginal(url)) return fail(413, 'Image too large.', 'original', url, TOO_LARGE_CACHE)
   let body: ArrayBuffer
   let type: string
   try {
@@ -52,8 +56,8 @@ export async function GET(req: Request): Promise<Response> {
   return new Response(body, {
     headers: {
       'Content-Type': type,
-      // Public artwork whose address changes with its content: let Vercel's CDN answer repeat requests.
-      'Cache-Control': 'public, max-age=86400, s-maxage=2592000',
+      // Public artwork whose address changes with its content: let Vercel's CDN and the browser answer repeat requests.
+      'Cache-Control': 'public, max-age=2592000, s-maxage=2592000',
     },
   })
 }

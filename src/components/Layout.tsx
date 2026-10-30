@@ -1,6 +1,6 @@
 import { AnimatePresence } from 'framer-motion'
 import { CalendarClock, CircleCheck, CirclePause, Compass, House, Library, ListPlus, Play, Plus, Settings, Share2, type LucideIcon } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { lazy, Suspense, useEffect, useMemo } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { OPEN_EVENT } from '../lib/alerts'
 import type { WatchStatus } from '../lib/types'
@@ -8,8 +8,10 @@ import { useLibrary } from '../state/library'
 import { useAutoSync } from '../state/useSync'
 import { AlertBell } from './Alerts'
 import { Logo } from './Logo'
-import { ShareDialog } from './ShareDialog'
-import { TitleForm } from './TitleForm'
+
+// Only opened on request, and the largest pieces of the first screen otherwise.
+const ShareDialog = lazy(() => import('./ShareDialog').then((m) => ({ default: m.ShareDialog })))
+const TitleForm = lazy(() => import('./TitleForm').then((m) => ({ default: m.TitleForm })))
 
 type NavItem = { to: string; label: string; icon: LucideIcon; mobile?: boolean; status?: WatchStatus }
 
@@ -184,7 +186,9 @@ export function Layout() {
             {error}
           </div>
         )}
-        <Outlet />
+        <Suspense fallback={<div className="skeleton h-40 rounded-2xl" aria-busy aria-label="Loading page" />}>
+          <Outlet />
+        </Suspense>
       </main>
 
       {/* Mobile bottom navigation */}
@@ -212,8 +216,10 @@ export function Layout() {
         </ul>
       </nav>
 
-      <AnimatePresence>{add && <TitleForm open onClose={closeAdd} defaultStatus={ADD_STATUS[add]} initialQuery={params.get('q') ?? undefined} />}</AnimatePresence>
-      <AnimatePresence>{share && <ShareDialog onClose={closeShare} only={params.get('share') !== '1' ? (params.get('share') ?? undefined) : undefined} />}</AnimatePresence>
+      <Suspense fallback={null}>
+        <AnimatePresence>{add && <TitleForm open onClose={closeAdd} defaultStatus={ADD_STATUS[add]} initialQuery={params.get('q') ?? undefined} />}</AnimatePresence>
+        <AnimatePresence>{share && <ShareDialog onClose={closeShare} only={params.get('share') !== '1' ? (params.get('share') ?? undefined) : undefined} />}</AnimatePresence>
+      </Suspense>
     </div>
   )
 }

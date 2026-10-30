@@ -1,6 +1,7 @@
 import { Check, Copy, Share2, TriangleAlert } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { copyText } from '../lib/format'
 import { withPublicPosters } from '../lib/posters'
 import { encodeShare, shareUrl } from '../lib/share'
 import { MEDIA, STATUS } from '../lib/backup'
@@ -12,18 +13,6 @@ type Link = { url: string } | { error: string }
 
 /** Longer links get cut off when sent in an Instagram DM, and a cut link can't be opened. */
 const INSTAGRAM_DM_LIMIT = 1000
-
-/** Copy via the Clipboard API, falling back to selecting the field (insecure contexts, older browsers). */
-export async function copyText(text: string, field: HTMLInputElement | null): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    if (!field) return false
-    field.select()
-    return document.execCommand('copy')
-  }
-}
 
 /** `only`: start with just this title selected (sharing from its page) instead of the whole library. */
 export function ShareDialog({ onClose, only }: { onClose: () => void; only?: string }) {

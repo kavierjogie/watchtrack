@@ -1,8 +1,7 @@
 import { Copy, TriangleAlert, X } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { isInAppBrowser } from '../lib/format'
-import { copyText } from './ShareDialog'
+import { copyText, isInAppBrowser } from '../lib/format'
 
 export const inAppBrowser = isInAppBrowser(navigator.userAgent)
 

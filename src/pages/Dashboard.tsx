@@ -9,7 +9,6 @@ import { connectDrive, driveConfigured, useDrive } from '../lib/drive'
 import { backupNudgeDue, setPrefs, snoozeBackupNudge, usePrefs } from '../lib/prefs'
 import { byContinue, lastActivity } from '../lib/titles'
 import { useLibrary } from '../state/library'
-import { exportBackup } from './Settings'
 
 const byActivity = <T extends Parameters<typeof lastActivity>[0]>(a: T, b: T) => lastActivity(b).localeCompare(lastActivity(a))
 
@@ -234,7 +233,8 @@ function BackupNudge() {
             type="button"
             className="btn-secondary min-h-9 px-3 text-xs"
             onClick={() =>
-              void exportBackup().then((saved) => {
+              // Loaded on click, so the first screen doesn't carry the whole Settings page for this button.
+              void import('./Settings').then((m) => m.exportBackup()).then((saved) => {
                 if (saved) snoozeBackupNudge()
               })
             }

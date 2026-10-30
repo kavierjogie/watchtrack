@@ -53,8 +53,17 @@ export default defineConfig({
       input: Object.fromEntries(
         ['index', 'about', 'privacy', 'terms', 'guides', 'guides/track-anime-and-tv-episodes', 'guides/organise-your-watchlist', 'guides/watchlist-local-storage'].map((p) => [p, `${p}.html`]),
       ),
-      // Libraries change less often than the app, so returning visitors re-download less.
-      output: { codeSplitting: { groups: [{ name: 'vendor', test: /node_modules/ }] } },
+      // Libraries change less often than the app, so returning visitors re-download less. React and Motion get their own
+      // chunks because tree-shaking changes the rest: using one new icon would otherwise re-download all of them.
+      output: {
+        codeSplitting: {
+          groups: [
+            { name: 'react', test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/, priority: 2 },
+            { name: 'motion', test: /node_modules[\\/](framer-motion|motion-dom|motion-utils)[\\/]/, priority: 2 },
+            { name: 'vendor', test: /node_modules/, priority: 1 },
+          ],
+        },
+      },
     },
   },
   test: {

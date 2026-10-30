@@ -1,5 +1,5 @@
 import { MotionConfig } from 'framer-motion'
-import { Component, useEffect, type ReactNode } from 'react'
+import { Component, lazy, Suspense, useEffect, type ComponentType, type ReactNode } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { InAppBrowserBanner } from './components/InAppBrowserBanner'
@@ -8,15 +8,23 @@ import { ConfirmProvider } from './components/Modal'
 import { FEEDBACK_MAILTO } from './lib/format'
 import { applyTheme, usePrefs } from './lib/prefs'
 import { Dashboard } from './pages/Dashboard'
-import { DiscoverPage } from './pages/Discover'
-import { CompletedPage, ContinuePage, LibraryPage, OnHoldPage, PlanPage } from './pages/Lists'
-import { NotificationsPage } from './pages/Notifications'
-import { SettingsPage } from './pages/Settings'
-import { UpcomingPage } from './pages/Upcoming'
-import { SharedPage } from './pages/Shared'
-import { TitleDetails } from './pages/TitleDetails'
-import { TransferPage } from './pages/Transfer'
 import { LibraryProvider } from './state/library'
+
+/** A page's code, fetched when first opened. The service worker still precaches every chunk, so all of them work offline. */
+const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) => lazy(() => load().then((m) => ({ default: m[name] })))
+const lists = () => import('./pages/Lists')
+const LibraryPage = page(lists, 'LibraryPage')
+const ContinuePage = page(lists, 'ContinuePage')
+const PlanPage = page(lists, 'PlanPage')
+const OnHoldPage = page(lists, 'OnHoldPage')
+const CompletedPage = page(lists, 'CompletedPage')
+const DiscoverPage = page(() => import('./pages/Discover'), 'DiscoverPage')
+const NotificationsPage = page(() => import('./pages/Notifications'), 'NotificationsPage')
+const SettingsPage = page(() => import('./pages/Settings'), 'SettingsPage')
+const UpcomingPage = page(() => import('./pages/Upcoming'), 'UpcomingPage')
+const SharedPage = page(() => import('./pages/Shared'), 'SharedPage')
+const TitleDetails = page(() => import('./pages/TitleDetails'), 'TitleDetails')
+const TransferPage = page(() => import('./pages/Transfer'), 'TransferPage')
 
 /** Last line of defence: a render error shows a way out instead of a blank page. Saved data is never touched. */
 class CrashScreen extends Component<{ children: ReactNode }, { failed: boolean; message: string }> {
@@ -87,7 +95,14 @@ export default function App() {
                   <Route path="*" element={<Dashboard />} />
                 </Route>
                 {/* Outside Layout: a friend opening a link sees just the shared list, not an empty app. */}
-                <Route path="shared" element={<SharedPage />} />
+                <Route
+                  path="shared"
+                  element={
+                    <Suspense fallback={null}>
+                      <SharedPage />
+                    </Suspense>
+                  }
+                />
               </Routes>
               <Toaster
                 position="top-center"

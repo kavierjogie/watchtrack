@@ -74,7 +74,7 @@ describe('IndexedDB persistence', () => {
 })
 
 describe('saving Kitsu posters for existing titles', () => {
-  const KITSU = 'https://media.kitsu.app/anime/1/poster_image/a.jpg'
+  const KITSU = 'https://media.kitsu.app/anime/1/poster_image/large-a.jpg'
   beforeEach(() => {
     const store = new Map<string, string>()
     vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) })
@@ -116,6 +116,17 @@ describe('saving Kitsu posters for existing titles', () => {
 
   const SOURCE = { provider: 'kitsu', id: '77', url: 'https://kitsu.app/anime/x' } as const
   const LARGE = 'https://media.kitsu.app/anime/77/poster_image/large.jpeg'
+
+  it('never sends an original through /api/poster: it saves the size Kitsu lists now instead', async () => {
+    const original = 'https://media.kitsu.app/anime/77/poster_image/b6a6e8714cee.png'
+    const t = createTitle({ title: 'Chainsaw Man', mediaType: 'anime', source: { ...SOURCE, id: '78' }, poster: { kind: 'remote', url: original } }) // Own id: lookups are remembered per id.
+    await saveTitle(t)
+    const fetchMock = vi.fn(async (u: string) => (u.includes('kitsu.app/api/edge') ? new Response(JSON.stringify({ data: { attributes: { posterImage: { large: LARGE, original } } } })) : new Response(png())))
+    vi.stubGlobal('fetch', fetchMock)
+    await saveKitsuPosters([t], () => {})
+    expect((await getTitle(t.id))?.poster).toMatchObject({ kind: 'local', url: LARGE })
+    expect(fetchMock.mock.calls.map(([u]) => u).filter((u) => u.startsWith('/api/poster'))).toEqual([`/api/poster?url=${encodeURIComponent(LARGE)}`])
+  })
 
   it('swaps an unsaveable URL for the one Kitsu lists now, once', async () => {
     const t = createTitle({ title: 'Chainsaw Man', mediaType: 'anime', source: SOURCE, poster: { kind: 'remote', url: KITSU } })
