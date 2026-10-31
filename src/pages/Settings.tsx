@@ -1,4 +1,4 @@
-import { Bell, BellRing, Check, Cloud, Download, HardDrive, Mail, RefreshCw, Shield, Smartphone, Trash2, Upload } from 'lucide-react'
+import { Bell, BellRing, Check, Cloud, Download, HardDrive, Loader2, Mail, RefreshCw, Shield, Smartphone, Trash2, Upload } from 'lucide-react'
 import { alertsOn, notifySupported, setBackgroundChecks, showSystemNotification } from '../lib/alerts'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -464,6 +464,7 @@ function DriveSync({ onRestore }: { onRestore: (text: string) => void }) {
 function SafetyCopies({ onRestore }: { onRestore: (text: string) => void }) {
   const [copies, setCopies] = useState<SafetyCopy[] | null>(null)
   const [failed, setFailed] = useState(false)
+  const [opening, setOpening] = useState<string | null>(null)
 
   const load = (open: boolean) => {
     if (!open || copies) return
@@ -472,10 +473,13 @@ function SafetyCopies({ onRestore }: { onRestore: (text: string) => void }) {
   }
 
   const restore = async (id: string) => {
+    setOpening(id)
     try {
       onRestore(await readSafetyCopy(id))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't open that copy.")
+    } finally {
+      setOpening(null)
     }
   }
 
@@ -493,8 +497,9 @@ function SafetyCopies({ onRestore }: { onRestore: (text: string) => void }) {
         ) : (
           <div className="flex flex-wrap gap-2">
             {copies.map((c) => (
-              <button key={c.id} type="button" className="btn-secondary" onClick={() => void restore(c.id)}>
-                {new Date(c.createdTime).toLocaleDateString()}
+              <button key={c.id} type="button" className="btn-secondary" disabled={opening !== null} onClick={() => void restore(c.id)}>
+                {opening === c.id && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                {opening === c.id ? 'Opening…' : new Date(c.createdTime).toLocaleDateString()}
               </button>
             ))}
           </div>
