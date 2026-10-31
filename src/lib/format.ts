@@ -110,15 +110,43 @@ export const isInAppBrowser = (userAgent: string) => /Instagram|FBAN|FBAV|FB_IAB
 /** Where "Send feedback" links go (Settings, crash screen). Public: it's in the page source. */
 export const FEEDBACK_MAILTO = 'mailto:kavier.jogie14@gmail.com?subject=WatchTrack%20feedback'
 
-/** Copy via the Clipboard API, falling back to selecting the field (insecure contexts, older browsers). */
+/** Select-and-copy from `field`, or from a temporary hidden one. Must run synchronously inside the tap. */
+function copyBySelecting(text: string, field: HTMLInputElement | null): boolean {
+  const before = document.activeElement
+  const el = field ?? document.createElement('textarea')
+  if (!field) {
+    el.value = text
+    el.readOnly = true
+    // 16px stops iOS zooming the page on focus.
+    el.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px'
+    document.body.append(el)
+  }
+  try {
+    el.focus({ preventScroll: true })
+    el.select()
+    el.setSelectionRange(0, el.value.length)
+    return document.execCommand('copy')
+  } catch {
+    return false
+  } finally {
+    if (!field) {
+      el.remove()
+      if (before instanceof HTMLElement) before.focus({ preventScroll: true })
+    }
+  }
+}
+
+/**
+ * Copy by selecting first, then the Clipboard API. Instagram's and other in-app browsers
+ * block the Clipboard API, and once its promise rejects the tap no longer counts for selecting.
+ */
 export async function copyText(text: string, field: HTMLInputElement | null): Promise<boolean> {
+  if (copyBySelecting(text, field)) return true
   try {
     await navigator.clipboard.writeText(text)
     return true
   } catch {
-    if (!field) return false
-    field.select()
-    return document.execCommand('copy')
+    return false
   }
 }
 
