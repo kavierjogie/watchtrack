@@ -24,7 +24,7 @@ interface CardInfo {
 const CARDS: CardInfo[] = [
   {
     id: 'top',
-    label: (d) => (d.review.top.length >= 5 ? 'The Top Five' : 'The Top Three'),
+    label: (d) => (d.review.top.length >= 3 && d.review.top.length < 5 ? 'The Top Three' : 'The Top Five'),
     peek: (d) => (d.review.top[0] ? `#1 ${d.review.top[0].title}` : ''),
     blurb: 'The titles that defined your year, ranked, posters and all.',
     contents: ['Your most-watched titles, ranked', 'Their posters, number one up front', 'Anime, series or movie, and how much you watched'],
@@ -77,6 +77,8 @@ export function ShareStudio({ data, titles, onClose }: { data: ShareData; titles
   const [busy, setBusy] = useState(false)
   const [tick, setTick] = useState(0)
   const mod = useRef<Promise<ImageModule> | null>(null)
+  /** The image code once loaded, so Share and Copy can call the browser in the same tick as the click (Safari requires it). */
+  const lib = useRef<ImageModule | null>(null)
   const art = useRef<Promise<Artwork> | null>(null)
   const drawing = useRef(false)
   const urls = useRef<string[]>([])
@@ -102,6 +104,7 @@ export function ShareStudio({ data, titles, onClose }: { data: ShareData; titles
     mod.current ??= import('../../lib/reviewImage')
     void mod.current
       .then(async (m) => {
+        lib.current = m
         setCaps({ share: m.canShareFiles(), copy: m.canCopyImage() })
         art.current ??= m.loadArtwork(titles)
         const blob = await m.renderReview(data, next, await art.current, theme)
@@ -123,10 +126,10 @@ export function ShareStudio({ data, titles, onClose }: { data: ShareData; titles
   const label = info.label(data)
 
   async function deliver(kind: 'share' | 'download' | 'copy') {
-    if (!card || !mod.current) return
+    const m = lib.current
+    if (!card || !m) return
     setBusy(true)
     try {
-      const m = await mod.current
       const name = m.fileName(data.review, variant, theme)
       if (kind === 'share') {
         if ((await m.shareImage(card.blob, name, data.review.year)) === 'shared') toast.success('Shared your year')
@@ -184,7 +187,7 @@ export function ShareStudio({ data, titles, onClose }: { data: ShareData; titles
   return (
     <Modal open onClose={onClose} title="Share your year" size="xl" footer={footer}>
       <div className="space-y-4">
-        <div role="tablist" aria-label="Card design" onKeyDown={onTabKey} className="-mx-5 flex snap-x snap-mandatory gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0">
+        <div role="tablist" aria-label="Card design" onKeyDown={onTabKey} className="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0">
           {CARDS.map((c, i) => {
             const lock = c.locked(data)
             const thumb = cards[keyOf(theme, c.id)]

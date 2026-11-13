@@ -135,8 +135,8 @@ describe('share cards', () => {
     for (const t of d.review.top.slice(1)) expect(drawn.some((x) => x.text === t.title[0].toUpperCase())).toBe(true)
     for (const rank of ['01', '02', '03', '04', '05']) expect(drawn.map((x) => x.text)).toContain(rank)
     for (const t of d.review.top) expect(words()).toContain(`${t.count.toLocaleString()} ${t.mediaType === 'movie' ? 'WATCH' : 'EPISODE'}`)
-    expect(words()).toContain('ANIME ·')
-    expect(words()).toContain('SERIES ·')
+    expect(drawn.map((x) => x.text)).toContain('ANIME')
+    expect(words()).toContain('SERIES')
   })
 
   it('never pads out a top five: 3 or 4 titles make a top three, fewer make none', () => {
@@ -210,6 +210,11 @@ describe('text fitting', () => {
   it('shortens a line with an ellipsis', () => {
     expect(fit(ctx as unknown as CanvasRenderingContext2D, 'abcdefghij', 60)).toBe('abcd…')
     expect(fit(ctx as unknown as CanvasRenderingContext2D, 'abc', 60)).toBe('abc')
+  })
+  it('ellipsises a single allowed line too', () => {
+    const [only, ...more] = wrap(ctx as unknown as CanvasRenderingContext2D, 'one two three four five', 120, 1)
+    expect(more).toHaveLength(0)
+    expect(only.endsWith('…')).toBe(true)
   })
   it('wraps words and ellipsises the last allowed line', () => {
     const lines = wrap(ctx as unknown as CanvasRenderingContext2D, 'one two three four five six seven', 120, 2)

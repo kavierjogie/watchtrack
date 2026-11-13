@@ -1,6 +1,6 @@
 import { getImage } from './db'
 import { publicPosterUrl } from './posters'
-import { MONTHS, monthState, type TopTitle, type YearReview } from './review'
+import { MONTHS, monthState, WEEKDAYS, type TopTitle, type YearReview } from './review'
 import type { Highlight, HighlightId, Personality, PersonalityId } from './reviewStory'
 import { SITE_URL } from './share'
 import type { MediaType, Title } from './types'
@@ -108,12 +108,15 @@ export function wrap(ctx: Ctx, text: string, max: number, maxLines: number): str
       line = next
       continue
     }
-    if (line) lines.push(line)
-    line = words[i]
-    if (lines.length === maxLines - 1) {
-      lines.push(fit(ctx, [line, ...words.slice(i + 1)].join(' '), max))
-      return lines
+    if (line) {
+      // Out of lines: what's left goes on this one, shortened.
+      if (lines.length === maxLines - 1) {
+        lines.push(fit(ctx, [line, ...words.slice(i)].join(' '), max))
+        return lines
+      }
+      lines.push(line)
     }
+    line = words[i]
   }
   if (line) lines.push(fit(ctx, line, max))
   return lines.slice(0, maxLines)
@@ -368,7 +371,8 @@ function poster(ctx: Ctx, t: { titleId: string; title: string }, art: Artwork | 
     glow(ctx, x + w * 0.8, y + h * 0.1, w, 'rgba(103,232,249,0.18)')
     const initial = [...t.title.trim()][0]?.toUpperCase() ?? '?'
     font(ctx, Math.round(w * 0.42), 800)
-    text(ctx, initial, x + w / 2, y + h * 0.42 + w * 0.14, 'rgba(237,233,254,0.9)', 'center')
+    // High in the tile: the bottom is kept for the rank and title laid over it.
+    text(ctx, initial, x + w / 2, y + h * 0.3 + w * 0.15, 'rgba(237,233,254,0.9)', 'center')
   }
   ctx.restore()
 }
@@ -394,7 +398,9 @@ function rankedPoster(ctx: Ctx, t: TopTitle, rank: number, art: Artwork | undefi
   ctx.lineWidth = big ? 4 : 2
   ctx.stroke()
 
-  const pad = big ? 36 : 20
+  // Overlay sizes follow the tile's width; only a wide hero tile gets the large type.
+  const wide = big && w >= 400
+  const pad = wide ? 36 : big ? 26 : 20
   const tw = w - pad * 2
   if (big) {
     font(ctx, 18, 750)
@@ -406,26 +412,26 @@ function rankedPoster(ctx: Ctx, t: TopTitle, rank: number, art: Artwork | undefi
     ctx.letterSpacing = '0px'
   }
   let metaY = y + h - pad
-  font(ctx, big ? 20 : 16, 750)
-  ctx.letterSpacing = big ? '3px' : '2px'
-  if (big) text(ctx, fit(ctx, `${MEDIA[t.mediaType]} · ${countLabel(t)}`.toUpperCase(), tw), x + pad, metaY, ON_POSTER.fg2)
+  font(ctx, wide ? 20 : big ? 18 : 16, 750)
+  ctx.letterSpacing = wide ? '3px' : '2px'
+  if (wide) text(ctx, fit(ctx, `${MEDIA[t.mediaType]} · ${countLabel(t)}`.toUpperCase(), tw), x + pad, metaY, ON_POSTER.fg2)
   else {
     // Narrow tiles: the count on its own line, so it's never cut off.
     text(ctx, fit(ctx, countLabel(t).toUpperCase(), tw), x + pad, metaY, ON_POSTER.fg2)
-    metaY -= 24
-    text(ctx, `${MEDIA[t.mediaType].toUpperCase()} ·`, x + pad, metaY, ON_POSTER.ink[2])
+    metaY -= big ? 28 : 24
+    text(ctx, MEDIA[t.mediaType].toUpperCase(), x + pad, metaY, ON_POSTER.ink[2])
   }
   ctx.letterSpacing = '0px'
-  font(ctx, big ? 46 : 26, 800)
-  const lh = big ? 54 : 31
+  font(ctx, wide ? 46 : big ? 34 : 26, 800)
+  const lh = wide ? 54 : big ? 40 : 31
   const lines = wrap(ctx, t.title, tw, 2)
-  const lastY = metaY - (big ? 44 : 30)
+  const lastY = metaY - (wide ? 44 : big ? 36 : 30)
   lines.forEach((l, i) => text(ctx, l, x + pad, lastY - (lines.length - 1 - i) * lh, ON_POSTER.fg))
-  const rankSize = big ? 132 : 64
+  const rankSize = wide ? 132 : big ? 96 : 64
   font(ctx, rankSize, 850)
-  ctx.letterSpacing = big ? '-6px' : '-2px'
+  ctx.letterSpacing = wide ? '-6px' : big ? '-4px' : '-2px'
   const num = String(rank).padStart(2, '0')
-  const rankY = lastY - (lines.length - 1) * lh - (big ? 62 : 38)
+  const rankY = lastY - (lines.length - 1) * lh - (wide ? 62 : big ? 50 : 38)
   text(ctx, num, x + pad - (big ? 6 : 3), rankY, ink(ctx, x + pad, x + pad + ctx.measureText(num).width, ON_POSTER.ink))
   ctx.letterSpacing = '0px'
 }
@@ -450,15 +456,15 @@ function drawTop(ctx: Ctx, d: ShareData, art?: Artwork) {
     const ch = (gh - 20) / 2
     top.slice(1).forEach((t, i) => rankedPoster(ctx, t, i + 2, art, gx + (i % 2) * (cw + 20), y0 + Math.floor(i / 2) * (ch + 20), cw, ch, false))
   } else {
-    // A podium: number one raised in the middle.
+    // A podium: bottoms level, number one taller in the middle.
     const cw = (INNER - 48) / 3
-    const ch = 480
+    const bottom = y0 + 640
     const slots = [
-      [PAD + cw + 24, y0 + 16],
-      [PAD, y0 + 100],
-      [PAD + (cw + 24) * 2, y0 + 100],
+      [PAD + cw + 24, y0],
+      [PAD, y0 + 110],
+      [PAD + (cw + 24) * 2, y0 + 110],
     ]
-    top.forEach((t, i) => rankedPoster(ctx, t, i + 1, art, slots[i][0], slots[i][1], cw, ch, false))
+    top.forEach((t, i) => rankedPoster(ctx, t, i + 1, art, slots[i][0], slots[i][1], cw, bottom - slots[i][1], i === 0))
   }
   const eps = top.filter((t) => t.mediaType !== 'movie').reduce((s, t) => s + t.count, 0)
   const mv = top.filter((t) => t.mediaType === 'movie').reduce((s, t) => s + t.count, 0)
@@ -596,20 +602,21 @@ function drawPersonality(ctx: Ctx, d: ShareData) {
 
   // The number behind it.
   y += 24
-  const ph = 196
+  const ph = 170
   rect(ctx, PAD, y, INNER, ph, 32, C.panel, C.panelLine)
-  eyebrow(ctx, 'The proof', PAD + 40, y + 54, C.accent, INNER - 80, 20)
-  const vs = fitSize(ctx, main.stat.value, 850, 104, 56, 380)
+  eyebrow(ctx, 'The proof', PAD + 40, y + 48, C.accent, INNER - 80, 20)
+  fitSize(ctx, main.stat.value, 850, 96, 56, 380)
   ctx.letterSpacing = '-3px'
   const vw = ctx.measureText(main.stat.value).width
-  text(ctx, main.stat.value, PAD + 36, y + 80 + vs * 0.72, ink(ctx, PAD + 40, PAD + 40 + vw))
+  const vb = y + ph - 34
+  text(ctx, main.stat.value, PAD + 36, vb, ink(ctx, PAD + 40, PAD + 40 + vw))
   ctx.letterSpacing = '0px'
   const lx = PAD + 40 + vw + 32
   font(ctx, 30, 650)
   const lines = wrap(ctx, main.stat.label, W - PAD - 40 - lx, 2)
-  const ly = y + 80 + vs * 0.72 - (lines.length - 1) * 38 - 4
+  const ly = vb - (lines.length - 1) * 38 - 4
   lines.forEach((l, i) => text(ctx, l, lx, ly + i * 38, C.fg))
-  y += ph + 56
+  y += ph + 52
 
   // Other traits it also qualified for, as chips, while there's room.
   if (p.also.length && y + 70 <= CONTENT_END) {
@@ -626,6 +633,16 @@ function drawPersonality(ctx: Ctx, d: ShareData) {
       text(ctx, label, x + 52, y + 54, C.fg)
       x += w + 12
     }
+    y += 122
+  }
+
+  // When you watch, in whatever room is left: eyebrow, then bars, then letters 30px under them.
+  const r = d.review
+  const chartH = Math.min(90, CONTENT_END - 30 - (y + 18))
+  if (chartH >= 36) {
+    const fav = r.favouriteWeekday
+    eyebrow(ctx, fav ? `When I watch: ${WEEKDAYS[fav.weekday]}s lead` : 'When I watch', PAD, y, C.muted, INNER, 20)
+    bars(ctx, r.byWeekday, fav?.weekday ?? -1, ['M', 'T', 'W', 'T', 'F', 'S', 'S'], y + 18, chartH)
   }
 }
 
@@ -666,18 +683,18 @@ function drawHighlight(ctx: Ctx, d: ShareData, art?: Artwork) {
   badge(ctx, HIGHLIGHT_ICON[hero.id], x, y + 48, 64)
   eyebrow(ctx, hero.label, x + 84, y + 90, C.accent, tw - 84, 22)
 
-  const start = more.length ? 176 : 240
+  const start = more.length ? 160 : 240
   const vs = fitSize(ctx, hero.value, 850, start, 64, tw)
   ctx.letterSpacing = '-5px'
-  const vy = y + 140 + Math.round(vs * 0.76)
+  const vy = y + 120 + Math.round(vs * 0.76)
   text(ctx, hero.value, x - 6, vy, ink(ctx, x, x + ctx.measureText(hero.value).width))
   ctx.letterSpacing = '0px'
-  let ly = vy + 62
-  font(ctx, 40, 750)
+  let ly = vy + 56
+  font(ctx, 36, 750)
   const unit = wrap(ctx, hero.unit, tw, 2)
   for (const l of unit) {
     text(ctx, l, x, ly, C.fg)
-    ly += 50
+    ly += 44
   }
   ly += 4
   font(ctx, 26, 500)
