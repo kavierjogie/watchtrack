@@ -1,174 +1,109 @@
-import { CalendarHeart, CircleCheck, Clapperboard, Film, Flame, Library, Share2, Trophy } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { CalendarHeart, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { toast } from 'sonner'
-import { EmptyState, PageHeader, PosterGridSkeleton, Section, StatCard } from '../components/cards'
-import { Poster } from '../components/Poster'
+import { EmptyState } from '../components/cards'
+import { ShareCards } from '../components/review/ShareCards'
+import { Calendar, Compared, DataNotes, Intro, Journey, LookingBack, Moments, PersonalityCard, Top5 } from '../components/review/sections'
 import { listAllHistory } from '../lib/db'
-import { errMsg } from '../lib/format'
-import { formatDay, MONTHS, reviewYears, yearInReview } from '../lib/review'
+import { buildYearReview, indexHistory, reviewYears } from '../lib/review'
+import type { ShareData } from '../lib/reviewImage'
+import { lookingBack, reviewInsights, watchingPersonality } from '../lib/reviewStory'
 import type { HistoryEntry } from '../lib/types'
 import { useLibrary } from '../state/library'
 
-/** Your year in WatchTrack, worked out on this device from the watch history. Nothing about it leaves the device. */
+/**
+ * Your year in WatchTrack, as eight short chapters. Everything is worked out on this device from the watch history
+ * (lib/review.ts for the numbers, lib/reviewStory.ts for the words); this page only lays it out.
+ */
 export function YearReviewPage() {
   const lib = useLibrary()
   const [params, setParams] = useSearchParams()
   const [history, setHistory] = useState<HistoryEntry[] | null>(null)
-  const [sharing, setSharing] = useState(false)
-  const [thisYear] = useState(() => new Date().getFullYear())
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  // Fixed for the visit, so the numbers don't shift while you read (and "so far" means when you opened it).
+  const [now] = useState(() => Date.now())
 
   useEffect(() => {
     let live = true
     listAllHistory()
-      .then((h) => live && setHistory(h))
-      .catch(() => live && setHistory([]))
+      .then((h) => {
+        if (!live) return
+        setHistory(h)
+        setFailed(false)
+      })
+      .catch(() => live && setFailed(true))
     return () => {
       live = false
     }
-  }, [lib.historyVersion])
+  }, [lib.historyVersion, attempt])
 
-  const years = useMemo(() => (history ? reviewYears(history) : []), [history])
+  // One pass over the history per change; switching years reuses it.
+  const index = useMemo(() => (history ? indexHistory(lib.titles, history) : null), [lib.titles, history])
+  const years = useMemo(() => (index ? reviewYears(index) : []), [index])
   const asked = Number(params.get('year'))
-  const year = years.includes(asked) ? asked : (years[0] ?? thisYear)
-  const review = useMemo(() => (history ? yearInReview(lib.titles, history, year) : null), [lib.titles, history, year])
+  const year = years.includes(asked) ? asked : (years[0] ?? new Date(now).getFullYear())
+  const review = useMemo(() => (index ? buildYearReview(index, year, now) : null), [index, year, now])
+  const personality = useMemo(() => (review ? watchingPersonality(review) : null), [review])
+  const insights = useMemo(() => (review ? reviewInsights(review) : []), [review])
+  const share = useMemo<ShareData | null>(() => (review ? { review, personality, insights } : null), [review, personality, insights])
 
-  if (!review || lib.loading) return <PosterGridSkeleton />
+  const chooseYear = useCallback((y: number) => setParams(y === years[0] ? {} : { year: String(y) }, { replace: true }), [setParams, years])
 
-  const watched = review.episodes + review.movies
-  if (!watched)
+  if (failed)
     return (
-      <>
-        <PageHeader title="Year in review" />
-        <EmptyState
-          icon={CalendarHeart}
-          title="Nothing logged yet"
-          body="Mark episodes and movies watched, and your year in review fills in here. It's worked out on this device and never uploaded."
-          action={
-            <Link to="/" className="btn-primary">
-              Go to Home
-            </Link>
-          }
-        />
-      </>
-    )
-
-  async function share() {
-    setSharing(true)
-    try {
-      const { shareReviewImage } = await import('../lib/reviewImage')
-      await shareReviewImage(review!)
-    } catch (err) {
-      toast.error("Couldn't make the image", { description: errMsg(err) })
-    } finally {
-      setSharing(false)
-    }
-  }
-
-  const peak = Math.max(1, ...review.byMonth)
-  const streak = review.longestStreak
-  // One watch isn't a "biggest day".
-  const bigDay = review.biggestDay && review.biggestDay.count > 1 ? review.biggestDay : null
-  return (
-    <div className="space-y-8">
-      <PageHeader
-        title={`Your ${year} in review`}
-        subtitle="Worked out on this device from what you logged in WatchTrack. Nothing is uploaded."
+      <EmptyState
+        icon={CalendarHeart}
+        title="Couldn't open your history"
+        body="Your library is still saved. This browser didn't let WatchTrack read it just now."
         action={
-          <button type="button" className="btn-primary" onClick={() => void share()} disabled={sharing}>
-            <Share2 className="size-4" aria-hidden /> {sharing ? 'Making image…' : 'Share image'}
+          <button type="button" className="btn-primary" onClick={() => setAttempt((n) => n + 1)}>
+            <RefreshCw className="size-4" aria-hidden /> Try again
           </button>
         }
       />
+    )
 
-      {years.length > 1 && (
-        <nav aria-label="Year" className="flex flex-wrap gap-2">
-          {years.map((y) => (
-            <button
-              key={y}
-              type="button"
-              aria-pressed={y === year}
-              className={y === year ? 'btn-primary min-h-9 px-3' : 'btn-secondary min-h-9 px-3'}
-              onClick={() => setParams(y === years[0] ? {} : { year: String(y) }, { replace: true })}
-            >
-              {y}
-            </button>
+  if (!index || lib.loading)
+    return (
+      <div className="space-y-6" aria-busy aria-label="Loading your year">
+        <div className="skeleton h-64 rounded-3xl" />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="skeleton h-32 rounded-2xl" />
           ))}
-        </nav>
-      )}
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Episodes" value={review.episodes} icon={Clapperboard} />
-        <StatCard label="Movies" value={review.movies} icon={Film} tone="bg-info/15 text-info" />
-        <StatCard label="Titles" value={review.titles} icon={Library} tone="bg-warn/15 text-warn" />
-        <StatCard label="Completed" value={review.completed} icon={CircleCheck} tone="bg-success/15 text-success" />
-      </div>
-
-      <Section title="Month by month">
-        <div className="card p-4">
-          <ol className="flex h-40 items-end gap-1.5 sm:gap-3" aria-label="Watches per month">
-            {review.byMonth.map((n, i) => (
-              <li key={i} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1.5" aria-label={`${MONTHS[i]}: ${n}`}>
-                <span className="text-[11px] tabular-nums text-muted" aria-hidden>
-                  {n || ''}
-                </span>
-                <span
-                  aria-hidden
-                  className={`w-full rounded-md ${i === review.busiestMonth?.month ? 'bg-accent' : 'bg-accent-soft'}`}
-                  style={{ height: n ? `${Math.max(6, (n / peak) * 100)}%` : '3px' }}
-                />
-                <span className="text-xs text-muted" aria-hidden>
-                  {MONTHS[i][0]}
-                </span>
-              </li>
-            ))}
-          </ol>
         </div>
-      </Section>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Highlight icon={Flame} label="Longest streak" value={streak ? `${streak.days} day${streak.days === 1 ? '' : 's'}` : '—'} hint={streak && streak.days > 1 ? `${formatDay(streak.from)} – ${formatDay(streak.to)}` : undefined} />
-        <Highlight icon={CalendarHeart} label="Busiest month" value={review.busiestMonth ? MONTHS[review.busiestMonth.month] : '—'} hint={review.busiestMonth ? `${review.busiestMonth.count} watched` : undefined} />
-        <Highlight icon={Trophy} label="Biggest day" value={bigDay ? formatDay(bigDay.day) : '—'} hint={bigDay ? `${bigDay.count} watched` : 'No day with more than one'} />
+        <div className="skeleton h-72 rounded-2xl" />
       </div>
+    )
 
-      {review.top.length > 0 && (
-        <Section title="Most watched">
-          <ol className="card divide-y divide-line">
-            {review.top.map((t, i) => {
-              const title = lib.byId(t.titleId)
-              return (
-                <li key={t.titleId}>
-                  <Link to={`/title/${t.titleId}`} className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface-2">
-                    <span className="w-5 text-center text-sm font-semibold text-muted tabular-nums">{i + 1}</span>
-                    <Poster poster={title?.poster ?? null} source={title?.source ?? null} title={t.title} mediaType={t.mediaType} className="w-10 shrink-0 rounded-lg" />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{t.title}</span>
-                    <span className="text-sm text-muted tabular-nums">
-                      {t.count} {t.mediaType === 'movie' ? 'time' : 'episode'}
-                      {t.count === 1 ? '' : 's'}
-                    </span>
-                  </Link>
-                </li>
-              )
-            })}
-          </ol>
-        </Section>
-      )}
-    </div>
-  )
-}
+  if (!review || !share)
+    return (
+      <EmptyState
+        icon={CalendarHeart}
+        title="Nothing logged yet"
+        body="Mark episodes and movies watched, and your year in review fills in here: your top shows, streaks, busiest months and watching personality. It's worked out on this device and never uploaded."
+        action={
+          <Link to="/" className="btn-primary">
+            Go to Home
+          </Link>
+        }
+      />
+    )
 
-function Highlight({ icon: Icon, label, value, hint }: { icon: typeof Flame; label: string; value: string; hint?: string }) {
   return (
-    <div className="card flex items-start gap-3 p-4">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent-text">
-        <Icon className="size-4" aria-hidden />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-xs text-muted">{label}</span>
-        <span className="block truncate font-semibold">{value}</span>
-        {hint && <span className="block truncate text-xs text-muted">{hint}</span>}
-      </span>
+    <div className="mx-auto max-w-5xl space-y-14 pb-8 sm:space-y-20">
+      <Intro review={review} years={years} year={year} onYear={chooseYear} />
+      <Journey review={review} />
+      <Calendar review={review} />
+      <PersonalityCard review={review} personality={personality} />
+      <Moments review={review} />
+      <Top5 review={review} byId={lib.byId} />
+      <Compared review={review} />
+      <LookingBack summary={lookingBack(review, personality?.main ?? null)} insights={insights}>
+        <ShareCards data={share} />
+      </LookingBack>
+      <DataNotes review={review} undated={index.undated} duplicates={index.duplicates} />
     </div>
   )
 }
