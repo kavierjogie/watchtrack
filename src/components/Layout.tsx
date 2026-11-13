@@ -206,7 +206,7 @@ export function Layout() {
               type="button"
               onClick={openAdd}
               aria-label="Add title"
-              className="press flex size-12 items-center justify-center rounded-2xl bg-accent text-on-accent shadow-[0_8px_24px_-10px_var(--accent-strong)] hover:bg-accent-hover"
+              className="press flex size-12 items-center justify-center rounded-2xl bg-accent text-on-accent shadow-[0_8px_24px_-10px_var(--accent-glow)] hover:bg-accent-hover"
             >
               <Plus className="size-6" aria-hidden />
             </button>

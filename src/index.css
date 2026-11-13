@@ -3,33 +3,42 @@
 @custom-variant dark (&:where(.dark, .dark *));
 @custom-variant reduce-transparency (@media (prefers-reduced-transparency: reduce));
 
+/*
+ * Light: "lavender mist", the daylight twin of the midnight theme. No pure white or black anywhere.
+ * Depth runs recessed → raised: bg-2 (sidebar, inputs) < bg (canvas) < surface (cards) < overlay (modals, menus).
+ * Shadows are indigo-tinted rather than grey so they read as part of the palette. Status colours are darkened to
+ * keep 4.5:1 on the tinted backgrounds, not just on white.
+ */
 :root {
-  --bg: #f7f6fb;
-  --bg-2: #f1eff8;
-  --surface: #ffffff;
-  --surface-2: #f1eefa;
-  --overlay: #ffffff;
-  --border: #e4e1ee;
-  --divider: #ece9f3;
-  --border-strong: #c9bbf2;
-  --text: #17141f;
-  --text-2: #3f3a4d;
-  --muted: #625d73;
-  --faint: #a29db3;
+  --bg: #f4f3f9;
+  --bg-2: #ecebf4;
+  --surface: #fbfbfe;
+  --surface-2: #f0eef8;
+  --overlay: #fdfcff;
+  --border: #e2dfec;
+  --divider: #e8e5f0;
+  --border-strong: #c3b4ee;
+  --text: #1c1929;
+  --text-2: #403b52;
+  --muted: #615c74;
+  --faint: #9c97ae;
   --accent: #7c3aed;
   --accent-hover: #6d28d9;
   --accent-strong: #6d28d9;
-  --accent-soft: #f1ebff;
-  --accent-line: #d9c9fb;
+  --accent-soft: #e8e0fc;
+  --accent-line: #d5c6f9;
   --accent-text: #6d28d9;
-  --on-accent: #ffffff;
-  --danger: #dc2626;
+  --on-accent: #fdfcff;
+  --danger: #c42121;
   --success: #047857;
-  --warn: #b45309;
-  --info: #2563eb;
-  --shadow-card: 0 1px 2px rgb(23 20 31 / 0.05), 0 4px 16px -6px rgb(23 20 31 / 0.08);
-  --shadow-pop: 0 12px 40px -12px rgb(23 20 31 / 0.28);
-  --glow: rgb(124 58 237 / 0.08);
+  --warn: #a34b08;
+  --info: #1f56d6;
+  --shadow-card: 0 1px 2px rgb(44 32 96 / 0.04), 0 4px 14px -6px rgb(44 32 96 / 0.08);
+  --shadow-pop: 0 1px 3px rgb(44 32 96 / 0.06), 0 18px 48px -14px rgb(44 32 96 / 0.24);
+  --glow: rgb(124 58 237 / 0.07);
+  /* Coloured shadow under filled accent buttons: softer than the solid brand colour on a light page. */
+  --accent-glow: rgb(109 40 217 / 0.45);
+  --backdrop: rgb(28 22 52 / 0.32);
 }
 
 /*
@@ -63,6 +72,8 @@
   --shadow-card: 0 1px 0 rgb(255 255 255 / 0.025) inset, 0 8px 24px -12px rgb(0 0 0 / 0.7);
   --shadow-pop: 0 24px 60px -16px rgb(0 0 0 / 0.8), 0 0 0 1px rgb(255 255 255 / 0.02);
   --glow: rgb(139 92 246 / 0.11);
+  --accent-glow: #7c3aed;
+  --backdrop: rgb(5 5 10 / 0.7);
 }
 
 @theme inline {
@@ -128,7 +139,7 @@ body {
   @apply press inline-flex min-h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50;
 }
 @utility btn-primary {
-  @apply btn bg-accent font-semibold text-on-accent shadow-[0_8px_20px_-12px_var(--accent-strong)] hover:bg-accent-hover disabled:bg-surface-2 disabled:text-faint disabled:opacity-100 disabled:shadow-none;
+  @apply btn bg-accent font-semibold text-on-accent shadow-[0_8px_20px_-12px_var(--accent-glow)] hover:bg-accent-hover disabled:bg-surface-2 disabled:text-faint disabled:opacity-100 disabled:shadow-none;
 }
 @utility btn-secondary {
   @apply btn border border-line bg-surface text-fg hover:border-line-strong/60 hover:bg-surface-2;
@@ -223,7 +234,7 @@ body {
 
 /* Modal backdrop fades in (@starting-style) and out (data-closing while the panel's exit animation runs). */
 dialog::backdrop {
-  background: rgb(5 5 10 / 0.7);
+  background: var(--backdrop);
   transition: background-color 200ms ease-out;
 }
 @starting-style {

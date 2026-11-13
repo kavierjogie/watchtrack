@@ -91,7 +91,7 @@ export function Poster({
   const waiting = local === undefined || recover || (!!url && loaded !== url)
 
   return (
-    <div className={`relative aspect-[2/3] overflow-hidden rounded-xl bg-surface-2 ring-1 ring-inset ring-white/5 ${waiting ? 'animate-pulse' : ''} ${className}`}>
+    <div className={`relative aspect-[2/3] overflow-hidden rounded-xl bg-surface-2 ring-1 ring-inset ring-fg/5 ${waiting ? 'animate-pulse' : ''} ${className}`}>
       {url ? (
         <img
           key={url}
