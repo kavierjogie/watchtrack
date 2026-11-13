@@ -73,8 +73,9 @@ const DISMISSED_WEIGHT = -0.5
  *  - format:     share of your library in this format (anime / TV series / movie)
  *  - era:        release year within ~5 years of what you usually watch, fading to 0 by 20 years
  *  - popularity: provider popularity 0–1
+ *  - fresh:      released this year or last, fading to 0 by five years old — so new titles edge out old ones
  */
-const W = { related: 3, genre: 3, similar: 2.5, quality: 1, format: 0.5, era: 0.5, popularity: 0.5 }
+const W = { related: 3, genre: 3, similar: 2.5, quality: 1, format: 0.5, era: 0.5, popularity: 0.5, fresh: 0.5 }
 
 /** Every threshold the rules use. */
 const TUNE = {
@@ -106,7 +107,7 @@ const TUNE = {
  * The highest score the factors can realistically add up to: a candidate gets either a relationship or genre
  * similarity as its main personal link, rarely both at full strength. Match % = score / this.
  */
-const MAX_SCORE = Math.max(W.related, W.similar) + W.genre + W.quality + W.format + W.era + W.popularity
+const MAX_SCORE = Math.max(W.related, W.similar) + W.genre + W.quality + W.format + W.era + W.popularity + W.fresh
 
 /** How strongly a relationship role suggests "watch this next". Roles not listed (summaries, cameos, ads) are ignored. */
 export const ROLE_STRENGTH: Record<string, number> = {
@@ -215,6 +216,8 @@ export interface Profile {
   era: number | null
   /** Positively weighted titles, strongest first. */
   seeds: Seed[]
+  /** The current year, for the fresh factor. */
+  year: number
 }
 
 const seedOf = (t: Title, weight = titleWeight(t)): Seed => ({
@@ -230,7 +233,7 @@ const seedOf = (t: Title, weight = titleWeight(t)): Seed => ({
   liked: false,
 })
 
-export function buildProfile(library: Title[], feedback: Feedback): Profile {
+export function buildProfile(library: Title[], feedback: Feedback, now = Date.now()): Profile {
   const raw = new Map<string, number>()
   const labels = new Map<string, string>()
   const genreTypes = new Map<string, Set<MediaType>>()
@@ -264,7 +267,7 @@ export function buildProfile(library: Title[], feedback: Feedback): Profile {
   const formatTotal = [...formatRaw.values()].reduce((a, b) => a + b, 0)
   const formats = new Map([...formatRaw].map(([t, v]) => [t, v / formatTotal]))
   seeds.sort((a, b) => b.weight - a.weight)
-  return { genres, labels, genreTypes, formats, era: weightedMedianYear(seeds), seeds }
+  return { genres, labels, genreTypes, formats, era: weightedMedianYear(seeds), seeds, year: new Date(now).getFullYear() }
 }
 
 function weightedMedianYear(seeds: Seed[]): number | null {
@@ -430,6 +433,7 @@ export function scoreCandidate(c: Candidate, profile: Profile, links: Link[]): O
   const popularity = c.popularity ?? 0
   const format = profile.formats.get(c.mediaType) ?? 0
   const era = profile.era == null || c.year == null ? 0 : clamp01(1 - (Math.abs(c.year - profile.era) - TUNE.eraNear) / (TUNE.eraFar - TUNE.eraNear))
+  const fresh = c.year == null ? 0 : clamp01(1 - (profile.year - c.year - 1) / 4)
   const parts = {
     related: W.related * related.v,
     genre: W.genre * genreMatch,
@@ -438,6 +442,7 @@ export function scoreCandidate(c: Candidate, profile: Profile, links: Link[]): O
     format: W.format * format,
     era: W.era * era,
     popularity: W.popularity * popularity,
+    fresh: W.fresh * fresh,
   }
   const score = Object.values(parts).reduce((a, b) => a + b, 0)
 
@@ -453,6 +458,7 @@ export function scoreCandidate(c: Candidate, profile: Profile, links: Link[]): O
   if (c.communityScore != null) add(parts.quality, `Rated ${(c.communityScore / 10).toFixed(1)}/10 on ${provider}`)
   add(parts.format, `${FORMAT_LABEL[c.mediaType]}, ${Math.round(format * 100)}% of what you watch`)
   if (profile.era != null && c.year != null) add(parts.era, `From ${c.year}, near the years you usually watch (around ${profile.era})`)
+  if (c.year != null) add(parts.fresh, `Recent release (${c.year})`)
   add(parts.popularity, popularity >= 0.6 ? `Widely watched on ${provider}` : `Some following on ${provider}`)
   factors.sort((a, b) => b.points - a.points)
 
@@ -560,6 +566,8 @@ export interface DiscoverOptions {
   keep?: Set<string>
   /** Refresh count: reshuffles exact ties so "another set" can differ even from the same pool. */
   round?: number
+  /** Shown before a recent refresh: offered only after everything not yet shown, so refreshing brings new titles. */
+  seen?: Set<string>
 }
 
 export interface DiscoverSection {
@@ -586,7 +594,8 @@ export function buildDiscover(pool: Candidate[], links: Link[], library: Title[]
   )
 
   // Ordinary sections skip tracked titles, except ones added during this visit so their card can show the new state.
-  const open = all.filter((r) => !r.tracked || opts.keep?.has(r.key))
+  const visible = all.filter((r) => !r.tracked || opts.keep?.has(r.key))
+  const open = opts.seen?.size ? [...visible.filter((r) => !opts.seen!.has(r.key)), ...visible.filter((r) => opts.seen!.has(r.key))] : visible
   const used = new Set<string>()
   const take = (list: Rec[], n: number, ok: (r: Rec) => boolean = () => true) => {
     const out: Rec[] = []

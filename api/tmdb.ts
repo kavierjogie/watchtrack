@@ -34,7 +34,8 @@ function route(raw: string): { url: string; cache: { fresh: number; stale: numbe
     if (!Number.isInteger(page) || page < 1 || page > MAX_PAGE || !MOVIE_GENRES.has(genre)) return null
     return { url: `discover/movie?sort_by=vote_count.desc&with_genres=${genre}&page=${page}`, cache: LONG }
   }
-  if (path === 'trending/movie/week') return { url: path, cache: SHORT }
+  // Discover's Trending and New & Upcoming rows (loadHighlights in src/lib/discover.ts). No query: one spelling each.
+  if (['trending/movie/week', 'trending/tv/week', 'movie/upcoming', 'movie/now_playing'].includes(path) && q < 0) return { url: path, cache: SHORT }
   // One episode's summary, for the "previously on" recap (src/lib/recap.ts). No query, so one spelling per episode.
   if (/^tv\/[1-9]\d{0,9}\/season\/(0|[1-9]\d{0,3})\/episode\/[1-9]\d{0,4}$/.test(path) && q < 0) return { url: path, cache: LONG }
   const m = /^(movie|tv)\/[1-9]\d{0,9}(\/recommendations)?$/.exec(path)

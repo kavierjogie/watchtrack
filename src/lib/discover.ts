@@ -11,7 +11,8 @@
  */
 import { useSyncExternalStore } from 'react'
 import { isObj, normTitle } from './backup'
-import { enrich, kitsuToResult, mazeToResult, NUMERIC_ID, request, searchTitles, tmdb, tmdbToResult, type KitsuAnime, type MazeShow, type Provider, type TmdbItem } from './metadata'
+import { dayFrom } from './format'
+import { enrich, kitsuToResult, mazeToResult, MetadataError, NUMERIC_ID, request, searchTitles, tmdb, tmdbToResult, type KitsuAnime, type MazeShow, type Provider, type TmdbItem } from './metadata'
 import { savePoster } from './posters'
 import { emptyProgress } from './progress'
 import { buildProfile, candidateKey, emptyFeedback, ROLE_STRENGTH, tasteGenres, titleWeight, type Candidate, type Feedback, type FeedbackItem, type Link, type SortKey } from './recommend'
@@ -164,19 +165,67 @@ async function kitsuRelated(id: string): Promise<{ role: string; c: Candidate }[
 
 // ---------- TVmaze ----------
 
+const mazeCandidate = (s: MazeShow): Candidate => ({
+  ...mazeToResult(s),
+  communityScore: s.rating?.average ? s.rating.average * 10 : null,
+  // TVmaze weights bunch up near the top of 0–100: 60 → 0.2, 80 → 0.6, 100 → 1.
+  popularity: clamp01(((s.weight ?? 0) - 50) / 50),
+})
+
+/** TVmaze allows about 20 requests per 10 s per IP: space this app's own requests so a first visit doesn't hit it. */
+const MAZE_GAP_MS = 450
+let mazeNext = 0
+async function mazeRequest<T>(url: string): Promise<T> {
+  const now = Date.now()
+  const at = Math.max(now, mazeNext)
+  mazeNext = at + MAZE_GAP_MS
+  if (at > now) await new Promise((r) => setTimeout(r, at - now))
+  return request<T>(url, {}, 'tvmaze')
+}
+
 /** One page of TVmaze's show index, trimmed to well-known scripted/animated shows with artwork. */
 async function mazePage(n: number): Promise<Candidate[]> {
-  const shows = await request<MazeShow[]>(`https://api.tvmaze.com/shows?page=${n}`, {}, 'tvmaze')
+  const shows = await mazeRequest<MazeShow[]>(`https://api.tvmaze.com/shows?page=${n}`)
   return shows
     .filter((s) => (s.type === 'Scripted' || s.type === 'Animation') && s.genres?.length && (s.weight ?? 0) >= 60 && s.image)
     .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))
     .slice(0, 120)
-    .map((s) => ({
-      ...mazeToResult(s),
-      communityScore: s.rating?.average ? s.rating.average * 10 : null,
-      // TVmaze weights bunch up near the top of 0–100: 60 → 0.2, 80 → 0.6, 100 → 1.
-      popularity: clamp01(((s.weight ?? 0) - 50) / 50),
-    }))
+    .map(mazeCandidate)
+}
+
+/** A title on a release list, with the date that put it there (premiere, season premiere or first release). */
+export interface Spot {
+  c: Candidate
+  date: string | null
+  /** Season the date belongs to, when the provider numbers it (TVmaze premieres). */
+  season: number | null
+}
+
+interface MazeEntry {
+  season: number
+  number: number | null
+  airdate: string
+  show?: MazeShow
+  _embedded?: { show?: MazeShow }
+}
+
+/**
+ * One day of TVmaze's schedule (`web` = streaming services worldwide, else US networks), cut down to what Discover
+ * shows: well-followed scripted/animated shows that air that day, and the ones whose episode 1 (a series or season
+ * premiere) airs that day. Only this small summary is cached, not the ~200 KB day.
+ */
+async function mazeDay(kind: 'web' | 'us', date: string): Promise<{ premieres: Spot[]; airing: Spot[] }> {
+  const rows = await mazeRequest<MazeEntry[]>(kind === 'web' ? `https://api.tvmaze.com/schedule/web?date=${date}` : `https://api.tvmaze.com/schedule?country=US&date=${date}`)
+  const premieres: Spot[] = []
+  const airing = new Map<number, Spot>()
+  for (const e of rows) {
+    const s = e.show ?? e._embedded?.show
+    if (!s || !s.image || (s.type !== 'Scripted' && s.type !== 'Animation')) continue
+    const w = s.weight ?? 0
+    if (e.number === 1 && w >= 70) premieres.push({ c: mazeCandidate(s), date: e.airdate || date, season: e.season ?? null })
+    if (w >= 85 && s.genres?.length && !airing.has(s.id)) airing.set(s.id, { c: mazeCandidate(s), date: e.airdate || date, season: e.season ?? null })
+  }
+  return { premieres, airing: [...airing.values()] }
 }
 
 // ---------- TMDB (via the /api/tmdb proxy) ----------
@@ -201,9 +250,23 @@ function tmdbCandidate(r: TmdbItem, kind: 'movie' | 'tv'): Candidate {
   }
 }
 
+/**
+ * TMDB is optional: without a server key the proxy answers 503 (`vite dev` has no API routes at all). Once a list
+ * request fails, TMDB is skipped for the rest of the visit and its absence isn't reported as an error.
+ */
+let tmdbOff = false
+
 async function tmdbList(path: string, kind: 'movie' | 'tv'): Promise<Candidate[]> {
-  const data = await tmdb<{ results: TmdbItem[] }>(path)
-  return data.results.filter((r) => !r.media_type || r.media_type === kind).map((r) => tmdbCandidate(r, kind))
+  if (tmdbOff) throw new MetadataError('TMDB is not set up on this server.')
+  try {
+    const data = await tmdb<{ results: TmdbItem[] }>(path)
+    return data.results.filter((r) => !r.media_type || r.media_type === kind).map((r) => tmdbCandidate(r, kind))
+  } catch (err) {
+    // A list request failing means TMDB as a whole is unavailable (no key, no API route, or down): rows fall back to
+    // Kitsu/TVmaze. One title's recommendations failing says nothing about the rest.
+    if (!/\/\d+\//.test(path)) tmdbOff = true
+    throw err
+  }
 }
 
 // ---------- Requests, shared by Discover and "Similar titles" (same cache keys, so one never refetches the other's) ----------
@@ -308,6 +371,12 @@ interface Task<T = { cands: Candidate[]; links?: Link[] }> {
   run: () => Promise<T>
 }
 
+/** Records one readable failure per provider. TMDB missing its server key isn't a failure: it's optional. */
+const failureList = (failed: PoolState['failed']) => (provider: Provider, err: unknown) => {
+  if (provider === 'tmdb' && tmdbOff) return
+  if (!failed.some((f) => f.provider === provider)) failed.push({ provider, message: err instanceof Error ? err.message : 'Request failed.' })
+}
+
 /** Concurrent requests per provider and batch — Kitsu sits behind Cloudflare, which challenges bursts. */
 const CONCURRENCY: Record<Provider, number> = { kitsu: 2, tvmaze: 2, tmdb: 3, anilist: 1 }
 
@@ -347,9 +416,7 @@ export async function loadPool(library: Title[], feedback: Feedback, round: numb
   let inferred: Inferred = {}
   let pending = 0
   const report = () => onUpdate({ pool: results.flatMap((r) => r.cands), links: results.flatMap((r) => r.links ?? []), inferred, pending, failed: [...failed] })
-  const onError = (provider: Provider, err: unknown) => {
-    if (!failed.some((f) => f.provider === provider)) failed.push({ provider, message: err instanceof Error ? err.message : 'Request failed.' })
-  }
+  const onError = failureList(failed)
   // Results keep task order, so when two providers return the same title the richer source (listed first) wins.
   const run = (tasks: Task[]) => {
     const base = results.length
@@ -422,14 +489,112 @@ export async function loadSimilar(t: Title): Promise<Omit<PoolState, 'pending'>>
   const failed: PoolState['failed'] = []
   await runQueued(
     tasks,
-    (provider, err) => {
-      if (!failed.some((f) => f.provider === provider)) failed.push({ provider, message: err instanceof Error ? err.message : 'Request failed.' })
-    },
+    failureList(failed),
     (i, value) => {
       if (value) results[i] = value
     },
   )
   return { pool: results.flatMap((r) => r.cands), links: results.flatMap((r) => r.links ?? []), inferred, failed }
+}
+
+// ---------- Highlights: what's popular now, new and coming soon ----------
+
+/**
+ * Raw lists for Discover's Trending and New & Upcoming rows; highlights.ts turns them into rows. Each list is only
+ * what its provider can actually vouch for:
+ *  - Kitsu: this season's anime by Kitsu popularity rank, and anime marked upcoming. (Kitsu's /trending endpoint
+ *    returns all-time favourites like Death Note, so it isn't used.)
+ *  - TVmaze: daily schedules — shows airing (by TVmaze follower weight) and series/season premieres (episode 1s).
+ *  - TMDB, when the server has a key: weekly trending series and movies, movies upcoming and now in cinemas.
+ */
+export interface Highlights {
+  season: Spot[]
+  upcomingAnime: Spot[]
+  premieres: Spot[]
+  /** Shows that aired in the last week. */
+  airing: Spot[]
+  /** null while loading, or when TMDB isn't available. */
+  tmdbTv: Spot[] | null
+  tmdbMovies: Spot[] | null
+  tmdbUpcoming: Spot[] | null
+  tmdbNowPlaying: Spot[] | null
+  pending: number
+  failed: PoolState['failed']
+  tmdbOff: boolean
+}
+
+/** Kitsu's seasons: winter = Jan–Mar, spring = Apr–Jun, summer = Jul–Sep, fall = Oct–Dec. */
+export function animeSeason(now = Date.now()): { season: string; year: number } {
+  const d = new Date(now)
+  return { season: ['winter', 'spring', 'summer', 'fall'][Math.floor(d.getMonth() / 3)], year: d.getFullYear() }
+}
+
+/** Schedule days fetched: the last week (just premiered) and the next week (premiering soon). */
+const PAST_DAYS = 6
+const NEXT_DAYS = 7
+
+const spotsOf = (cands: Candidate[]): Spot[] => cands.map((c) => ({ c, date: c.date, season: null }))
+
+/** Loads every highlight list, reporting as each lands. Never throws. */
+export async function loadHighlights(onUpdate: (h: Highlights) => void, now = Date.now()): Promise<void> {
+  const { season, year } = animeSeason(now)
+  const h: Highlights = { season: [], upcomingAnime: [], premieres: [], airing: [], tmdbTv: null, tmdbMovies: null, tmdbUpcoming: null, tmdbNowPlaying: null, pending: 0, failed: [], tmdbOff }
+  const seasonPages: Candidate[][] = [[], []]
+  const days = new Map<string, { premieres: Spot[]; airing: Spot[] }>()
+  const today = dayFrom(now)
+  const report = () => {
+    h.season = spotsOf(seasonPages.flat())
+    const all = [...days.entries()].sort(([a], [b]) => a.localeCompare(b))
+    h.premieres = all.flatMap(([, d]) => d.premieres)
+    // The most-followed shows on air this past week, each once.
+    const airing = new Map<string, Spot>()
+    for (const [k, d] of all) if (k.slice(k.indexOf(':') + 1) <= today) for (const s of d.airing) if (!airing.has(s.c.source.id)) airing.set(s.c.source.id, s)
+    h.airing = [...airing.values()].sort((a, b) => (b.c.popularity ?? 0) - (a.c.popularity ?? 0))
+    h.tmdbOff = tmdbOff
+    onUpdate({ ...h, failed: [...h.failed] })
+  }
+  const kitsu = (key: string, query: string, ttl = 12 * HOUR) => cached(`kitsu2:${key}`, ttl, () => kitsuList(query))
+  const tmdbTask = (field: 'tmdbTv' | 'tmdbMovies' | 'tmdbUpcoming' | 'tmdbNowPlaying', path: string, kind: 'movie' | 'tv'): Task<void> => ({
+    provider: 'tmdb',
+    run: async () => {
+      h[field] = spotsOf(await cached(path === 'trending/movie/week' ? 'tmdb:trending:movie' : `tmdb:${path}`, 12 * HOUR, () => tmdbList(path, kind)))
+    },
+  })
+  // Today first, then outwards, so the rows people look at first fill first.
+  const offsets = [0, ...Array.from({ length: Math.max(PAST_DAYS, NEXT_DAYS) }, (_, i) => [i + 1, -(i + 1)]).flat()].filter((o) => o >= -PAST_DAYS && o <= NEXT_DAYS)
+  const tasks: Task<void>[] = [
+    ...[0, 1].map(
+      (page): Task<void> => ({
+        provider: 'kitsu',
+        run: async () => {
+          seasonPages[page] = await kitsu(`season:${season}:${year}:${page}`, `filter[season]=${season}&filter[seasonYear]=${year}&sort=popularityRank&page[offset]=${page * 20}`)
+        },
+      }),
+    ),
+    {
+      provider: 'kitsu',
+      run: async () => {
+        h.upcomingAnime = spotsOf(await kitsu('upcoming', 'filter[status]=upcoming&sort=popularityRank'))
+      },
+    },
+    tmdbTask('tmdbTv', 'trending/tv/week', 'tv'),
+    tmdbTask('tmdbMovies', 'trending/movie/week', 'movie'),
+    tmdbTask('tmdbNowPlaying', 'movie/now_playing', 'movie'),
+    tmdbTask('tmdbUpcoming', 'movie/upcoming', 'movie'),
+    ...offsets.flatMap((o) =>
+      (['web', 'us'] as const).map((kind): Task<void> => {
+        const date = dayFrom(now, o)
+        // A past day's schedule doesn't change; today's and later ones gain shows as they're announced.
+        return { provider: 'tvmaze', run: async () => void days.set(`${kind}:${date}`, await cached(`tvmaze:day:${kind}:${date}`, o < 0 ? 7 * 24 * HOUR : 12 * HOUR, () => mazeDay(kind, date))) }
+      }),
+    ),
+  ]
+  h.pending = tasks.length
+  report()
+  await runQueued(tasks, failureList(h.failed), () => {
+    h.pending--
+    report()
+  })
 }
 
 // ---------- Saving a recommendation ----------
@@ -486,12 +651,16 @@ export interface DiscoverFilters {
 export interface DiscoverStore {
   feedback: Feedback
   filters: DiscoverFilters
+  /** Candidate key → when it was on screen as a top pick before a refresh (see markSeen). */
+  seen: Record<string, string>
 }
 
 const STORE_KEY = 'watchtrack:discover'
 const DEFAULT_FILTERS: DiscoverFilters = { type: 'all', genre: '', sort: 'match' }
 const MAX_DISMISSED = 1000
 const MAX_LIKED = 30
+const MAX_SEEN = 300
+const SEEN_FOR = 7 * 24 * HOUR
 
 let store: DiscoverStore | null = null
 const listeners = new Set<() => void>()
@@ -514,9 +683,10 @@ export function getDiscover(): DiscoverStore {
     store = {
       feedback: { dismissed: cleanItems(fb.dismissed), liked: cleanItems(fb.liked) },
       filters: { ...DEFAULT_FILTERS, ...(isObj(raw.filters) ? (raw.filters as Partial<DiscoverFilters>) : {}) },
+      seen: isObj(raw.seen) ? (Object.fromEntries(Object.entries(raw.seen).filter(([, at]) => typeof at === 'string')) as Record<string, string>) : {},
     }
   } catch {
-    store = { feedback: emptyFeedback(), filters: DEFAULT_FILTERS }
+    store = { feedback: emptyFeedback(), filters: DEFAULT_FILTERS, seen: {} }
   }
   return store
 }
@@ -554,31 +724,45 @@ export function setFilters(patch: Partial<DiscoverFilters>) {
 }
 
 export function dismiss(c: Candidate) {
-  const { feedback, filters } = getDiscover()
+  const { feedback, filters, seen } = getDiscover()
   const { [candidateKey(c)]: _, ...liked } = feedback.liked
-  setDiscover({ filters, feedback: { liked, dismissed: capped({ ...feedback.dismissed, [candidateKey(c)]: itemOf(c) }, MAX_DISMISSED) } })
+  setDiscover({ filters, seen, feedback: { liked, dismissed: capped({ ...feedback.dismissed, [candidateKey(c)]: itemOf(c) }, MAX_DISMISSED) } })
 }
 
 export function undismiss(key: string) {
-  const { feedback, filters } = getDiscover()
+  const { feedback, filters, seen } = getDiscover()
   const { [key]: _, ...dismissed } = feedback.dismissed
-  setDiscover({ filters, feedback: { ...feedback, dismissed } })
+  setDiscover({ filters, seen, feedback: { ...feedback, dismissed } })
 }
 
 export function restoreDismissed() {
-  const { feedback, filters } = getDiscover()
-  setDiscover({ filters, feedback: { ...feedback, dismissed: {} } })
+  const { feedback, filters, seen } = getDiscover()
+  setDiscover({ filters, seen, feedback: { ...feedback, dismissed: {} } })
 }
 
 /** "More like this" for a title that isn't in the library: remembered as a liked title. Returns its seed id. */
 export function likeCandidate(c: Candidate): string {
-  const { feedback, filters } = getDiscover()
+  const { feedback, filters, seen } = getDiscover()
   const key = candidateKey(c)
-  setDiscover({ filters, feedback: { ...feedback, liked: capped({ ...feedback.liked, [key]: itemOf(c) }, MAX_LIKED) } })
+  setDiscover({ filters, seen, feedback: { ...feedback, liked: capped({ ...feedback.liked, [key]: itemOf(c) }, MAX_LIKED) } })
   return `liked:${key}`
 }
 
+/**
+ * Remember the picks on screen when the user asks for another set, so the next set leads with titles they haven't
+ * been shown (buildDiscover's `seen`). Forgotten after a week, so a good match isn't buried for ever.
+ */
+export function markSeen(keys: string[], now = Date.now()) {
+  const s = getDiscover()
+  const at = new Date(now).toISOString()
+  const fresh = Object.entries(s.seen).filter(([, t]) => now - Date.parse(t) < SEEN_FOR)
+  setDiscover({ ...s, seen: Object.fromEntries([...fresh, ...keys.map((k) => [k, at] as const)].sort((a, b) => b[1].localeCompare(a[1])).slice(0, MAX_SEEN)) })
+}
+
+/** Keys from markSeen still within their week. */
+export const seenKeys = (seen: Record<string, string>, now = Date.now()) => new Set(Object.entries(seen).flatMap(([k, t]) => (now - Date.parse(t) < SEEN_FOR ? [k] : [])))
+
 export function resetDiscover() {
-  setDiscover({ feedback: emptyFeedback(), filters: DEFAULT_FILTERS })
+  setDiscover({ feedback: emptyFeedback(), filters: DEFAULT_FILTERS, seen: {} })
   clearMetaCache()
 }

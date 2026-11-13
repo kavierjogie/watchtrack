@@ -154,7 +154,8 @@ describe('loadPool', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
     const s = await run([])
     expect(s.pool).toEqual([])
-    expect(s.failed.map((f) => f.provider).sort()).toEqual(['kitsu', 'tmdb', 'tvmaze'])
+    // TMDB is optional: when it can't be reached the rows fall back quietly instead of reporting an error.
+    expect(s.failed.map((f) => f.provider).sort()).toEqual(['kitsu', 'tvmaze'])
   })
 
   it("doesn't refetch what it already has", async () => {

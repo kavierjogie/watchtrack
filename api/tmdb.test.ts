@@ -21,7 +21,7 @@ describe('tmdb', () => {
     vi.unstubAllGlobals()
   })
 
-  it.each([SEARCH, 'discover/movie?sort_by=vote_count.desc&with_genres=12&page=2', 'movie/123', 'tv/5', 'tv/5/recommendations', 'movie/5/recommendations', 'trending/movie/week', 'tv/5/season/2/episode/11'])(
+  it.each([SEARCH, 'discover/movie?sort_by=vote_count.desc&with_genres=12&page=2', 'movie/123', 'tv/5', 'tv/5/recommendations', 'movie/5/recommendations', 'trending/movie/week', 'trending/tv/week', 'movie/upcoming', 'movie/now_playing', 'tv/5/season/2/episode/11'])(
     'forwards what the app sends: %s',
     async (path) => {
       expect((await call(path)).status).toBe(200)
