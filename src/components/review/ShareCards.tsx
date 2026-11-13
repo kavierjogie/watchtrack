@@ -233,7 +233,7 @@ export function ShareStudio({ data, titles, onClose }: { data: ShareData; titles
             id="share-preview"
             role="tabpanel"
             aria-labelledby={`share-tab-${variant}`}
-            className={`mx-auto aspect-[4/5] w-full max-w-[min(100%,27rem,calc((92dvh-19rem)*0.8))] overflow-hidden rounded-2xl border border-line shadow-pop ${theme === 'daylight' ? 'bg-[#efeafc]' : 'bg-[#0b0922]'}`}
+            className={`mx-auto aspect-[4/5] w-full max-w-[min(100%,27rem,calc((92dvh-19rem)*0.8))] overflow-hidden rounded-2xl border border-line shadow-pop ${theme === 'daylight' ? 'bg-[#f4efe9]' : 'bg-[#17130f]'}`}
           >
             {card ? (
               <img key={card.url} src={card.url} alt={`Preview of ${label}, the 1080 × 1350 share card`} className="review-fade size-full object-cover" />

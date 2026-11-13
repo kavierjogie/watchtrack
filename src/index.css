@@ -4,76 +4,77 @@
 @custom-variant reduce-transparency (@media (prefers-reduced-transparency: reduce));
 
 /*
- * Light: "lavender mist", the daylight twin of the midnight theme. No pure white or black anywhere.
+ * Espresso & Mint. Light: "oat milk", the daylight twin of the espresso theme. No pure white or black anywhere.
  * Depth runs recessed → raised: bg-2 (sidebar, inputs) < bg (canvas) < surface (cards) < overlay (modals, menus).
- * Shadows are indigo-tinted rather than grey so they read as part of the palette. Status colours are darkened to
- * keep 4.5:1 on the tinted backgrounds, not just on white.
+ * Shadows are tinted with the brown text colour rather than grey so they read as part of the palette. Status colours
+ * are darkened to keep 4.5:1 on the warm backgrounds, and kept off mint/honey so they never read as the brand.
+ * Values come from the Theme Studio (src/theme-studio/themes.ts), whose test checks every text pair against WCAG AA.
  */
 :root {
-  --bg: #f4f3f9;
-  --bg-2: #ecebf4;
-  --surface: #fbfbfe;
-  --surface-2: #f0eef8;
-  --overlay: #fdfcff;
-  --border: #e2dfec;
-  --divider: #e8e5f0;
-  --border-strong: #c3b4ee;
-  --text: #1c1929;
-  --text-2: #403b52;
-  --muted: #615c74;
-  --faint: #9c97ae;
-  --accent: #7c3aed;
-  --accent-hover: #6d28d9;
-  --accent-strong: #6d28d9;
-  --accent-soft: #e8e0fc;
-  --accent-line: #d5c6f9;
-  --accent-text: #6d28d9;
-  --on-accent: #fdfcff;
-  --danger: #c42121;
-  --success: #047857;
-  --warn: #a34b08;
-  --info: #1f56d6;
-  --shadow-card: 0 1px 2px rgb(44 32 96 / 0.04), 0 4px 14px -6px rgb(44 32 96 / 0.08);
-  --shadow-pop: 0 1px 3px rgb(44 32 96 / 0.06), 0 18px 48px -14px rgb(44 32 96 / 0.24);
-  --glow: rgb(124 58 237 / 0.07);
+  --bg: #f4efe9;
+  --bg-2: #ede8e2;
+  --surface: #fbf8f4;
+  --surface-2: #f1eeea;
+  --overlay: #fdfbf8;
+  --border: #e3e0dc;
+  --divider: #e3ded8;
+  --border-strong: #8bb4a3;
+  --text: #221c17;
+  --text-2: #57514c;
+  --muted: #76716b;
+  --faint: #a49f99;
+  --accent: #2f7d61;
+  --accent-hover: #296e55;
+  --accent-strong: #26644e;
+  --accent-soft: #e3e9e2;
+  --accent-line: #bed3c8;
+  --accent-text: #2d7158;
+  --on-accent: #fbf8f4;
+  --danger: #9f4f4d;
+  --success: #687942;
+  --warn: #9c6341;
+  --info: #5e7193;
+  --shadow-card: 0 1px 2px rgb(34 28 23 / 0.05), 0 4px 14px -6px rgb(34 28 23 / 0.1);
+  --shadow-pop: 0 1px 3px rgb(34 28 23 / 0.06), 0 18px 48px -14px rgb(34 28 23 / 0.24);
+  --glow: rgb(47 125 97 / 0.06);
   /* Coloured shadow under filled accent buttons: softer than the solid brand colour on a light page. */
-  --accent-glow: rgb(109 40 217 / 0.45);
-  --backdrop: rgb(28 22 52 / 0.32);
+  --accent-glow: rgb(47 125 97 / 0.45);
+  --backdrop: rgb(34 28 23 / 0.32);
 }
 
 /*
- * Near-black layers (bg → bg-2 → surface → surface-2) carry the depth; purple is reserved for interaction.
- * Primary buttons are lavender with near-black text: white on #A78BFA/#8B5CF6 falls below 4.5:1.
+ * Coffee-brown layers (bg → bg-2 → surface → surface-2) carry the depth; mint is reserved for interaction.
+ * Primary buttons are mint with espresso text: white on #7CC4A4 falls below 4.5:1.
  */
 .dark {
-  --bg: #0b0b12;
-  --bg-2: #10101a;
-  --surface: #171725;
-  --surface-2: #202033;
-  --overlay: #191927;
-  --border: #29283a;
-  --divider: #222132;
-  --border-strong: #5b4385;
-  --text: #f5f3ff;
-  --text-2: #c4c0d4;
-  --muted: #918ba6;
-  --faint: #625d73;
-  --accent: #a78bfa;
-  --accent-hover: #8b5cf6;
-  --accent-strong: #7c3aed;
-  --accent-soft: #251b3d;
-  --accent-line: #49336d;
-  --accent-text: #a78bfa;
-  --on-accent: #0b0b12;
-  --danger: #f87171;
-  --success: #34d399;
-  --warn: #fbbf24;
-  --info: #60a5fa;
+  --bg: #15120f;
+  --bg-2: #1a1613;
+  --surface: #221d19;
+  --surface-2: #2f2a25;
+  --overlay: #28231f;
+  --border: #3b3632;
+  --divider: #272420;
+  --border-strong: #547965;
+  --text: #f3eee7;
+  --text-2: #bcb7b1;
+  --muted: #96928c;
+  --faint: #696661;
+  --accent: #7cc4a4;
+  --accent-hover: #8dcaad;
+  --accent-strong: #639d83;
+  --accent-soft: #30382f;
+  --accent-line: #445c4e;
+  --accent-text: #7cc4a4;
+  --on-accent: #15120f;
+  --danger: #e36a6a;
+  --success: #a9cf6a;
+  --warn: #e58e5a;
+  --info: #86a9e6;
   --shadow-card: 0 1px 0 rgb(255 255 255 / 0.025) inset, 0 8px 24px -12px rgb(0 0 0 / 0.7);
   --shadow-pop: 0 24px 60px -16px rgb(0 0 0 / 0.8), 0 0 0 1px rgb(255 255 255 / 0.02);
-  --glow: rgb(139 92 246 / 0.11);
-  --accent-glow: #7c3aed;
-  --backdrop: rgb(5 5 10 / 0.7);
+  --glow: rgb(124 196 164 / 0.08);
+  --accent-glow: #639d83;
+  --backdrop: rgb(11 9 8 / 0.72);
 }
 
 @theme inline {
@@ -164,7 +165,7 @@ body {
 @utility card {
   @apply rounded-2xl border border-line bg-surface shadow-card;
 }
-/* Clickable cards lift onto the hover surface with a restrained purple edge. */
+/* Clickable cards lift onto the hover surface with a restrained mint edge. */
 @utility card-link {
   @apply card transition-[border-color,background-color] duration-150 hover:border-line-strong hover:bg-surface-2;
 }
@@ -306,19 +307,19 @@ dialog[data-closing]::backdrop {
 }
 
 /*
- * The review "stage": always midnight, whatever the app theme (the wrapper also carries .dark, so every token inside
+ * The review "stage": always espresso, whatever the app theme (the wrapper also carries .dark, so every token inside
  * switches with it). Layered glows give the long scroll depth without any image.
  */
 .review-stage {
   background:
-    radial-gradient(60rem 42rem at 100% -6rem, rgb(139 92 246 / 0.24), transparent 62%),
-    radial-gradient(52rem 40rem at -12% 38%, rgb(79 70 229 / 0.15), transparent 60%),
-    radial-gradient(44rem 32rem at 112% 78%, rgb(103 232 249 / 0.07), transparent 60%),
-    linear-gradient(180deg, #0e0a2a, #08071a 38%, #0b0922);
+    radial-gradient(60rem 42rem at 100% -6rem, rgb(124 196 164 / 0.2), transparent 62%),
+    radial-gradient(52rem 40rem at -12% 38%, rgb(233 184 114 / 0.12), transparent 60%),
+    radial-gradient(44rem 32rem at 112% 78%, rgb(166 220 196 / 0.06), transparent 60%),
+    linear-gradient(180deg, #1d1813, #110e0b 38%, #17130f);
 }
-/* The signature gradient for the big numbers: violet → periwinkle → cyan. */
+/* The signature gradient for the big numbers: mint → sage → honey. */
 .review-ink {
-  background: linear-gradient(100deg, #a78bfa, #a5b4fc 55%, #67e8f9);
+  background: linear-gradient(100deg, #7cc4a4, #b9d9a0 55%, #e9b872);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

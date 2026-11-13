@@ -98,8 +98,8 @@ export function Intro({ review: r, headline, years, year, onYear }: { review: Ye
   return (
     <header className="relative isolate flex min-h-[min(calc(100svh-7rem),52rem)] flex-col overflow-hidden px-5 pb-10 pt-6 sm:px-10 sm:pt-8 lg:min-h-0 lg:px-10 lg:pb-8">
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-        <span className="review-orb absolute -right-24 -top-32 size-[34rem] rounded-full bg-[radial-gradient(circle,rgb(139_92_246/0.45),transparent_65%)] blur-2xl" />
-        <span className="review-orb absolute -bottom-40 -left-32 size-[30rem] rounded-full bg-[radial-gradient(circle,rgb(103_232_249/0.14),transparent_65%)] blur-2xl [animation-delay:-8s]" />
+        <span className="review-orb absolute -right-24 -top-32 size-[34rem] rounded-full bg-[radial-gradient(circle,rgb(124_196_164/0.45),transparent_65%)] blur-2xl" />
+        <span className="review-orb absolute -bottom-40 -left-32 size-[30rem] rounded-full bg-[radial-gradient(circle,rgb(233_184_114/0.14),transparent_65%)] blur-2xl [animation-delay:-8s]" />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="flex items-center gap-2">
@@ -204,7 +204,7 @@ export function Journey({ review: r }: { review: YearReview }) {
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-[#0d0b24] px-4 py-3 sm:px-5">
+    <div className="bg-[#1a1511] px-4 py-3 sm:px-5">
       <dt className="text-xs text-muted">{label}</dt>
       <dd className="text-lg font-semibold tabular-nums">{value}</dd>
     </div>
@@ -252,7 +252,7 @@ export function PersonalityCard({ review: r, personality }: { review: YearReview
   return (
     <Chapter n={3} eyebrow="Your watching personality" title="This year, you were…">
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <div className="relative overflow-hidden rounded-3xl border border-accent-line/70 bg-[linear-gradient(135deg,rgb(124_58_237/0.22),rgb(79_70_229/0.08)_55%,transparent)] p-6 sm:p-10 lg:rounded-2xl lg:p-7">
+        <div className="relative overflow-hidden rounded-3xl border border-accent-line/70 bg-[linear-gradient(135deg,rgb(124_196_164/0.22),rgb(233_184_114/0.08)_55%,transparent)] p-6 sm:p-10 lg:rounded-2xl lg:p-7">
           <span className="flex size-14 items-center justify-center rounded-2xl bg-accent lg:size-12 text-on-accent shadow-[0_12px_40px_-10px_var(--accent-strong)]">
             <Icon className="size-7 lg:size-6" aria-hidden />
           </span>
@@ -336,7 +336,7 @@ export function Moments({ review: r, byId }: { review: YearReview; byId: (id: st
             </p>
             <div aria-hidden className="mt-5 flex flex-wrap gap-1 lg:mt-4">
               {Array.from({ length: Math.min(streak.days, 30) }, (_, i) => (
-                <span key={i} className="review-bar size-3 rounded-[4px] bg-linear-to-br from-accent to-[#67e8f9]" style={{ '--rise-delay': `${i * 20}ms` } as CSSProperties} />
+                <span key={i} className="review-bar size-3 rounded-[4px] bg-linear-to-br from-accent to-[#e9b872]" style={{ '--rise-delay': `${i * 20}ms` } as CSSProperties} />
               ))}
               {streak.days > 30 && <span className="ml-1 text-xs leading-3 text-muted">+{streak.days - 30}</span>}
             </div>
@@ -421,7 +421,7 @@ export function Top5({ review: r, byId }: { review: YearReview; byId: (id: strin
     <Chapter n={5} eyebrow={`Your top ${r.top.length}`} title="What you couldn't stop watching">
       <ol className="space-y-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] lg:gap-6 lg:space-y-0">
         <li>
-          <Link to={`/title/${first.titleId}`} className="group relative flex flex-col gap-6 overflow-hidden rounded-3xl border border-accent-line/60 bg-[linear-gradient(120deg,rgb(124_58_237/0.2),transparent_60%)] p-5 sm:flex-row sm:items-end sm:p-8 lg:h-full lg:gap-5 lg:rounded-2xl lg:p-5">
+          <Link to={`/title/${first.titleId}`} className="group relative flex flex-col gap-6 overflow-hidden rounded-3xl border border-accent-line/60 bg-[linear-gradient(120deg,rgb(124_196_164/0.2),transparent_60%)] p-5 sm:flex-row sm:items-end sm:p-8 lg:h-full lg:gap-5 lg:rounded-2xl lg:p-5">
             <Poster poster={t1?.poster ?? null} source={t1?.source ?? null} title={first.title} mediaType={first.mediaType} className="review-rise w-40 shrink-0 rounded-2xl shadow-pop sm:w-56 lg:w-32 xl:w-40" />
             <div className="min-w-0">
               <p className="review-ink text-7xl font-extrabold leading-none tracking-tight sm:text-9xl lg:text-6xl xl:text-7xl">#1</p>
@@ -429,7 +429,7 @@ export function Top5({ review: r, byId }: { review: YearReview; byId: (id: strin
               <p className="mt-2 text-fg-2">
                 {countText(first)} · ≈{plural(hoursOf(first.minutes), 'hour')}
               </p>
-              {first.completed && <p className="mt-3 inline-flex rounded-full border border-[#67e8f9]/40 bg-[#67e8f9]/10 px-3 py-1 text-xs font-semibold text-[#67e8f9]">Completed in {r.year}</p>}
+              {first.completed && <p className="mt-3 inline-flex rounded-full border border-[#e9b872]/40 bg-[#e9b872]/10 px-3 py-1 text-xs font-semibold text-[#e9b872]">Completed in {r.year}</p>}
             </div>
           </Link>
         </li>
@@ -545,7 +545,7 @@ function Bar({ year, value, max, muted = false }: { year: number; value: number;
     <div className="flex items-center gap-3">
       <span className={`w-10 text-[11px] tabular-nums ${muted ? 'text-muted' : 'font-semibold text-fg'}`}>{year}</span>
       <span className="h-2 flex-1 overflow-hidden rounded-full bg-white/6">
-        <span className={`review-bar block h-full origin-left rounded-full ${muted ? 'bg-white/25' : 'bg-linear-to-r from-accent to-[#67e8f9]'}`} style={{ width: `${(value / max) * 100}%` }} />
+        <span className={`review-bar block h-full origin-left rounded-full ${muted ? 'bg-white/25' : 'bg-linear-to-r from-accent to-[#e9b872]'}`} style={{ width: `${(value / max) * 100}%` }} />
       </span>
       <span className={`w-12 text-right text-sm tabular-nums ${muted ? 'text-muted' : 'font-semibold'}`}>{value.toLocaleString()}</span>
     </div>
@@ -588,7 +588,7 @@ export function Finale({ review: r, standout, byId, onShare }: { review: YearRev
   const totals = [r.stats.episodes && plural(r.stats.episodes, 'episode'), r.stats.movies && plural(r.stats.movies, 'movie'), `≈${plural(hoursOf(r.stats.minutes), 'hour')}`].filter(Boolean).join(' · ')
   return (
     <section aria-labelledby="review-finale" className="review-rise relative isolate overflow-hidden rounded-[2rem] border border-accent-line/60 p-6 text-center sm:p-14 lg:rounded-3xl lg:p-10">
-      <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_50%_0%,rgb(139_92_246/0.38),transparent_70%),radial-gradient(50%_50%_at_50%_110%,rgb(103_232_249/0.14),transparent_70%)]" />
+      <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_50%_0%,rgb(124_196_164/0.38),transparent_70%),radial-gradient(50%_50%_at_50%_110%,rgb(233_184_114/0.14),transparent_70%)]" />
       <p className="eyebrow text-accent-text">{r.inProgress ? 'So far' : 'That’s a wrap'}</p>
       <h2 id="review-finale" className="mt-3 text-4xl font-semibold tracking-tight text-balance sm:text-6xl lg:text-4xl xl:text-5xl">
         That was your {r.year}{r.inProgress ? ', so far' : ''}.

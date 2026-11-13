@@ -114,7 +114,7 @@ export function applyTheme(theme: Prefs['theme']) {
   root.classList.toggle('dark', dark)
   root.style.colorScheme = dark ? 'dark' : 'light'
   // Match the phone's status bar to the page.
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0b0b12' : '#f4f3f9')
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#15120f' : '#f4efe9')
 }
 
 const NUDGE_TITLES = 5

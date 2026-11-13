@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- WatchTrack: a W drawn as a video scrub track. Lavender = watched, dim = still to watch, white knob = where you are. -->
-  <rect width="512" height="512" rx="116" fill="#171725"/>
+  <!-- WatchTrack: a W drawn as a video scrub track. Mint = watched, dim = still to watch, white knob = where you are. -->
+  <rect width="512" height="512" rx="116" fill="#221d19"/>
   <g fill="none" stroke-width="60" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M104 150 L188 362 L256 226 L324 362 L408 150" stroke="#5d4f8f"/>
-    <path d="M104 150 L188 362 L256 226 L324 362 L372.7 239" stroke="#a78bfa"/>
+    <path d="M104 150 L188 362 L256 226 L324 362 L408 150" stroke="#445c4e"/>
+    <path d="M104 150 L188 362 L256 226 L324 362 L372.7 239" stroke="#7cc4a4"/>
   </g>
-  <circle cx="372.7" cy="239" r="38" fill="#f5f3ff" stroke="#171725" stroke-width="22" paint-order="stroke"/>
+  <circle cx="372.7" cy="239" r="38" fill="#f3eee7" stroke="#221d19" stroke-width="22" paint-order="stroke"/>
 </svg>

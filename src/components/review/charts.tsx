@@ -46,8 +46,8 @@ export function MonthChart({ review: r }: { review: YearReview }) {
                     ? s === 'tracked'
                       ? 'h-1.5 rounded-full bg-white/12'
                       : 'h-8 rounded-md border border-dashed border-white/15 bg-transparent'
-                    : `rounded-lg ${top ? 'bg-linear-to-t from-accent-strong via-accent to-[#67e8f9] shadow-[0_0_36px_-6px_rgb(139_92_246/0.75)]' : 'bg-linear-to-t from-[#2c2563] to-[#6b5dd3] group-hover:brightness-125'}`
-                } ${on ? 'ring-2 ring-white/80 ring-offset-2 ring-offset-[#0b0922]' : ''}`}
+                    : `rounded-lg ${top ? 'bg-linear-to-t from-accent-strong via-accent to-[#e9b872] shadow-[0_0_36px_-6px_rgb(124_196_164/0.6)]' : 'bg-linear-to-t from-[#2a3a31] to-[#4f7d68] group-hover:brightness-125'}`
+                } ${on ? 'ring-2 ring-white/80 ring-offset-2 ring-offset-[#17130f]' : ''}`}
               />
               <span aria-hidden className={`text-xs ${on ? 'font-semibold text-fg' : top ? 'font-medium text-accent-text' : 'text-muted'}`}>
                 <span className="sm:hidden">{MONTHS[i][0]}</span>
@@ -60,7 +60,7 @@ export function MonthChart({ review: r }: { review: YearReview }) {
 
       <ul className="mt-5 flex flex-wrap gap-x-5 lg:mt-4 gap-y-1.5 text-[11px] text-muted" aria-label="Legend">
         <li className="flex items-center gap-1.5">
-          <span aria-hidden className="size-2.5 rounded-sm bg-linear-to-t from-accent-strong to-[#67e8f9]" /> Busiest month
+          <span aria-hidden className="size-2.5 rounded-sm bg-linear-to-t from-accent-strong to-[#e9b872]" /> Busiest month
         </li>
         <li className="flex items-center gap-1.5">
           <span aria-hidden className="h-1 w-3 rounded-full bg-white/25" /> Nothing logged
@@ -108,7 +108,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-/** Watches by weekday, Monday first, with the favourite day lit and the weekend tinted cyan. */
+/** Watches by weekday, Monday first, with the favourite day lit and the weekend tinted honey. */
 export function WeekdayChart({ review: r }: { review: YearReview }) {
   const peak = Math.max(1, ...r.byWeekday)
   return (
@@ -119,7 +119,7 @@ export function WeekdayChart({ review: r }: { review: YearReview }) {
           <li key={i} className="flex flex-col items-center gap-1.5" aria-label={`${WEEKDAYS[i]}: ${n}`} title={`${WEEKDAYS[i]}: ${n}`}>
             <span aria-hidden className="flex h-24 w-full items-end rounded-md lg:h-20 bg-white/[0.04]">
               <span
-                className={`review-bar w-full rounded-md ${lead ? 'bg-linear-to-t from-accent-strong to-[#67e8f9]' : i >= 5 ? 'bg-linear-to-t from-[#1f4c63] to-[#3f8fb0]' : 'bg-linear-to-t from-[#2c2563] to-[#6b5dd3]'}`}
+                className={`review-bar w-full rounded-md ${lead ? 'bg-linear-to-t from-accent-strong to-[#e9b872]' : i >= 5 ? 'bg-linear-to-t from-[#4a3a24] to-[#9a7442]' : 'bg-linear-to-t from-[#2a3a31] to-[#4f7d68]'}`}
                 style={{ height: n ? `${Math.max(6, (n / peak) * 100)}%` : '2px', '--rise-delay': `${i * 40}ms` } as CSSProperties}
               />
             </span>

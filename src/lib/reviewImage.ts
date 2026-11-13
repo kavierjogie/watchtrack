@@ -41,38 +41,38 @@ export const topCount = (r: YearReview) => (r.top.length >= 5 ? 5 : r.top.length
 
 const PALETTES = {
   midnight: {
-    bg: ['#100b2e', '#08071a', '#0c0922'],
-    glow: ['rgba(139,92,246,0.38)', 'rgba(79,70,229,0.22)', 'rgba(103,232,249,0.11)'],
-    ring: 'rgba(196,181,253,',
-    fg: '#f5f3ff',
-    fg2: '#cfc9e6',
-    muted: '#9b94bb',
-    accent: '#a78bfa',
-    cyan: '#67e8f9',
-    ink: ['#a78bfa', '#a5b4fc', '#67e8f9'],
+    bg: ['#1d1813', '#110e0b', '#17130f'],
+    glow: ['rgba(124,196,164,0.30)', 'rgba(233,184,114,0.16)', 'rgba(166,220,196,0.08)'],
+    ring: 'rgba(190,226,208,',
+    fg: '#f3eee7',
+    fg2: '#cfc8bf',
+    muted: '#a09990',
+    accent: '#7cc4a4',
+    cyan: '#e9b872',
+    ink: ['#7cc4a4', '#b9d9a0', '#e9b872'],
     panel: 'rgba(255,255,255,0.045)',
-    panelLine: 'rgba(221,214,254,0.12)',
-    line: 'rgba(221,214,254,0.14)',
-    track: 'rgba(221,214,254,0.08)',
-    bar: ['#7c6cd6', '#3d3480'],
-    chip: ['rgba(139,92,246,0.16)', 'rgba(167,139,250,0.45)', '#ddd6fe'],
+    panelLine: 'rgba(232,224,212,0.12)',
+    line: 'rgba(232,224,212,0.14)',
+    track: 'rgba(232,224,212,0.08)',
+    bar: ['#5f9d82', '#2f4a3d'],
+    chip: ['rgba(124,196,164,0.16)', 'rgba(124,196,164,0.45)', '#cfe8dc'],
   },
   daylight: {
-    bg: ['#f8f5ff', '#efeafc', '#e6ecfc'],
-    glow: ['rgba(139,92,246,0.24)', 'rgba(99,102,241,0.15)', 'rgba(34,211,238,0.16)'],
-    ring: 'rgba(124,58,237,',
-    fg: '#1c1640',
-    fg2: '#3f3a5c',
-    muted: '#6b6585',
-    accent: '#7c3aed',
-    cyan: '#0e7490',
-    ink: ['#7c3aed', '#4f46e5', '#0891b2'],
+    bg: ['#fbf8f4', '#f4efe9', '#efe6da'],
+    glow: ['rgba(47,125,97,0.18)', 'rgba(144,96,31,0.12)', 'rgba(124,196,164,0.16)'],
+    ring: 'rgba(47,125,97,',
+    fg: '#221c17',
+    fg2: '#57514c',
+    muted: '#76716b',
+    accent: '#2f7d61',
+    cyan: '#90601f',
+    ink: ['#2f7d61', '#5f7d3a', '#90601f'],
     panel: 'rgba(255,255,255,0.62)',
-    panelLine: 'rgba(124,58,237,0.16)',
-    line: 'rgba(76,29,149,0.14)',
-    track: 'rgba(76,29,149,0.08)',
-    bar: ['#a594f9', '#6d5bd0'],
-    chip: ['rgba(124,58,237,0.1)', 'rgba(124,58,237,0.35)', '#5b21b6'],
+    panelLine: 'rgba(47,125,97,0.16)',
+    line: 'rgba(34,28,23,0.14)',
+    track: 'rgba(34,28,23,0.08)',
+    bar: ['#8fc4ac', '#3f8a6c'],
+    chip: ['rgba(47,125,97,0.1)', 'rgba(47,125,97,0.35)', '#26644e'],
   },
 }
 type Palette = (typeof PALETTES)['midnight']
@@ -158,7 +158,7 @@ function eyebrow(ctx: Ctx, s: string, x: number, y: number, color = C.muted, max
   ctx.letterSpacing = '0px'
 }
 
-/** Violet → periwinkle → cyan across what it fills: the review's signature. */
+/** Mint → sage → honey across what it fills: the review's signature. */
 function ink(ctx: Ctx, x0: number, x1: number, stops = C.ink, y0 = 0, y1 = 0) {
   const g = ctx.createLinearGradient(x0, y0, Math.max(x0 + 1, x1), y1)
   g.addColorStop(0, stops[0])
@@ -260,10 +260,10 @@ function badge(ctx: Ctx, name: IconName, x: number, y: number, size: number) {
 
 // ---------- Frame ----------
 
-/** The app icon (public/icon.svg), drawn rather than loaded: a W as a scrub track, watched part in lavender. */
+/** The app icon (public/icon.svg), drawn rather than loaded: a W as a scrub track, watched part in mint. */
 function logo(ctx: Ctx, x: number, y: number, size: number) {
   const k = size / 512
-  rect(ctx, x, y, size, size, 116 * k, '#171725', 'rgba(167,139,250,0.35)')
+  rect(ctx, x, y, size, size, 116 * k, '#221d19', 'rgba(124,196,164,0.35)')
   const pts: [number, number][] = [
     [104, 150],
     [188, 362],
@@ -280,13 +280,13 @@ function logo(ctx: Ctx, x: number, y: number, size: number) {
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   ctx.lineWidth = 60 * k
-  line(pts, '#5d4f8f')
-  line([...pts.slice(0, 4), [372.7, 239]], '#a78bfa')
+  line(pts, '#445c4e')
+  line([...pts.slice(0, 4), [372.7, 239]], '#7cc4a4')
   ctx.lineCap = 'butt'
   ctx.lineJoin = 'miter'
   for (const [r, color] of [
-    [49, '#171725'],
-    [38, '#f5f3ff'],
+    [49, '#221d19'],
+    [38, '#f3eee7'],
   ] as const) {
     ctx.fillStyle = color
     ctx.beginPath()
@@ -363,16 +363,16 @@ function poster(ctx: Ctx, t: { titleId: string; title: string }, art: Artwork | 
     ctx.drawImage(img, x + (w - iw * k) / 2, y + (h - ih * k) / 2, iw * k, ih * k)
   } else {
     const g = ctx.createLinearGradient(x, y, x + w, y + h)
-    g.addColorStop(0, '#4c2f9e')
-    g.addColorStop(0.6, '#24206a')
-    g.addColorStop(1, '#0f2a4a')
+    g.addColorStop(0, '#2f5a48')
+    g.addColorStop(0.6, '#2a221b')
+    g.addColorStop(1, '#3d2f1f')
     ctx.fillStyle = g
     ctx.fillRect(x, y, w, h)
-    glow(ctx, x + w * 0.8, y + h * 0.1, w, 'rgba(103,232,249,0.18)')
+    glow(ctx, x + w * 0.8, y + h * 0.1, w, 'rgba(233,184,114,0.18)')
     const initial = [...t.title.trim()][0]?.toUpperCase() ?? '?'
     font(ctx, Math.round(w * 0.42), 800)
     // High in the tile: the bottom is kept for the rank and title laid over it.
-    text(ctx, initial, x + w / 2, y + h * 0.3 + w * 0.15, 'rgba(237,233,254,0.9)', 'center')
+    text(ctx, initial, x + w / 2, y + h * 0.3 + w * 0.15, 'rgba(243,238,231,0.9)', 'center')
   }
   ctx.restore()
 }
@@ -386,9 +386,9 @@ function rankedPoster(ctx: Ctx, t: TopTitle, rank: number, art: Artwork | undefi
   ctx.roundRect(x, y, w, h, r)
   ctx.clip()
   const s = ctx.createLinearGradient(0, y + h * 0.34, 0, y + h)
-  s.addColorStop(0, 'rgba(7,5,22,0)')
-  s.addColorStop(0.55, 'rgba(7,5,22,0.72)')
-  s.addColorStop(1, 'rgba(7,5,22,0.95)')
+  s.addColorStop(0, 'rgba(10,8,6,0)')
+  s.addColorStop(0.55, 'rgba(10,8,6,0.72)')
+  s.addColorStop(1, 'rgba(10,8,6,0.95)')
   ctx.fillStyle = s
   ctx.fillRect(x, y, w, h)
   ctx.restore()
@@ -407,7 +407,7 @@ function rankedPoster(ctx: Ctx, t: TopTitle, rank: number, art: Artwork | undefi
     ctx.letterSpacing = '3px'
     const label = 'MY NUMBER ONE'
     const lw = ctx.measureText(label).width + 36
-    rect(ctx, x + 24, y + 24, lw, 42, 21, 'rgba(7,5,22,0.62)', 'rgba(255,255,255,0.22)')
+    rect(ctx, x + 24, y + 24, lw, 42, 21, 'rgba(10,8,6,0.62)', 'rgba(255,255,255,0.22)')
     text(ctx, label, x + 24 + 18 + 1.5, y + 52, ON_POSTER.fg)
     ctx.letterSpacing = '0px'
   }
@@ -657,8 +657,8 @@ function drawHighlight(ctx: Ctx, d: ShareData, art?: Artwork) {
   const y = 344
   const h = more.length ? 474 : CONTENT_END - y
   const panel = ctx.createLinearGradient(PAD, y, W - PAD, y + h)
-  panel.addColorStop(0, C === PALETTES.midnight ? 'rgba(124,58,237,0.26)' : 'rgba(124,58,237,0.14)')
-  panel.addColorStop(1, C === PALETTES.midnight ? 'rgba(79,70,229,0.06)' : 'rgba(255,255,255,0.55)')
+  panel.addColorStop(0, C === PALETTES.midnight ? 'rgba(47,125,97,0.26)' : 'rgba(47,125,97,0.14)')
+  panel.addColorStop(1, C === PALETTES.midnight ? 'rgba(233,184,114,0.06)' : 'rgba(255,255,255,0.55)')
   rect(ctx, PAD, y, INNER, h, 40, panel, ink(ctx, PAD, W - PAD, C.ink, y, y + h), 3)
   // A large faint echo of the icon behind the text.
   ctx.save()
