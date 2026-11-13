@@ -16,7 +16,7 @@ export function MonthChart({ review: r }: { review: YearReview }) {
 
   return (
     <div>
-      <div className="flex h-60 items-end gap-1 sm:h-72 sm:gap-2.5" role="group" aria-label="Watches per month">
+      <div className="flex h-60 items-end gap-1 sm:h-72 sm:gap-2.5 lg:h-48" role="group" aria-label="Watches per month">
         {r.byMonth.map((mo, i) => {
           const s = monthState(r, i)
           const on = i === active
@@ -58,7 +58,7 @@ export function MonthChart({ review: r }: { review: YearReview }) {
         })}
       </div>
 
-      <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-1.5 text-[11px] text-muted" aria-label="Legend">
+      <ul className="mt-5 flex flex-wrap gap-x-5 lg:mt-4 gap-y-1.5 text-[11px] text-muted" aria-label="Legend">
         <li className="flex items-center gap-1.5">
           <span aria-hidden className="size-2.5 rounded-sm bg-linear-to-t from-accent-strong to-[#67e8f9]" /> Busiest month
         </li>
@@ -71,7 +71,7 @@ export function MonthChart({ review: r }: { review: YearReview }) {
       </ul>
 
       {/* The readout for the selected month: never covers the chart or runs off a phone screen. */}
-      <div className="mt-4 flex min-h-20 flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-2xl border border-white/8 bg-white/[0.04] px-5 py-4" aria-live="polite">
+      <div className="mt-4 flex min-h-20 flex-wrap lg:mt-3 lg:min-h-16 lg:py-3 items-center justify-between gap-x-6 gap-y-3 rounded-2xl border border-white/8 bg-white/[0.04] px-5 py-4" aria-live="polite">
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-2 text-lg font-semibold">
             {MONTHS[active]}
@@ -117,7 +117,7 @@ export function WeekdayChart({ review: r }: { review: YearReview }) {
         const lead = i === r.favouriteWeekday?.weekday
         return (
           <li key={i} className="flex flex-col items-center gap-1.5" aria-label={`${WEEKDAYS[i]}: ${n}`} title={`${WEEKDAYS[i]}: ${n}`}>
-            <span aria-hidden className="flex h-24 w-full items-end rounded-md bg-white/[0.04]">
+            <span aria-hidden className="flex h-24 w-full items-end rounded-md lg:h-20 bg-white/[0.04]">
               <span
                 className={`review-bar w-full rounded-md ${lead ? 'bg-linear-to-t from-accent-strong to-[#67e8f9]' : i >= 5 ? 'bg-linear-to-t from-[#1f4c63] to-[#3f8fb0]' : 'bg-linear-to-t from-[#2c2563] to-[#6b5dd3]'}`}
                 style={{ height: n ? `${Math.max(6, (n / peak) * 100)}%` : '2px', '--rise-delay': `${i * 40}ms` } as CSSProperties}

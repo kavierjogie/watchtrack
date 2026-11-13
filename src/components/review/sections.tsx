@@ -73,17 +73,17 @@ export function CountUp({ value, prefix = '' }: { value: number; prefix?: string
 /** One chapter: a numbered eyebrow, a big heading, and its own composition. Rises in as it scrolls into view. */
 export function Chapter({ n, eyebrow, title, intro, children, className = '' }: { n: number; eyebrow: string; title: string; intro?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section id={`review-${n}`} aria-labelledby={`chapter-${n}`} className={`review-rise min-w-0 scroll-mt-20 space-y-8 lg:scroll-mt-8 ${className}`}>
-      <header className="max-w-3xl space-y-3">
+    <section id={`review-${n}`} aria-labelledby={`chapter-${n}`} className={`review-rise min-w-0 scroll-mt-20 space-y-8 lg:scroll-mt-8 lg:space-y-5 ${className}`}>
+      <header className="max-w-3xl space-y-3 lg:space-y-2">
         <p className="eyebrow flex items-center gap-3 text-accent-text">
           <span className="tabular-nums">{String(n).padStart(2, '0')}</span>
           <span aria-hidden className="h-px w-8 bg-accent-line" />
           {eyebrow}
         </p>
-        <h2 id={`chapter-${n}`} className="text-3xl font-semibold tracking-tight text-balance sm:text-5xl">
+        <h2 id={`chapter-${n}`} className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl xl:text-[2.5rem] xl:leading-tight">
           {title}
         </h2>
-        {intro && <p className="text-base text-fg-2 sm:text-lg">{intro}</p>}
+        {intro && <p className="text-base text-fg-2 sm:text-lg lg:text-base">{intro}</p>}
       </header>
       {children}
     </section>
@@ -96,7 +96,7 @@ export function Intro({ review: r, headline, years, year, onYear }: { review: Ye
   const { main, other } = lead(r)
   const begin = () => document.getElementById('review-1')?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
   return (
-    <header className="relative isolate flex min-h-[min(calc(100svh-7rem),52rem)] flex-col overflow-hidden px-5 pb-10 pt-6 sm:px-10 sm:pt-8 lg:px-14">
+    <header className="relative isolate flex min-h-[min(calc(100svh-7rem),52rem)] flex-col overflow-hidden px-5 pb-10 pt-6 sm:px-10 sm:pt-8 lg:min-h-0 lg:px-10 lg:pb-8">
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
         <span className="review-orb absolute -right-24 -top-32 size-[34rem] rounded-full bg-[radial-gradient(circle,rgb(139_92_246/0.45),transparent_65%)] blur-2xl" />
         <span className="review-orb absolute -bottom-40 -left-32 size-[30rem] rounded-full bg-[radial-gradient(circle,rgb(103_232_249/0.14),transparent_65%)] blur-2xl [animation-delay:-8s]" />
@@ -122,17 +122,17 @@ export function Intro({ review: r, headline, years, year, onYear }: { review: Ye
         )}
       </div>
 
-      <div className="my-auto py-12 sm:py-16">
+      <div className="my-auto py-12 sm:py-16 lg:py-10">
         <p className="eyebrow text-accent-text">{r.inProgress ? 'Year in review · so far' : 'Year in review'}</p>
         <h1 className="mt-4">
-          <span className="review-ink block text-[clamp(6rem,30vw,15rem)] font-extrabold leading-[0.82] tracking-[-0.06em]">{r.year}</span>
-          <span className="mt-6 block max-w-3xl text-3xl font-semibold tracking-tight text-balance sm:text-5xl">{headline}</span>
+          <span className="review-ink block text-[clamp(6rem,30vw,15rem)] font-extrabold leading-[0.82] lg:text-[clamp(6.5rem,9vw,9rem)] tracking-[-0.06em]">{r.year}</span>
+          <span className="mt-6 block max-w-3xl text-3xl font-semibold tracking-tight text-balance sm:text-5xl lg:mt-4 lg:text-4xl">{headline}</span>
         </h1>
-        <p className="mt-8 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-fg-2">
-          <span className="text-5xl font-bold tracking-tight text-fg sm:text-6xl">
+        <p className="mt-8 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-fg-2 lg:mt-6">
+          <span className="text-5xl font-bold tracking-tight text-fg sm:text-6xl lg:text-5xl">
             <CountUp value={main.n} />
           </span>
-          <span className="text-xl font-medium text-fg sm:text-2xl">{main.unit}</span>
+          <span className="text-xl font-medium text-fg sm:text-2xl lg:text-xl">{main.unit}</span>
           <span className="text-base text-muted sm:text-lg">
             {other.n ? `and ${plural(other.n, other.unit.replace(/s$/, ''))}, ` : ''}across {plural(r.titles, 'title')}
           </span>
@@ -140,7 +140,7 @@ export function Intro({ review: r, headline, years, year, onYear }: { review: Ye
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <button type="button" className="btn-primary min-h-12 rounded-full px-6 text-base" onClick={begin}>
+        <button type="button" className="btn-primary min-h-12 rounded-full px-6 text-base lg:min-h-11 lg:text-sm" onClick={begin}>
           Start exploring <ArrowDown className="size-4" aria-hidden />
         </button>
         {r.coverage.startedThisYear && (
@@ -169,23 +169,23 @@ export function Journey({ review: r }: { review: YearReview }) {
   ]
   return (
     <Chapter n={1} eyebrow="The numbers" title="Everything you watched">
-      <div className="grid gap-10 lg:grid-cols-[1.2fr_1fr] lg:items-end lg:gap-16">
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] lg:items-end lg:gap-12">
         <div className="min-w-0">
-          <p className="text-lg text-fg-2">You watched</p>
-          <p className="review-ink -ml-1 text-[clamp(5rem,26vw,11rem)] font-extrabold leading-none tracking-[-0.05em]">
+          <p className="text-lg text-fg-2 lg:text-base">You watched</p>
+          <p className="review-ink -ml-1 text-[clamp(5rem,26vw,11rem)] font-extrabold leading-none tracking-[-0.05em] lg:text-[clamp(5rem,7vw,7rem)]">
             <CountUp value={main.n} />
           </p>
-          <p className="mt-1 text-2xl font-semibold sm:text-3xl">{main.unit}</p>
+          <p className="mt-1 text-2xl font-semibold sm:text-3xl lg:text-2xl">{main.unit}</p>
           {main.unit.startsWith('ep') && mix && <p className="mt-2 text-sm text-muted">{mix}</p>}
         </div>
-        <dl className="divide-y divide-white/8 border-y border-white/8">
+        <dl className="divide-y divide-white/8 border-y border-white/8 lg:grid lg:grid-cols-2 lg:gap-x-8 lg:divide-y-0 lg:border-b-0">
           {rows.map((row) => (
-            <div key={row.label} className="flex items-baseline justify-between gap-4 py-4">
+            <div key={row.label} className="flex items-baseline justify-between gap-4 py-4 lg:border-b lg:border-white/8 lg:py-3">
               <div className="min-w-0">
                 <dt className="text-fg-2">{row.label}</dt>
                 {row.hint && <p className="truncate text-xs text-muted">{row.hint}</p>}
               </div>
-              <dd className="text-4xl font-bold tracking-tight sm:text-5xl">
+              <dd className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-3xl">
                 <CountUp value={row.value} prefix={row.prefix} />
               </dd>
             </div>
@@ -230,7 +230,7 @@ export function Calendar({ review: r }: { review: YearReview }) {
         </>
       }
     >
-      <div className="rounded-3xl border border-white/8 bg-white/[0.025] p-4 sm:p-8">
+      <div className="rounded-3xl border border-white/8 bg-white/[0.025] p-4 sm:p-8 lg:rounded-2xl lg:p-6">
         <MonthChart review={r} />
       </div>
     </Chapter>
@@ -252,15 +252,15 @@ export function PersonalityCard({ review: r, personality }: { review: YearReview
   return (
     <Chapter n={3} eyebrow="Your watching personality" title="This year, you were…">
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <div className="relative overflow-hidden rounded-3xl border border-accent-line/70 bg-[linear-gradient(135deg,rgb(124_58_237/0.22),rgb(79_70_229/0.08)_55%,transparent)] p-6 sm:p-10">
-          <span className="flex size-14 items-center justify-center rounded-2xl bg-accent text-on-accent shadow-[0_12px_40px_-10px_var(--accent-strong)]">
-            <Icon className="size-7" aria-hidden />
+        <div className="relative overflow-hidden rounded-3xl border border-accent-line/70 bg-[linear-gradient(135deg,rgb(124_58_237/0.22),rgb(79_70_229/0.08)_55%,transparent)] p-6 sm:p-10 lg:rounded-2xl lg:p-7">
+          <span className="flex size-14 items-center justify-center rounded-2xl bg-accent lg:size-12 text-on-accent shadow-[0_12px_40px_-10px_var(--accent-strong)]">
+            <Icon className="size-7 lg:size-6" aria-hidden />
           </span>
-          <p className="review-ink mt-6 text-4xl font-extrabold tracking-tight text-balance sm:text-6xl">{personality.main.name}</p>
-          <p className="mt-4 text-xl font-medium text-fg">{personality.main.tagline}</p>
+          <p className="review-ink mt-6 text-4xl font-extrabold tracking-tight text-balance sm:text-6xl lg:mt-5 lg:text-5xl">{personality.main.name}</p>
+          <p className="mt-4 text-xl font-medium text-fg lg:mt-3 lg:text-lg">{personality.main.tagline}</p>
           <p className="mt-2 max-w-xl text-fg-2">{personality.main.reason}</p>
           {personality.also.length > 0 && (
-            <div className="mt-6">
+            <div className="mt-6 lg:mt-5">
               <p className="eyebrow">Also a bit of</p>
               <ul className="mt-2 flex flex-wrap gap-1.5">
                 {personality.also.map((p) => {
@@ -276,7 +276,7 @@ export function PersonalityCard({ review: r, personality }: { review: YearReview
             </div>
           )}
         </div>
-        <div className="space-y-5 rounded-3xl border border-white/8 bg-white/[0.025] p-6">
+        <div className="space-y-5 rounded-3xl border border-white/8 bg-white/[0.025] p-6 lg:rounded-2xl lg:p-5">
           <div>
             <p className="font-medium">When you watch</p>
             <p className="text-sm text-muted">
@@ -307,7 +307,7 @@ const MOMENT_ICON: Record<Moment['kind'], LucideIcon> = { first: Flag, milestone
 
 function Record({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <div className={`review-rise relative min-w-0 overflow-hidden rounded-3xl border border-white/8 bg-white/[0.03] p-6 sm:p-7 ${className}`}>
+    <div className={`review-rise relative min-w-0 overflow-hidden rounded-3xl border border-white/8 bg-white/[0.03] p-6 sm:p-7 lg:rounded-2xl lg:p-5 ${className}`}>
       <p className="eyebrow">{label}</p>
       {children}
     </div>
@@ -322,19 +322,19 @@ export function Moments({ review: r, byId }: { review: YearReview; byId: (id: st
   const binge = r.biggestBinge && r.biggestBinge.count >= BINGE_EPISODES ? r.biggestBinge : null
   return (
     <Chapter n={4} eyebrow="Your records" title="The moments that stood out">
-      <div className="grid grid-flow-dense gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-flow-dense gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {streak && streak.days >= 2 && (
           <Record label="Longest streak" className="lg:col-span-2">
             <p className="mt-3 flex items-baseline gap-3">
-              <span className="review-ink text-7xl font-extrabold tracking-tight sm:text-8xl">
+              <span className="review-ink text-7xl font-extrabold tracking-tight sm:text-8xl lg:text-6xl">
                 <CountUp value={streak.days} />
               </span>
-              <span className="text-xl font-medium">days in a row</span>
+              <span className="text-xl font-medium lg:text-lg">days in a row</span>
             </p>
             <p className="mt-1 text-sm text-muted">
               {formatDay(streak.from)} – {formatDay(streak.to)}
             </p>
-            <div aria-hidden className="mt-5 flex flex-wrap gap-1">
+            <div aria-hidden className="mt-5 flex flex-wrap gap-1 lg:mt-4">
               {Array.from({ length: Math.min(streak.days, 30) }, (_, i) => (
                 <span key={i} className="review-bar size-3 rounded-[4px] bg-linear-to-br from-accent to-[#67e8f9]" style={{ '--rise-delay': `${i * 20}ms` } as CSSProperties} />
               ))}
@@ -344,7 +344,7 @@ export function Moments({ review: r, byId }: { review: YearReview; byId: (id: st
         )}
         {r.biggestDay && r.biggestDay.count >= 2 && (
           <Record label="Biggest day">
-            <p className="mt-3 text-6xl font-extrabold tracking-tight">
+            <p className="mt-3 text-6xl font-extrabold tracking-tight lg:text-5xl">
               <CountUp value={r.biggestDay.count} />
             </p>
             <p className="mt-1 text-fg-2">watched in one day</p>
@@ -353,16 +353,16 @@ export function Moments({ review: r, byId }: { review: YearReview; byId: (id: st
         )}
         {r.busiestMonth && activeMonths > 1 && (
           <Record label="Most active month">
-            <p className="review-ink mt-3 text-5xl font-extrabold tracking-tight">{MONTHS[r.busiestMonth.month]}</p>
+            <p className="review-ink mt-3 text-5xl font-extrabold tracking-tight lg:text-4xl xl:text-5xl">{MONTHS[r.busiestMonth.month]}</p>
             <p className="mt-2 text-fg-2">{plural(r.busiestMonth.count, 'watch', 'watches')}</p>
           </Record>
         )}
         {top && (
           <Record label="Most watched" className="sm:col-span-2">
-            <Link to={`/title/${top.titleId}`} className="mt-4 flex items-center gap-4 rounded-2xl hover:opacity-90">
-              <Poster poster={topTitle?.poster ?? null} source={topTitle?.source ?? null} title={top.title} mediaType={top.mediaType} className="w-16 shrink-0 rounded-lg" />
+            <Link to={`/title/${top.titleId}`} className="mt-4 flex items-center gap-4 rounded-2xl hover:opacity-90 lg:mt-3">
+              <Poster poster={topTitle?.poster ?? null} source={topTitle?.source ?? null} title={top.title} mediaType={top.mediaType} className="w-16 shrink-0 rounded-lg lg:w-14" />
               <span className="min-w-0">
-                <span className="line-clamp-2 text-xl font-semibold">{top.title}</span>
+                <span className="line-clamp-2 text-xl font-semibold lg:text-lg">{top.title}</span>
                 <span className="text-sm text-muted">
                   {plural(top.count, top.mediaType === 'movie' ? 'watch' : 'episode', top.mediaType === 'movie' ? 'watches' : 'episodes')}
                   {top.mediaType !== 'movie' && r.stats.episodes ? ` · ${Math.round((top.count / r.stats.episodes) * 100)}% of your episodes` : ''}
@@ -372,9 +372,9 @@ export function Moments({ review: r, byId }: { review: YearReview; byId: (id: st
           </Record>
         )}
         {binge && (
-          <Record label="Biggest binge" className="sm:col-span-2 lg:col-span-3">
+          <Record label="Biggest binge" className="sm:col-span-2">
             <p className="mt-3 flex flex-wrap items-baseline gap-x-3">
-              <span className="text-6xl font-extrabold tracking-tight">{binge.count}</span>
+              <span className="text-6xl font-extrabold tracking-tight lg:text-5xl">{binge.count}</span>
               <span className="text-lg text-fg-2">episodes of {binge.title}</span>
             </p>
             <p className="text-sm text-muted">{formatDay(binge.day, true)}</p>
@@ -383,13 +383,13 @@ export function Moments({ review: r, byId }: { review: YearReview; byId: (id: st
       </div>
 
       <div>
-        <p className="eyebrow mb-4">Along the way</p>
-        <ol className="grid gap-x-10 sm:grid-cols-2">
+        <p className="eyebrow mb-4 lg:mb-2">Along the way</p>
+        <ol className="grid gap-x-10 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-8">
           {r.moments.map((m, i) => {
             const Icon = MOMENT_ICON[m.kind]
             const big = m.kind === 'streak' || m.kind === 'binge' || m.kind === 'day'
             return (
-              <li key={`${m.kind}-${m.day}-${i}`} className="flex gap-4 border-b border-white/6 py-4">
+              <li key={`${m.kind}-${m.day}-${i}`} className="flex gap-4 border-b border-white/6 py-4 lg:gap-3 lg:py-3">
                 <span className={`flex size-9 shrink-0 items-center justify-center rounded-full ${big ? 'bg-accent text-on-accent' : 'bg-white/5 text-accent-text ring-1 ring-white/10'}`}>
                   <Icon className="size-4" aria-hidden />
                 </span>
@@ -419,13 +419,13 @@ export function Top5({ review: r, byId }: { review: YearReview; byId: (id: strin
   const t1 = byId(first.titleId)
   return (
     <Chapter n={5} eyebrow={`Your top ${r.top.length}`} title="What you couldn't stop watching">
-      <ol className="space-y-6">
+      <ol className="space-y-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] lg:gap-6 lg:space-y-0">
         <li>
-          <Link to={`/title/${first.titleId}`} className="group relative flex flex-col gap-6 overflow-hidden rounded-3xl border border-accent-line/60 bg-[linear-gradient(120deg,rgb(124_58_237/0.2),transparent_60%)] p-5 sm:flex-row sm:items-end sm:p-8">
-            <Poster poster={t1?.poster ?? null} source={t1?.source ?? null} title={first.title} mediaType={first.mediaType} className="review-rise w-40 shrink-0 rounded-2xl shadow-pop sm:w-56" />
+          <Link to={`/title/${first.titleId}`} className="group relative flex flex-col gap-6 overflow-hidden rounded-3xl border border-accent-line/60 bg-[linear-gradient(120deg,rgb(124_58_237/0.2),transparent_60%)] p-5 sm:flex-row sm:items-end sm:p-8 lg:h-full lg:gap-5 lg:rounded-2xl lg:p-5">
+            <Poster poster={t1?.poster ?? null} source={t1?.source ?? null} title={first.title} mediaType={first.mediaType} className="review-rise w-40 shrink-0 rounded-2xl shadow-pop sm:w-56 lg:w-32 xl:w-40" />
             <div className="min-w-0">
-              <p className="review-ink text-7xl font-extrabold leading-none tracking-tight sm:text-9xl">#1</p>
-              <p className="mt-3 line-clamp-3 text-3xl font-semibold tracking-tight text-balance wrap-anywhere sm:text-4xl">{first.title}</p>
+              <p className="review-ink text-7xl font-extrabold leading-none tracking-tight sm:text-9xl lg:text-6xl xl:text-7xl">#1</p>
+              <p className="mt-3 line-clamp-3 text-3xl font-semibold tracking-tight text-balance wrap-anywhere sm:text-4xl lg:mt-2 lg:text-2xl">{first.title}</p>
               <p className="mt-2 text-fg-2">
                 {countText(first)} · ≈{plural(hoursOf(first.minutes), 'hour')}
               </p>
@@ -435,7 +435,7 @@ export function Top5({ review: r, byId }: { review: YearReview; byId: (id: strin
         </li>
         {rest.length > 0 && (
           <li>
-            <ol className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
+            <ol className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6 lg:gap-4">
               {rest.map((t, i) => {
                 const title = byId(t.titleId)
                 return (
@@ -444,9 +444,9 @@ export function Top5({ review: r, byId }: { review: YearReview; byId: (id: strin
                       <div className="relative">
                         <Poster poster={title?.poster ?? null} source={title?.source ?? null} title={t.title} mediaType={t.mediaType} className="w-full rounded-2xl transition-transform duration-300 group-hover:-translate-y-1" />
                         <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 rounded-b-2xl bg-linear-to-t from-black/80 to-transparent" />
-                        <span className="absolute bottom-2 left-3 text-4xl font-extrabold tracking-tight text-white drop-shadow sm:text-5xl">#{i + 2}</span>
+                        <span className="absolute bottom-2 left-3 text-4xl font-extrabold tracking-tight text-white drop-shadow sm:text-5xl lg:text-3xl">#{i + 2}</span>
                       </div>
-                      <p className="mt-3 line-clamp-2 font-medium wrap-anywhere">{t.title}</p>
+                      <p className="mt-3 line-clamp-2 font-medium wrap-anywhere lg:mt-2 lg:text-sm">{t.title}</p>
                       <p className="text-xs text-muted">{countText(t)}</p>
                     </Link>
                   </li>
@@ -493,7 +493,7 @@ export function Compared({ review: r }: { review: YearReview }) {
   if (!c)
     return (
       <Chapter n={6} eyebrow="Year compared" title="Your first year in WatchTrack">
-        <div className="rounded-3xl border border-dashed border-white/15 p-6 sm:p-8">
+        <div className="rounded-3xl border border-dashed border-white/15 p-6 sm:p-8 lg:rounded-2xl lg:p-6">
           <p className="text-lg font-medium">No {r.year - 1} history to compare with</p>
           <p className="mt-2 max-w-2xl text-fg-2">
             Nothing was logged before {formatDay(r.coverage.from, true)}. That isn't zero, it just wasn't tracked, so no comparison is made up. Next year, this is where you'll see how {r.year} measures up.
@@ -506,14 +506,14 @@ export function Compared({ review: r }: { review: YearReview }) {
   const change = c.fair ? percentChange(curEp, prevEp) : null
   return (
     <Chapter n={6} eyebrow="Year compared" title={`${r.year} against ${c.previousYear}`} intro={compareIntro(c)}>
-      <div className="grid gap-8 lg:grid-cols-[1fr_1.6fr] lg:gap-14">
+      <div className="grid gap-8 lg:gap-4">
         <div>
-          <p className="text-7xl font-extrabold tracking-tight sm:text-8xl">
+          <p className="text-7xl font-extrabold tracking-tight sm:text-8xl lg:text-6xl">
             <span className={change !== null && change > 0 ? 'review-ink' : ''}>
               {change !== null ? `${change > 0 ? '+' : ''}${change}%` : `${curEp - prevEp > 0 ? '+' : ''}${(curEp - prevEp).toLocaleString()}`}
             </span>
           </p>
-          <p className="mt-2 text-lg text-fg-2">
+          <p className="mt-2 text-lg text-fg-2 lg:mt-1 lg:text-base">
             {change !== null ? (change >= 0 ? 'more episodes' : 'fewer episodes') : curEp - prevEp >= 0 ? 'more episodes' : 'fewer episodes'} than {c.previousYear}
             {c.narrowed || c.toToday ? ', over the same dates' : ''}.
           </p>
@@ -524,7 +524,7 @@ export function Compared({ review: r }: { review: YearReview }) {
             const cur = m.get(c.current)
             const max = Math.max(1, prev, cur)
             return (
-              <li key={m.label} className="space-y-2 border-b border-white/6 py-4">
+              <li key={m.label} className="space-y-2 border-b border-white/6 py-4 lg:space-y-1.5 lg:py-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm text-fg-2">{m.label}</p>
                   <Delta current={cur} previous={prev} fair={c.fair} />
@@ -565,11 +565,11 @@ function compareIntro(c: Comparison): string {
 export function LookingBack({ summary, insights }: { summary: string; insights: Insight[] }) {
   return (
     <Chapter n={7} eyebrow="Looking back" title="Your year, in a few lines">
-      <blockquote className="max-w-4xl border-l-2 border-accent pl-5 text-2xl leading-snug font-medium text-balance sm:pl-8 sm:text-3xl">{summary}</blockquote>
+      <blockquote className="max-w-4xl border-l-2 border-accent pl-5 text-2xl leading-snug font-medium text-balance sm:pl-8 sm:text-3xl lg:pl-5 lg:text-xl">{summary}</blockquote>
       {insights.length > 0 && (
-        <ul className="grid gap-x-10 sm:grid-cols-2">
+        <ul className="grid gap-x-10 sm:grid-cols-2 lg:grid-cols-1">
           {insights.map((i, n) => (
-            <li key={i.id} className="review-rise flex items-start gap-3 border-b border-white/6 py-4" style={{ '--rise-delay': `${n * 50}ms` } as CSSProperties}>
+            <li key={i.id} className="review-rise flex items-start gap-3 border-b border-white/6 py-4 lg:py-3" style={{ '--rise-delay': `${n * 50}ms` } as CSSProperties}>
               <Medal className="mt-0.5 size-4 shrink-0 text-accent-text" aria-hidden />
               <span className="text-fg-2">{i.text}</span>
             </li>
@@ -587,18 +587,18 @@ export function Finale({ review: r, standout, byId, onShare }: { review: YearRev
   const t = top && byId(top.titleId)
   const totals = [r.stats.episodes && plural(r.stats.episodes, 'episode'), r.stats.movies && plural(r.stats.movies, 'movie'), `≈${plural(hoursOf(r.stats.minutes), 'hour')}`].filter(Boolean).join(' · ')
   return (
-    <section aria-labelledby="review-finale" className="review-rise relative isolate overflow-hidden rounded-[2rem] border border-accent-line/60 p-6 text-center sm:p-14">
+    <section aria-labelledby="review-finale" className="review-rise relative isolate overflow-hidden rounded-[2rem] border border-accent-line/60 p-6 text-center sm:p-14 lg:rounded-3xl lg:p-10">
       <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_50%_0%,rgb(139_92_246/0.38),transparent_70%),radial-gradient(50%_50%_at_50%_110%,rgb(103_232_249/0.14),transparent_70%)]" />
       <p className="eyebrow text-accent-text">{r.inProgress ? 'So far' : 'That’s a wrap'}</p>
-      <h2 id="review-finale" className="mt-3 text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
+      <h2 id="review-finale" className="mt-3 text-4xl font-semibold tracking-tight text-balance sm:text-6xl lg:text-4xl xl:text-5xl">
         That was your {r.year}{r.inProgress ? ', so far' : ''}.
       </h2>
 
-      <div className="mx-auto mt-10 grid max-w-3xl gap-8 sm:grid-cols-2 sm:text-left">
+      <div className="mx-auto mt-10 grid max-w-3xl gap-8 sm:grid-cols-2 sm:text-left lg:mt-8">
         <div>
           <p className="eyebrow">Your standout</p>
           <p className="mt-2 flex flex-wrap items-baseline gap-x-3 max-sm:justify-center">
-            <span className="review-ink text-7xl font-extrabold tracking-tight">{standout.value}</span>
+            <span className="review-ink text-7xl font-extrabold tracking-tight lg:text-6xl">{standout.value}</span>
             <span className="text-lg font-medium">{standout.unit}</span>
           </p>
           <p className="text-sm text-muted">{standout.detail}</p>
@@ -617,11 +617,11 @@ export function Finale({ review: r, standout, byId, onShare }: { review: YearRev
         )}
       </div>
 
-      <p className="mt-10 text-lg text-fg-2">{totals}</p>
-      <button type="button" className="btn-primary mt-8 min-h-14 rounded-full px-8 text-base" onClick={onShare}>
+      <p className="mt-10 text-lg text-fg-2 lg:mt-8 lg:text-base">{totals}</p>
+      <button type="button" className="btn-primary mt-8 min-h-14 rounded-full px-8 text-base lg:mt-6 lg:min-h-12" onClick={onShare}>
         <Share2 className="size-5" aria-hidden /> Share your year
       </button>
-      <div className="mt-12 flex flex-col items-center gap-2 text-sm text-muted">
+      <div className="mt-12 flex flex-col items-center gap-2 text-sm text-muted lg:mt-8">
         <span className="flex items-center gap-2 text-fg">
           <Logo className="size-6" />
         </span>
