@@ -9,7 +9,7 @@ interface ModalProps {
   children: ReactNode
   /** Footer actions */
   footer?: ReactNode
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
 }
 
 /** Critically damped: settles without overshoot. Apple's default for UI that wasn't thrown. */
@@ -61,7 +61,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
   }
 
   if (!open) return null
-  const width = size === 'sm' ? 'sm:max-w-md' : size === 'lg' ? 'sm:max-w-3xl' : 'sm:max-w-xl'
+  const width = size === 'sm' ? 'sm:max-w-md' : size === 'lg' ? 'sm:max-w-3xl' : size === 'xl' ? 'sm:max-w-5xl' : 'sm:max-w-xl'
 
   return (
     <dialog

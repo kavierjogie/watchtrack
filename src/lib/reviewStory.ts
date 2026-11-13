@@ -8,7 +8,7 @@ import { formatDay, MONTHS, percentChange, toHours, WEEKDAYS, type YearReview } 
 
 // ---------- Watching personality ----------
 
-export type PersonalityId = 'marathon' | 'binge' | 'completionist' | 'weekend' | 'consistent' | 'anime' | 'movies' | 'easygoing'
+export type PersonalityId = 'marathon' | 'binge' | 'completionist' | 'weekend' | 'consistent' | 'anime' | 'movies' | 'explorer' | 'easygoing'
 
 export interface Personality {
   id: PersonalityId
@@ -16,6 +16,8 @@ export interface Personality {
   tagline: string
   /** Why you got it, in your own numbers. */
   reason: string
+  /** The one number behind it, for the share card: "62%" / "of your episodes came in binges". */
+  stat: { value: string; label: string }
   /** How far past its threshold you are (1 = just made it). Highest wins. */
   score: number
 }
@@ -29,13 +31,13 @@ const plural = (n: number, word: string, many = `${word}s`) => `${n.toLocaleStri
  * The rules, in tie-break order. Each is "measured value / threshold": a trait applies at 1 or more. The thresholds are
  * shown in the page's "How this works", so the result can be checked by hand.
  */
-export const PERSONALITY_RULES: { id: PersonalityId; name: string; tagline: string; rule: string; test: (r: YearReview) => { score: number; reason: string } | null }[] = [
+export const PERSONALITY_RULES: { id: PersonalityId; name: string; tagline: string; rule: string; test: (r: YearReview) => { score: number; reason: string; stat: Personality['stat'] } | null }[] = [
   {
     id: 'marathon',
     name: 'The Marathon Watcher',
     tagline: 'When you sit down, you settle in.',
     rule: '3 or more days with 8+ watches',
-    test: (r) => (r.marathonDays >= 3 ? { score: r.marathonDays / 3, reason: `On ${plural(r.marathonDays, 'day')} you watched 8 or more in a single day${r.biggestDay ? `, with a record of ${r.biggestDay.count} on ${formatDay(r.biggestDay.day)}` : ''}.` } : null),
+    test: (r) => (r.marathonDays >= 3 ? { score: r.marathonDays / 3, stat: { value: r.marathonDays.toLocaleString(), label: 'days with 8 or more watches' }, reason: `On ${plural(r.marathonDays, 'day')} you watched 8 or more in a single day${r.biggestDay ? `, with a record of ${r.biggestDay.count} on ${formatDay(r.biggestDay.day)}` : ''}.` } : null),
   },
   {
     id: 'binge',
@@ -44,7 +46,7 @@ export const PERSONALITY_RULES: { id: PersonalityId; name: string; tagline: stri
     rule: '40%+ of episodes in binges (4+ of one show in a day), over 3+ binges',
     test: (r) =>
       r.bingeSessions >= 3 && r.bingeShare >= 0.4
-        ? { score: r.bingeShare / 0.4, reason: `${pct(r.bingeShare)} of your episodes came in binges of 4 or more of the same show in a day, across ${plural(r.bingeSessions, 'binge')}.` }
+        ? { score: r.bingeShare / 0.4, stat: { value: pct(r.bingeShare), label: 'of your episodes came in binges' }, reason: `${pct(r.bingeShare)} of your episodes came in binges of 4 or more of the same show in a day, across ${plural(r.bingeSessions, 'binge')}.` }
         : null,
   },
   {
@@ -55,16 +57,16 @@ export const PERSONALITY_RULES: { id: PersonalityId; name: string; tagline: stri
     test: (r) => {
       const done = r.stats.completedSeries
       const share = r.seriesWatched ? done / r.seriesWatched : 0
-      return done >= 4 && share >= 0.4 ? { score: share / 0.4, reason: `You completed ${plural(done, 'series', 'series')}: ${pct(Math.min(1, share))} of the ${plural(r.seriesWatched, 'series', 'series')} you watched this year.` } : null
+      return done >= 4 && share >= 0.4 ? { score: share / 0.4, stat: { value: done.toLocaleString(), label: `series completed, ${pct(Math.min(1, share))} of those you watched` }, reason: `You completed ${plural(done, 'series', 'series')}: ${pct(Math.min(1, share))} of the ${plural(r.seriesWatched, 'series', 'series')} you watched this year.` } : null
     },
   },
   {
     id: 'weekend',
-    name: 'The Weekend Warrior',
+    name: 'The Weekend Watcher',
     tagline: 'Saturdays and Sundays are for watching.',
     rule: '15+ watches, half or more on Saturday and Sunday',
     test: (r) =>
-      r.stats.watches >= 15 && r.weekendShare >= 0.5 ? { score: r.weekendShare / 0.5, reason: `${pct(r.weekendShare)} of everything you watched was on a Saturday or Sunday. An even spread would be 29%.` } : null,
+      r.stats.watches >= 15 && r.weekendShare >= 0.5 ? { score: r.weekendShare / 0.5, stat: { value: pct(r.weekendShare), label: 'of your watching on Saturdays and Sundays' }, reason: `${pct(r.weekendShare)} of everything you watched was on a Saturday or Sunday. An even spread would be 29%.` } : null,
   },
   {
     id: 'consistent',
@@ -73,29 +75,46 @@ export const PERSONALITY_RULES: { id: PersonalityId; name: string; tagline: stri
     rule: 'Something watched in 60%+ of weeks, over 8+ weeks',
     test: (r) => {
       const share = r.activeWeeks / r.coveredWeeks
-      return r.coveredWeeks >= 8 && share >= 0.6 ? { score: share / 0.6, reason: `You watched something in ${r.activeWeeks} of the ${r.coveredWeeks} weeks ${r.inProgress ? 'so far' : 'of the year'}.` } : null
+      return r.coveredWeeks >= 8 && share >= 0.6 ? { score: share / 0.6, stat: { value: `${r.activeWeeks}/${r.coveredWeeks}`, label: 'weeks with something watched' }, reason: `You watched something in ${r.activeWeeks} of the ${r.coveredWeeks} weeks ${r.inProgress ? 'so far' : 'of the year'}.` } : null
     },
   },
   {
     id: 'anime',
-    name: 'The Anime Explorer',
+    name: 'The Anime Enthusiast',
     tagline: 'Your year was drawn, not filmed.',
     rule: '60%+ of episodes were anime, across 4+ anime series',
     test: (r) => {
       const share = r.stats.episodes ? r.animeEpisodes / r.stats.episodes : 0
       const titles = r.animeSeries
-      return share >= 0.6 && titles >= 4 ? { score: share / 0.6, reason: `${pct(share)} of your episodes were anime, across ${plural(titles, 'series', 'series')}.` } : null
+      return share >= 0.6 && titles >= 4 ? { score: share / 0.6, stat: { value: pct(share), label: `of your episodes were anime, across ${plural(titles, 'series', 'series')}` }, reason: `${pct(share)} of your episodes were anime, across ${plural(titles, 'series', 'series')}.` } : null
     },
   },
   {
     id: 'movies',
-    name: 'The Movie Enthusiast',
+    name: 'The Movie Buff',
     tagline: 'Two hours and a story: perfect.',
     rule: '6+ movies, making up 35%+ of everything watched',
     test: (r) => {
       const share = r.stats.movies / r.stats.watches
       return r.stats.movies >= 6 && share >= 0.35
-        ? { score: share / 0.35, reason: `You watched ${plural(r.stats.movies, 'movie')}${r.movieRewatches ? ` (${plural(r.distinctMovies, 'different one')})` : ''}: ${pct(share)} of everything you logged.` }
+        ? { score: share / 0.35, stat: { value: r.stats.movies.toLocaleString(), label: `movies, ${pct(share)} of everything you watched` }, reason: `You watched ${plural(r.stats.movies, 'movie')}${r.movieRewatches ? ` (${plural(r.distinctMovies, 'different one')})` : ''}: ${pct(share)} of everything you logged.` }
+        : null
+    },
+  },
+  {
+    id: 'explorer',
+    name: 'The Genre Explorer',
+    tagline: 'No single genre could keep you.',
+    rule: '8+ genres across 6+ titles, with no genre in more than half of them',
+    test: (r) => {
+      const [first, second] = r.genres
+      const lead = first ? first.titles / r.genreTitles : 1
+      return r.genreTitles >= 6 && r.genres.length >= 8 && lead <= 0.5
+        ? {
+            score: r.genres.length / 8,
+            stat: { value: r.genres.length.toLocaleString(), label: `genres across ${plural(r.genreTitles, 'title')}` },
+            reason: `You covered ${r.genres.length} genres this year. ${first.name}${second ? ` and ${second.name}` : ''} led, but nothing ran the show.`,
+          }
         : null
     },
   },
@@ -107,7 +126,7 @@ export function watchingPersonality(r: YearReview): { main: Personality; also: P
   const matched: Personality[] = []
   for (const rule of PERSONALITY_RULES) {
     const hit = rule.test(r)
-    if (hit) matched.push({ id: rule.id, name: rule.name, tagline: rule.tagline, reason: hit.reason, score: hit.score })
+    if (hit) matched.push({ id: rule.id, name: rule.name, tagline: rule.tagline, reason: hit.reason, stat: hit.stat, score: hit.score })
   }
   // Stable sort: equal scores keep the rule order above.
   matched.sort((a, b) => b.score - a.score)
@@ -118,6 +137,7 @@ export function watchingPersonality(r: YearReview): { main: Personality; also: P
         name: 'The Easygoing Viewer',
         tagline: 'No rules, just good stuff when you feel like it.',
         reason: `No single habit dominated: ${plural(r.stats.watches, 'watch', 'watches')} across ${plural(r.titles, 'title')} on ${plural(r.stats.activeDays, 'day')}, at your own pace.`,
+        stat: { value: r.titles.toLocaleString(), label: `titles on ${plural(r.stats.activeDays, 'day')}, no habit in charge` },
         score: 0,
       },
       also: [],
@@ -193,6 +213,7 @@ const HEADLINES: Partial<Record<PersonalityId, string>> = {
   weekend: 'Weekends, well spent.',
   consistent: 'A little, often, all year long.',
   movies: 'A year at the movies.',
+  explorer: 'A year that went everywhere.',
 }
 
 /** The opening line, chosen from the year's dominant habit so it always says something true about you. */
@@ -223,5 +244,91 @@ export function standoutRecord(r: YearReview): Standout {
   return { value: r.stats.activeDays.toLocaleString(), unit: r.stats.activeDays === 1 ? 'day with something on' : 'days with something on', detail: `Across ${plural(r.titles, 'title')}.` }
 }
 
-/** One data-backed observation for a share card: the most interesting insight that isn't already on the card. */
-export const shareHighlight = (insights: Insight[]) => insights.find((i) => !['top', 'time', 'movies'].includes(i.id)) ?? null
+// ---------- Highlight reel (the share card that celebrates one achievement) ----------
+
+export type HighlightId = 'title' | 'binge' | 'streak' | 'month' | 'finished' | 'genre' | 'milestone' | 'furthest'
+
+export interface Highlight {
+  id: HighlightId
+  /** What kind of achievement it is ("Longest streak"). */
+  label: string
+  /** The big figure, already formatted. A genre highlight's figure is the genre's name. */
+  value: string
+  /** Read straight after the value ("days in a row"). */
+  unit: string
+  detail: string
+  /** The title it's about, for its poster. */
+  titleId?: string
+  /** How far past its threshold it is (1 = just made it). Highest leads the card. */
+  score: number
+}
+
+const MILESTONE_STEPS = [100, 250, 500, 1000, 2000, 5000, 10_000]
+
+/**
+ * The year's achievements worth celebrating, best first. Each needs a fixed minimum (an 8-episode favourite, a week-long
+ * streak, a 6-episode binge…) and is ranked by how far past it you went, so a thin year gets none rather than a forced one.
+ */
+export function reviewHighlights(r: YearReview): Highlight[] {
+  const out: Highlight[] = []
+  const top = r.top[0]
+  if (top && top.mediaType !== 'movie' && top.count >= 8 && r.stats.episodes)
+    out.push({
+      id: 'title',
+      label: 'Most-watched title',
+      value: top.count.toLocaleString(),
+      unit: `episodes of ${top.title}`,
+      detail: `${pct(top.count / r.stats.episodes)} of every episode you watched${top.completed ? ', and you finished it' : ''}.`,
+      titleId: top.titleId,
+      score: top.count / 8,
+    })
+  else if (top && top.mediaType === 'movie' && top.count >= 3)
+    out.push({ id: 'title', label: 'Most-watched title', value: top.count.toLocaleString(), unit: `times watching ${top.title}`, detail: 'Some films are worth seeing again.', titleId: top.titleId, score: top.count / 3 })
+  const b = r.biggestBinge
+  if (b && b.count >= 6) out.push({ id: 'binge', label: 'Biggest binge', value: b.count.toLocaleString(), unit: `episodes of ${b.title} in one day`, detail: `On ${formatDay(b.day)}. Just one more, right?`, titleId: b.titleId, score: b.count / 6 })
+  const s = r.stats.longestStreak
+  if (s && s.days >= 7) out.push({ id: 'streak', label: 'Longest streak', value: s.days.toLocaleString(), unit: 'days in a row', detail: `Something watched every day, ${formatDay(s.from)} – ${formatDay(s.to)}.`, score: s.days / 7 })
+  const m = standoutMonth(r)
+  if (m && m.count >= 15) {
+    const mostly = r.byMonth[m.month].top
+    out.push({
+      id: 'month',
+      label: 'Most productive month',
+      value: m.count.toLocaleString(),
+      unit: `watches in ${MONTHS[m.month]}`,
+      detail: mostly && mostly.count >= 3 ? `Led by ${mostly.title}, ${plural(mostly.count, 'time')}.` : 'Your busiest month of the year.',
+      score: m.count / 15,
+    })
+  }
+  const done = Math.max(0, ...r.completedByMonth)
+  if (done >= 3) {
+    const month = r.completedByMonth.indexOf(done)
+    out.push({
+      id: 'finished',
+      label: 'Most finished in a month',
+      value: done.toLocaleString(),
+      unit: `series completed in ${MONTHS[month]}`,
+      detail: `Out of ${plural(r.stats.completedSeries, 'series', 'series')} you completed ${r.inProgress ? 'so far' : 'all year'}.`,
+      score: done / 3,
+    })
+  }
+  const g = r.genres[0]
+  if (g && g.titles >= 4 && g.titles / r.genreTitles >= 0.3)
+    out.push({ id: 'genre', label: 'Favourite genre', value: g.name, unit: 'was your genre of the year', detail: `${g.titles} of the ${r.genreTitles} titles you watched were ${g.name}.`, score: g.titles / 4 })
+  const reached = [...MILESTONE_STEPS].reverse().find((n) => r.stats.watches >= n)
+  if (reached) {
+    const what = r.moments.find((x) => x.kind === 'milestone' && x.title === `Watch number ${reached.toLocaleString()}`)
+    out.push({
+      id: 'milestone',
+      label: 'Milestone',
+      value: reached.toLocaleString(),
+      unit: 'watches logged',
+      detail: what ? `Number ${reached.toLocaleString()} was ${what.detail}, on ${formatDay(what.day)}.` : `${r.stats.watches.toLocaleString()} in all.`,
+      score: Math.log2(reached / 50),
+    })
+  }
+  const f = r.furthest
+  if (f && f.episode >= 100) out.push({ id: 'furthest', label: 'Deepest dive', value: f.episode.toLocaleString(), unit: `episodes into ${f.title}`, detail: 'The furthest you reached in any one show.', titleId: f.titleId, score: f.episode / 200 })
+  // Stable sort: equal scores keep the order above.
+  return out.sort((a, b) => b.score - a.score)
+}

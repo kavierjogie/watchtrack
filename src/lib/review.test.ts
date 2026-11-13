@@ -85,7 +85,7 @@ describe('habits and records', () => {
     const sat = Array.from({ length: 8 }, (_, i) => ep(frieren, at(2026, 3, 7, 12, i * 20), i + 1))
     const weekdays = [2, 3, 4, 5, 9, 10].map((d, i) => ep(severance, at(2026, 3, d), i + 1, 1))
     const r = review([frieren, severance], [...sat, ...weekdays])
-    expect(r.biggestBinge).toEqual({ day: '2026-03-07', title: 'Frieren', count: 8 })
+    expect(r.biggestBinge).toMatchObject({ day: '2026-03-07', title: 'Frieren', count: 8 })
     expect(r).toMatchObject({ marathonDays: 1, bingeSessions: 1 })
     expect(r.bingeShare).toBeCloseTo(8 / 14)
     expect(r.favouriteWeekday).toEqual({ weekday: 5, count: 8, share: 8 / 14 })

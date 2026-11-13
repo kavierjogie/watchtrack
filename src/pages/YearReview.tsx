@@ -8,7 +8,7 @@ import { Calendar, Compared, DataNotes, Finale, Intro, Journey, LookingBack, Mom
 import { listAllHistory } from '../lib/db'
 import { buildYearReview, indexHistory, reviewYears } from '../lib/review'
 import type { ShareData } from '../lib/reviewImage'
-import { lookingBack, reviewHeadline, reviewInsights, standoutRecord, watchingPersonality } from '../lib/reviewStory'
+import { lookingBack, reviewHeadline, reviewHighlights, reviewInsights, standoutRecord, watchingPersonality } from '../lib/reviewStory'
 import type { HistoryEntry } from '../lib/types'
 import { useLibrary } from '../state/library'
 
@@ -48,8 +48,14 @@ export function YearReviewPage() {
   const review = useMemo(() => (index ? buildYearReview(index, year, now) : null), [index, year, now])
   const personality = useMemo(() => (review ? watchingPersonality(review) : null), [review])
   const insights = useMemo(() => (review ? reviewInsights(review) : []), [review])
-  const share = useMemo<ShareData | null>(() => (review ? { review, personality, insights } : null), [review, personality, insights])
-  const topTitles = useMemo(() => (review ? review.top.map((t) => lib.byId(t.titleId)) : []), [review, lib])
+  const highlights = useMemo(() => (review ? reviewHighlights(review) : []), [review])
+  const share = useMemo<ShareData | null>(() => (review ? { review, personality, highlights } : null), [review, personality, highlights])
+  // Only these posters go on the cards: the top titles, and the lead highlight's title.
+  const shareTitles = useMemo(() => {
+    const ids = new Set(review?.top.map((t) => t.titleId))
+    if (highlights[0]?.titleId) ids.add(highlights[0].titleId)
+    return [...ids].map((id) => lib.byId(id))
+  }, [review, highlights, lib])
 
   const chooseYear = useCallback((y: number) => setParams(y === years[0] ? {} : { year: String(y) }, { replace: true }), [setParams, years])
 
@@ -111,7 +117,7 @@ export function YearReviewPage() {
         <Finale review={review} standout={standoutRecord(review)} byId={lib.byId} onShare={() => setSharing(true)} />
         <DataNotes review={review} undated={index.undated} duplicates={index.duplicates} />
       </div>
-      <AnimatePresence>{sharing && <ShareStudio key={year} data={share} titles={topTitles} onClose={() => setSharing(false)} />}</AnimatePresence>
+      <AnimatePresence>{sharing && <ShareStudio key={year} data={share} titles={shareTitles} onClose={() => setSharing(false)} />}</AnimatePresence>
     </div>
   )
 }

@@ -282,7 +282,7 @@ export interface YearReview {
   biggestDay: { day: string; count: number } | null
   /** Best 7 days in a row. */
   biggestWeek: { from: string; to: string; count: number } | null
-  biggestBinge: { day: string; title: string; count: number } | null
+  biggestBinge: { day: string; titleId: string; title: string; count: number } | null
   /** Days with MARATHON_WATCHES or more watches. */
   marathonDays: number
   /** Share of episodes watched in a binge (BINGE_EPISODES+ of one title in a day). */
@@ -295,6 +295,12 @@ export interface YearReview {
   /** Watches per month across the months covered; null under ~6 weeks of coverage. */
   perMonth: number | null
   top: TopTitle[]
+  /** Genres of the titles watched this year (from each title's own genre list), most titles first. */
+  genres: { name: string; titles: number }[]
+  /** Titles watched this year that have any genre listed: what `genres` shares are out of. */
+  genreTitles: number
+  /** Series (not movies) marked completed in each month of the year. */
+  completedByMonth: number[]
   /** The furthest episode reached in an overall-numbered series (One Piece E1100). */
   furthest: { titleId: string; title: string; episode: number } | null
   moments: Moment[]
@@ -408,7 +414,7 @@ export function buildYearReview(index: ReviewIndex, year: number, now = Date.now
     bingeEpisodes += c
     bingeSessions++
     const [day, id] = k.split('|')
-    if (!biggestBinge || c > biggestBinge.count || (c === biggestBinge.count && day < biggestBinge.day)) biggestBinge = { day, title: titleName(index, id), count: c }
+    if (!biggestBinge || c > biggestBinge.count || (c === biggestBinge.count && day < biggestBinge.day)) biggestBinge = { day, titleId: id, title: titleName(index, id), count: c }
   }
 
   // Weeks run Monday to Sunday; the partial weeks at either end of the covered span still count.
@@ -424,6 +430,24 @@ export function buildYearReview(index: ReviewIndex, year: number, now = Date.now
     top.push({ titleId, title: t.title, mediaType: t.mediaType, count: v.count, minutes: v.minutes, completed })
   }
   top.sort((a, b) => b.count - a.count || a.title.localeCompare(b.title))
+
+  // Genres as each title lists them ("Anime" is a format here, not a genre); a title counts once per genre.
+  const genreCount = new Map<string, number>()
+  let genreTitles = 0
+  for (const titleId of perTitle.keys()) {
+    const names = new Set((index.titles.get(titleId)?.genres ?? []).map((g) => g.trim()).filter((g) => g && g.toLowerCase() !== 'anime'))
+    if (names.size) genreTitles++
+    for (const g of names) genreCount.set(g, (genreCount.get(g) ?? 0) + 1)
+  }
+  const genres = [...genreCount].map(([name, titles]) => ({ name, titles })).sort((a, b) => b.titles - a.titles || a.name.localeCompare(b.name))
+
+  // Same rule as periodStats' completedSeries, split by month.
+  const completedByMonth = new Array<number>(12).fill(0)
+  for (const t of index.titles.values()) {
+    if (t.mediaType === 'movie' || t.status !== 'completed' || !t.completedAt || Number.isNaN(Date.parse(t.completedAt))) continue
+    const d = dayKey(new Date(t.completedAt))
+    if (d.startsWith(`${year}-`)) completedByMonth[Number(d.slice(5, 7)) - 1]++
+  }
 
   let seriesStarted = 0
   for (const id of series) {
@@ -476,6 +500,9 @@ export function buildYearReview(index: ReviewIndex, year: number, now = Date.now
     perActiveDay: ws.length / stats.activeDays,
     perMonth: coverageDays >= 45 ? ws.length / (coverageDays / 30.44) : null,
     top: top.slice(0, topCount),
+    genres,
+    genreTitles,
+    completedByMonth,
     furthest,
     moments,
     comparison: compareWithPreviousYear(index, year, inProgress ? today : null),

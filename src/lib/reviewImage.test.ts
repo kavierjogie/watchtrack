@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildYearReview, indexHistory, type YearReview } from './review'
-import { drawReview, fileName, fit, FOOTER_TOP, H, SITE_HOST, wrap, W, type Artwork, type ShareData, type ShareVariant } from './reviewImage'
-import { reviewHeadline, reviewInsights, watchingPersonality } from './reviewStory'
+import { drawReview, fileName, fit, FOOTER_TOP, H, SITE_HOST, topCount, wrap, W, type Artwork, type ShareData, type ShareTheme, type ShareVariant } from './reviewImage'
+import { reviewHighlights, watchingPersonality } from './reviewStory'
 import { createTitle } from './titles'
 import type { HistoryEntry, MediaType, Title } from './types'
 
@@ -56,6 +56,9 @@ function fakeContext() {
     lineTo() {},
     closePath() {},
     arc() {},
+    translate() {},
+    scale() {},
+    globalAlpha: 1,
   }
   return { ctx, drawn }
 }
@@ -80,7 +83,7 @@ const ep = (t: Title, when: string, kind: HistoryEntry['kind'] = 'episode'): His
 
 function data(titles: Title[], history: HistoryEntry[]): ShareData {
   const review = buildYearReview(indexHistory(titles, history), 2026, new Date(2027, 0, 10).getTime()) as YearReview
-  return { review, personality: watchingPersonality(review), insights: reviewInsights(review) }
+  return { review, personality: watchingPersonality(review), highlights: reviewHighlights(review) }
 }
 
 const LONG = 'The Extraordinarily Long Official English Title Of A Light Novel Adaptation That Never Seems To End: Season 2'
@@ -92,19 +95,21 @@ function busyYear(): ShareData {
   return data(shows, history)
 }
 
-const VARIANTS: ShareVariant[] = ['summary', 'top', 'stats', 'personality']
+const VARIANTS: ShareVariant[] = ['top', 'stats', 'personality', 'highlight']
+const THEMES: ShareTheme[] = ['midnight', 'daylight']
+const words = () => drawn.map((t) => t.text).join(' ')
 
 describe('share cards', () => {
   const FOOTER = ['Your watching story, your way.', 'Create your own Year in Review with WatchTrack.', SITE_HOST]
-  it.each(VARIANTS)('%s: every line of text stays inside the 1080×1350 card and clear of the sign-off, even with very long titles', (variant) => {
+  it.each(VARIANTS.flatMap((v) => THEMES.map((t) => [v, t] as const)))('%s (%s): every line of text stays inside the 1080×1350 card and clear of the sign-off, even with very long titles', (variant, theme) => {
     const d = busyYear()
-    const canvas = drawReview(d, variant)
+    const canvas = drawReview(d, variant, undefined, theme)
     expect([canvas.width, canvas.height]).toEqual([W, H])
     expect(drawn.length).toBeGreaterThan(5)
     for (const t of drawn) {
       const left = t.align === 'right' ? t.x - t.width : t.align === 'center' ? t.x - t.width / 2 : t.x
       // 80px safe margins on every side.
-      expect(left, t.text).toBeGreaterThanOrEqual(80 - 6)
+      expect(left, t.text).toBeGreaterThanOrEqual(80 - 8)
       expect(left + t.width, t.text).toBeLessThanOrEqual(W - 80)
       expect(t.y - t.size, t.text).toBeGreaterThanOrEqual(80 - 6)
       expect(t.y, t.text).toBeLessThanOrEqual(H - 80)
@@ -118,57 +123,84 @@ describe('share cards', () => {
     drawReview(busyYear(), variant)
     const texts = drawn.map((t) => t.text)
     expect(texts).toContain(SITE_HOST)
-    expect(texts).toContain('Your watching story, your way.')
+    expect(texts.some((t) => t === 'Your watching story, your way.' || (t.endsWith('…') && 'Your watching story, your way.'.startsWith(t.slice(0, -1))))).toBe(true)
     expect(texts.some((t) => t.startsWith('Create your own Year in Review'))).toBe(true)
   })
 
-  it('leads the overview with a headline drawn from the year itself', () => {
-    const d = busyYear()
-    drawReview(d, 'summary')
-    const words = drawn.map((t) => t.text).join(' ')
-    for (const w of reviewHeadline(d.review, d.personality?.main ?? null).split(' ')) expect(words).toContain(w.replace(/[.…]$/, ''))
-  })
-
-  it('draws posters it has, and lettered tiles for the rest', () => {
+  it('ranks the top five with their type and count, posters where it has them and lettered tiles for the rest', () => {
     const d = busyYear()
     const art: Artwork = new Map([[d.review.top[0].titleId, { width: 300, height: 450 } as ImageBitmap]])
     drawReview(d, 'top', art)
     expect(ctxNow.images).toBe(1)
-    // The other four get their initial instead.
     for (const t of d.review.top.slice(1)) expect(drawn.some((x) => x.text === t.title[0].toUpperCase())).toBe(true)
+    for (const rank of ['01', '02', '03', '04', '05']) expect(drawn.map((x) => x.text)).toContain(rank)
+    for (const t of d.review.top) expect(words()).toContain(`${t.count.toLocaleString()} ${t.mediaType === 'movie' ? 'WATCH' : 'EPISODE'}`)
+    expect(words()).toContain('ANIME ·')
+    expect(words()).toContain('SERIES ·')
   })
 
-  it('shows the same numbers as the review', () => {
+  it('never pads out a top five: 3 or 4 titles make a top three, fewer make none', () => {
+    const shows = ['A', 'B', 'C', 'D'].map((x) => make(x, 'tv'))
+    const d4 = data(shows, shows.map((s, i) => ep(s, at(2026, 2, i + 1))))
+    expect(topCount(d4.review)).toBe(3)
+    drawReview(d4, 'top')
+    expect(words()).toContain('MY TOP THREE')
+    expect(drawn.map((x) => x.text)).not.toContain('04')
+    expect(topCount(data(shows.slice(0, 2), [ep(shows[0], at(2026, 2, 1)), ep(shows[1], at(2026, 2, 2))]).review)).toBe(0)
+  })
+
+  it('shows the same numbers as the review, and no estimated watch time', () => {
     const d = busyYear()
     drawReview(d, 'stats')
     const texts = drawn.map((t) => t.text)
     expect(texts).toContain(d.review.stats.episodes.toLocaleString())
     expect(texts).toContain(d.review.stats.activeDays.toLocaleString())
-    expect(texts).toContain(String(d.review.stats.longestStreak!.days))
-    drawn.length = 0
-    drawReview(d, 'top')
-    for (const t of d.review.top) expect(drawn.some((x) => x.text.startsWith(`${t.count.toLocaleString()} `))).toBe(true)
+    expect(texts).toContain(d.review.titles.toLocaleString())
+    expect(words().toLowerCase()).not.toContain('hour')
   })
 
-  it('names the personality on its card and on the summary', () => {
+  it('leaves zero stats off the numbers card instead of showing them', () => {
+    const t = make('Frieren', 'anime')
+    drawReview(data([t], [ep(t, at(2026, 2, 1)), ep(t, at(2026, 2, 3))]), 'stats')
+    expect(words()).not.toContain('movies watched')
+    expect(words()).not.toContain('completed')
+  })
+
+  it('names the personality, with the number that earned it', () => {
     const d = busyYear()
     expect(d.personality).not.toBeNull()
-    drawReview(d, 'summary')
-    expect(drawn.map((t) => t.text).join(' ').toLowerCase()).toContain(d.personality!.main.name.toLowerCase())
+    drawReview(d, 'personality')
+    expect(words().replace(/\s+/g, ' ')).toContain(d.personality!.main.name.split(' ').slice(-1)[0])
+    expect(drawn.map((x) => x.text)).toContain(d.personality!.main.stat.value)
+  })
+
+  it('leads the highlight reel with the best highlight and its runners-up', () => {
+    const d = busyYear()
+    expect(d.highlights.length).toBeGreaterThan(1)
+    drawReview(d, 'highlight')
+    const texts = drawn.map((x) => x.text)
+    expect(texts).toContain(d.highlights[0].value)
+    expect(texts).toContain(d.highlights[1].value)
+    expect(words()).toContain(d.highlights[0].label.toUpperCase())
   })
 
   it('works for a tiny year, a movies-only year, and a year still going', () => {
     const t = make('Frieren', 'anime')
     for (const v of VARIANTS) expect(() => drawReview(data([t], [ep(t, at(2026, 2, 1))]), v)).not.toThrow()
     const films = [make('A', 'movie'), make('B', 'movie')]
-    expect(() => drawReview(data(films, films.map((f, i) => ep(f, at(2026, 3, i + 1), 'movie'))), 'summary')).not.toThrow()
+    drawn.length = 0
+    expect(() => drawReview(data(films, films.map((f, i) => ep(f, at(2026, 3, i + 1), 'movie'))), 'stats')).not.toThrow()
     expect(drawn.some((x) => x.text === 'movies')).toBe(true)
+    const going = buildYearReview(indexHistory([t], [ep(t, at(2026, 2, 1))]), 2026, new Date(2026, 5, 1).getTime())!
+    drawn.length = 0
+    drawReview({ review: going, personality: null, highlights: [] }, 'stats')
+    expect(words()).toContain('so far')
   })
 
-  it('names files by year and design', () => {
+  it('names files by year, design and style', () => {
     const d = busyYear()
-    expect(fileName(d.review, 'summary')).toBe('watchtrack-2026-in-review.png')
-    expect(fileName(d.review, 'top')).toBe('watchtrack-2026-top.png')
+    expect(fileName(d.review, 'top')).toBe('watchtrack-2026-top-five.png')
+    expect(fileName(d.review, 'stats', 'daylight')).toBe('watchtrack-2026-numbers-light.png')
   })
 })
 

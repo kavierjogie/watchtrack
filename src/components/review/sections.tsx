@@ -1,4 +1,4 @@
-import { ArrowDown, CalendarHeart, CalendarRange, CircleCheckBig, Clapperboard, Coffee, Film, Flag, Flame, Info, Medal, Milestone, Minus, Repeat, Share2, Sparkles, Timer, TrendingDown, TrendingUp, Trophy, type LucideIcon } from 'lucide-react'
+import { ArrowDown, CalendarHeart, CalendarRange, CircleCheckBig, Clapperboard, Coffee, Compass, Film, Flag, Flame, Info, Medal, Milestone, Minus, Repeat, Share2, Sparkles, Timer, TrendingDown, TrendingUp, Trophy, type LucideIcon } from 'lucide-react'
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { BINGE_EPISODES, formatDay, monthState, MONTHS, percentChange, RUNTIME_MINUTES, toHours, WEEKDAYS, type Comparison, type Moment, type PeriodStats, type YearReview } from '../../lib/review'
@@ -239,7 +239,7 @@ export function Calendar({ review: r }: { review: YearReview }) {
 
 // ---------- 3. Personality ----------
 
-const PERSONALITY_ICON: Record<PersonalityId, LucideIcon> = { marathon: Timer, binge: Flame, completionist: CircleCheckBig, weekend: CalendarRange, consistent: Repeat, anime: Sparkles, movies: Film, easygoing: Coffee }
+const PERSONALITY_ICON: Record<PersonalityId, LucideIcon> = { marathon: Timer, binge: Flame, completionist: CircleCheckBig, weekend: CalendarRange, consistent: Repeat, anime: Sparkles, movies: Film, explorer: Compass, easygoing: Coffee }
 
 export function PersonalityCard({ review: r, personality }: { review: YearReview; personality: { main: Personality; also: Personality[] } | null }) {
   if (!personality)
