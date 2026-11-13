@@ -46,7 +46,7 @@ export const formatReleaseTime = (iso: string) => (isDateOnly(iso) ? null : new 
 
 export const isDateOnly = (iso: string) => /^\d{4}-\d{2}-\d{2}$/.test(iso)
 
-const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+export const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 /** The calendar day (YYYY-MM-DD) a release falls on for this viewer. Date-only values are that day everywhere, never shifted. */
 export const localDay = (iso: string) => (isDateOnly(iso) ? iso : dayKey(new Date(iso)))

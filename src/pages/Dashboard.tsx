@@ -170,8 +170,14 @@ export function Dashboard() {
       )}
 
       {episodesLogged > 0 && (
-        <p className="flex items-center justify-center gap-2 text-xs text-muted">
-          <Clapperboard className="size-3.5" aria-hidden /> {episodesLogged.toLocaleString()} episode{episodesLogged === 1 ? '' : 's'} logged with WatchTrack
+        <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-muted">
+          <span className="flex items-center gap-2">
+            <Clapperboard className="size-3.5" aria-hidden /> {episodesLogged.toLocaleString()} episode{episodesLogged === 1 ? '' : 's'} logged with WatchTrack
+          </span>
+          <span aria-hidden>·</span>
+          <Link to="/review" className="font-medium text-accent-text hover:underline">
+            See your year in review
+          </Link>
         </p>
       )}
     </div>

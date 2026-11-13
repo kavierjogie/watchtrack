@@ -28,6 +28,7 @@ const UpcomingPage = page(() => import('./pages/Upcoming'), 'UpcomingPage')
 const SharedPage = page(() => import('./pages/Shared'), 'SharedPage')
 const TitleDetails = page(() => import('./pages/TitleDetails'), 'TitleDetails')
 const TransferPage = page(() => import('./pages/Transfer'), 'TransferPage')
+const YearReviewPage = page(() => import('./pages/YearReview'), 'YearReviewPage')
 
 /** Last line of defence: a render error shows a way out instead of a blank page. Saved data is never touched. */
 class CrashScreen extends Component<{ children: ReactNode }, { failed: boolean; message: string }> {
@@ -96,6 +97,7 @@ export default function App() {
                   <Route path="title/:id" element={<TitleDetails />} />
                   <Route path="settings" element={<SettingsPage />} />
                   <Route path="transfer" element={<TransferPage />} />
+                  <Route path="review" element={<YearReviewPage />} />
                   <Route path="*" element={<Dashboard />} />
                 </Route>
                 {/* Outside Layout: a friend opening a link sees just the shared list, not an empty app. */}

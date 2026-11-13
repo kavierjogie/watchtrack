@@ -8,6 +8,7 @@ import { lastActivity } from '../lib/titles'
 import { MEDIA_LABEL, STATUS_LABEL, type Title, type WatchStatus } from '../lib/types'
 import { useWatchActions } from '../state/useWatchActions'
 import { Poster } from './Poster'
+import { PreviouslyOn } from './PreviouslyOn'
 import { TitleMenu } from './TitleMenu'
 
 const STATUS_TONE: Record<WatchStatus, string> = {
@@ -195,6 +196,7 @@ export function ContinueCard({ t, extra }: { t: Title; extra?: ReactNode }) {
         <div className="mt-2">
           <ProgressBar value={progressFraction(p)} />
         </div>
+        <PreviouslyOn t={t} />
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
           {pos.state === 'next' && !waiting && (
             <button type="button" className="btn-primary min-h-9 px-3" onClick={() => void markWatched(t)}>

@@ -35,6 +35,8 @@ function route(raw: string): { url: string; cache: { fresh: number; stale: numbe
     return { url: `discover/movie?sort_by=vote_count.desc&with_genres=${genre}&page=${page}`, cache: LONG }
   }
   if (path === 'trending/movie/week') return { url: path, cache: SHORT }
+  // One episode's summary, for the "previously on" recap (src/lib/recap.ts). No query, so one spelling per episode.
+  if (/^tv\/[1-9]\d{0,9}\/season\/(0|[1-9]\d{0,3})\/episode\/[1-9]\d{0,4}$/.test(path) && q < 0) return { url: path, cache: LONG }
   const m = /^(movie|tv)\/[1-9]\d{0,9}(\/recommendations)?$/.exec(path)
   return m ? { url: path, cache: m[2] ? LONG : SHORT } : null
 }

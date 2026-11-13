@@ -45,7 +45,7 @@ export class MetadataError extends Error {
 
 export const PROVIDER_LABEL: Record<Provider, string> = { kitsu: 'Kitsu', anilist: 'AniList', tvmaze: 'TVmaze', tmdb: 'TMDB' }
 
-const stripHtml = (s: string | null | undefined) =>
+export const stripHtml = (s: string | null | undefined) =>
   (s ?? '')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, '')

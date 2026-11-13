@@ -21,7 +21,7 @@ describe('tmdb', () => {
     vi.unstubAllGlobals()
   })
 
-  it.each([SEARCH, 'discover/movie?sort_by=vote_count.desc&with_genres=12&page=2', 'movie/123', 'tv/5', 'tv/5/recommendations', 'movie/5/recommendations', 'trending/movie/week'])(
+  it.each([SEARCH, 'discover/movie?sort_by=vote_count.desc&with_genres=12&page=2', 'movie/123', 'tv/5', 'tv/5/recommendations', 'movie/5/recommendations', 'trending/movie/week', 'tv/5/season/2/episode/11'])(
     'forwards what the app sends: %s',
     async (path) => {
       expect((await call(path)).status).toBe(200)
@@ -34,6 +34,11 @@ describe('tmdb', () => {
     'movie/0123',
     'movie/123?append_to_response=credits',
     'movie/1/credits',
+    'tv/5/season/2/episode/11?language=fr',
+    'tv/5/season/02/episode/11',
+    'tv/5/season/2/episode/0',
+    'tv/5/season/2/episode/11/images',
+    'movie/5/season/2/episode/11',
     'search/multi',
     'search/multi?query=loki',
     'search/multi?include_adult=true&query=loki',
