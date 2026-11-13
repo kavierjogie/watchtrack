@@ -3,11 +3,11 @@ import type { Tombstone } from './merge'
 import type { HistoryEntry, Snapshot, StoredImage, Title } from './types'
 
 const DB_NAME = 'watchtrack'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 interface WatchDB extends DBSchema {
   titles: { key: string; value: Title; indexes: { byUpdated: string; byStatus: string } }
-  watchHistory: { key: string; value: HistoryEntry; indexes: { byTitle: string; byAt: string } }
+  watchHistory: { key: string; value: HistoryEntry; indexes: { byTitle: string; byAt: string; byKind: string } }
   images: { key: string; value: StoredImage }
   settings: { key: string; value: { key: string; value: unknown } }
 }
@@ -26,7 +26,7 @@ let dbPromise: Promise<IDBPDatabase<WatchDB>> | null = null
 export function getDb(): Promise<IDBPDatabase<WatchDB>> {
   if (!dbPromise) {
     dbPromise = openDB<WatchDB>(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion) {
+      upgrade(db, oldVersion, _newVersion, tx) {
         // Migrations run in order. Add `if (oldVersion < 2) { ... }` for future schema changes.
         if (oldVersion < 1) {
           const titles = db.createObjectStore('titles', { keyPath: 'id' })
@@ -38,6 +38,8 @@ export function getDb(): Promise<IDBPDatabase<WatchDB>> {
           db.createObjectStore('images', { keyPath: 'id' })
           db.createObjectStore('settings', { keyPath: 'key' })
         }
+        // Lets the episode count be read without loading every history entry.
+        if (oldVersion < 2) tx.objectStore('watchHistory').createIndex('byKind', 'kind')
       },
       blocking() {
         // Another tab wants a newer schema: close so it can upgrade, reopen lazily next call.
@@ -46,6 +48,8 @@ export function getDb(): Promise<IDBPDatabase<WatchDB>> {
       },
     }).catch((err: unknown) => {
       dbPromise = null
+      // This tab runs an older build than the one that upgraded the database (another tab or the service worker).
+      if (err instanceof DOMException && err.name === 'VersionError') throw new StorageError('WatchTrack was updated. Reload the page to continue.')
       throw new StorageError(
         `Could not open local storage. ${err instanceof Error ? err.message : ''} Private browsing or blocked site data can prevent saving.`,
       )
@@ -127,9 +131,11 @@ const TOMBSTONES = 'tombstones'
 type SettingsStore = IDBPObjectStore<WatchDB, StoreNames<WatchDB>[], 'settings', 'readwrite'>
 
 async function addTombstones(store: SettingsStore, ids: string[]) {
+  if (!ids.length) return
   const at = new Date().toISOString()
   const current = ((await store.get(TOMBSTONES))?.value as Tombstone[] | undefined) ?? []
-  await store.put({ key: TOMBSTONES, value: [...current.filter((t) => !ids.includes(t.id)), ...ids.map((id) => ({ id, at }))] })
+  const added = new Set(ids)
+  await store.put({ key: TOMBSTONES, value: [...current.filter((t) => !added.has(t.id)), ...ids.map((id) => ({ id, at }))] })
 }
 
 export async function listTombstones(): Promise<Tombstone[]> {
@@ -157,6 +163,11 @@ export async function applySync(data: { titles: Title[]; history: HistoryEntry[]
 export async function listHistory(titleId: string): Promise<HistoryEntry[]> {
   const rows = await (await getDb()).getAllFromIndex('watchHistory', 'byTitle', titleId)
   return rows.sort((a, b) => b.at.localeCompare(a.at))
+}
+
+/** How many episodes have been marked watched, counted by the index rather than by loading the history. */
+export async function countEpisodes(): Promise<number> {
+  return (await getDb()).countFromIndex('watchHistory', 'byKind', 'episode')
 }
 
 export async function listAllHistory(): Promise<HistoryEntry[]> {

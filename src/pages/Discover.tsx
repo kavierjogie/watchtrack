@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { Check, Compass, Eye, ExternalLink, Loader2, Plus, RotateCw, Sparkles, Star, WifiOff, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -482,7 +482,7 @@ function RecCard({ r, actions }: { r: Rec; actions: Actions }) {
   const busy = actions.busy.has(r.key)
   const personal = isPersonal(r)
   return (
-    <motion.li layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }} className="flex min-w-0 flex-col">
+    <m.li layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }} className="flex min-w-0 flex-col">
       <div className="group relative">
         <button type="button" onClick={() => actions.open(r)} className="block w-full rounded-xl focus-visible:outline-offset-4" aria-label={`Details for ${c.title}`}>
           <Poster poster={cardPoster(c)} source={c.source} title={c.title} mediaType={c.mediaType} className="transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:shadow-lg" />
@@ -541,7 +541,7 @@ function RecCard({ r, actions }: { r: Rec; actions: Actions }) {
           <Sparkles className="size-4" aria-hidden />
         </button>
       </div>
-    </motion.li>
+    </m.li>
   )
 }
 

@@ -1,5 +1,5 @@
 import { CircleCheck, CirclePause, Ellipsis, ExternalLink, ListPlus, Pencil, Play, RefreshCw, Undo2 } from 'lucide-react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { canRefresh, useSyncState } from '../lib/sync'
@@ -50,7 +50,7 @@ export function TitleMenu({ t }: { t: Title }) {
       <AnimatePresence>
         {open && (
           // Grows out of the ⋯ button (bottom-right corner) and shrinks back into it.
-          <motion.ul
+          <m.ul
             role="menu"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -74,7 +74,7 @@ export function TitleMenu({ t }: { t: Title }) {
                 </button>
               </li>
             ))}
-          </motion.ul>
+          </m.ul>
         )}
       </AnimatePresence>
       <AnimatePresence>{editing && t.progress && <ProgressEditor title={t} open onClose={() => setEditing(false)} />}</AnimatePresence>

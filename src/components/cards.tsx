@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { CalendarClock, Check, ChevronRight, CirclePause, Play, Star, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
@@ -72,7 +72,7 @@ export function TitleCard({ t, showStatus = true }: { t: Title; showStatus?: boo
   const p = t.progress
   const pos = p ? position(p) : null
   return (
-    <motion.div layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }} className="group min-w-0">
+    <m.div layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }} className="group min-w-0">
       <div className="relative">
         {/* Duplicate target for the pointer only; keyboard and screen readers use the title link below. */}
         <Link to={`/title/${t.id}`} tabIndex={-1} aria-hidden className="relative block overflow-hidden rounded-xl shadow-card">
@@ -113,7 +113,7 @@ export function TitleCard({ t, showStatus = true }: { t: Title; showStatus?: boo
           <Rating value={t.rating} />
         </p>
       </Link>
-    </motion.div>
+    </m.div>
   )
 }
 
@@ -153,7 +153,7 @@ export function ContinueCard({ t, extra }: { t: Title; extra?: ReactNode }) {
   const waiting = waitingFor(p, t.sync)
 
   return (
-    <motion.article
+    <m.article
       layout="position"
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
@@ -234,7 +234,7 @@ export function ContinueCard({ t, extra }: { t: Title; extra?: ReactNode }) {
           {extra}
         </div>
       </div>
-    </motion.article>
+    </m.article>
   )
 }
 

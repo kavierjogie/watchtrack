@@ -460,7 +460,11 @@ function AlertToggle({ t }: { t: Title }) {
           type="checkbox"
           className="mt-0.5 size-4 shrink-0 accent-accent"
           checked={on}
-          onChange={(e) => void lib.patch(t.id, (cur) => ({ ...cur, alerts: e.target.checked })).catch(() => toast.error("Couldn't save that change."))}
+          onChange={(e) => {
+            // Read now: the save runs later, after React has reset the controlled checkbox to its old value.
+            const alerts = e.target.checked
+            void lib.edit(t.id, (cur) => ({ ...cur, alerts })).catch(() => toast.error("Couldn't save that change."))
+          }}
         />
         <span>
           <span className="flex items-center gap-1.5 font-medium">
@@ -506,7 +510,7 @@ function SequelCard({ t, sequel, onPickSource }: { t: Title; sequel: Sequel; onP
         toast.info("Couldn't match the whole show automatically", { description: 'Pick it from the search instead.' })
         return onPickSource()
       }
-      const saved = await lib.patch(t.id, (cur) => relinkTitle(cur, show))
+      const saved = await lib.edit(t.id, (cur) => relinkTitle(cur, show))
       if (!saved) return
       toast.success(`Now tracking every season of ${saved.title}`, { description: `Linked to ${PROVIDER_LABEL[show.source.provider]}.` })
       void refreshOne(saved)

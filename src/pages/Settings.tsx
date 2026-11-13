@@ -158,7 +158,7 @@ function AlertSettings() {
                   label={t.title}
                   hint={STATUS_LABEL[t.status]}
                   checked={alertsOn(t)}
-                  onChange={(on) => void lib.patch(t.id, (cur) => ({ ...cur, alerts: on })).catch(() => toast.error("Couldn't save that change."))}
+                  onChange={(on) => void lib.edit(t.id, (cur) => ({ ...cur, alerts: on })).catch(() => toast.error("Couldn't save that change."))}
                 />
               </li>
             ))}

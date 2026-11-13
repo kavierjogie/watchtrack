@@ -1,4 +1,4 @@
-import { animate, AnimatePresence, motion, useDragControls, useIsPresent, useMotionValue, type PanInfo } from 'framer-motion'
+import { animate, AnimatePresence, m, useDragControls, useIsPresent, useMotionValue, type PanInfo } from 'framer-motion'
 import { X } from 'lucide-react'
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 
@@ -79,7 +79,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
       aria-label={title}
       className={`m-0 mt-auto max-h-[92dvh] w-full max-w-none overflow-visible bg-transparent p-0 text-fg sm:m-auto ${width}`}
     >
-      <motion.div
+      <m.div
         ref={panel}
         initial={hidden}
         animate={{ opacity: 1, y: 0 }}
@@ -109,7 +109,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
         </div>
         <div className="overflow-y-auto px-5 py-4">{children}</div>
         {footer && <footer className="flex flex-wrap justify-end gap-2 border-t border-divider px-5 py-3">{footer}</footer>}
-      </motion.div>
+      </m.div>
     </dialog>
   )
 }

@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { Check, Eye, LinkIcon, ListX, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
@@ -135,7 +135,7 @@ export function SharedPage() {
 /** Like TitleCard, but not a link; the only action is copying it into your own list. */
 function SharedCard({ t, owned, disabled, onAdd }: { t: Title; owned: boolean; disabled: boolean; onAdd: () => void }) {
   return (
-    <motion.li initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
+    <m.li initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
       <div className="relative">
         <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} />
         {t.progress && (
@@ -162,6 +162,6 @@ function SharedCard({ t, owned, disabled, onAdd }: { t: Title; owned: boolean; d
           </button>
         )}
       </div>
-    </motion.li>
+    </m.li>
   )
 }

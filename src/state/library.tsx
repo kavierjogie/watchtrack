@@ -18,6 +18,8 @@ interface LibraryState {
   save: (title: Title) => Promise<void>
   /** Atomic update of the stored title (no history entry); see db.updateTitle. */
   patch: (id: string, fn: (t: Title) => Title | null) => Promise<Title | undefined>
+  /** Like patch, but for a user's own edit: bumps updatedAt and queues a Drive sync, so the change reaches other devices. */
+  edit: (id: string, fn: (t: Title) => Title) => Promise<Title | undefined>
   commit: (change: Change) => Promise<void>
   remove: (id: string) => Promise<void>
   undoLast: (titleId: string) => Promise<Title | null>
@@ -35,10 +37,10 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
   const reload = useCallback(async () => {
     try {
-      const [t, h] = await Promise.all([db.listTitles(), db.listAllHistory()])
+      const [t, episodes] = await Promise.all([db.listTitles(), db.countEpisodes()])
       // Stored records are untrusted too (older versions, imports, manual edits): a damaged field mustn't crash a page.
       setTitles(t.map(normalizeTitle))
-      setEpisodesLogged(h.filter((e) => e.kind === 'episode').length)
+      setEpisodesLogged(episodes)
       setHistoryVersion((v) => v + 1)
       setError(null)
     } catch (err) {
@@ -86,6 +88,14 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         if (t) upsert(normalizeTitle(t))
         return t
       },
+      edit: async (id, fn) => {
+        const t = await db.updateTitle(id, (cur) => ({ ...fn(cur), updatedAt: new Date().toISOString() }))
+        if (t) {
+          upsert(normalizeTitle(t))
+          markDirty()
+        }
+        return t
+      },
       commit: async ({ title, history }) => {
         await db.saveTitle(title, history)
         upsert(title)
@@ -97,8 +107,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         await db.deleteTitle(id)
         setTitles((prev) => prev.filter((t) => t.id !== id))
         markDirty()
-        const h = await db.listAllHistory()
-        setEpisodesLogged(h.filter((e) => e.kind === 'episode').length)
+        setEpisodesLogged(await db.countEpisodes())
       },
       undoLast: async (titleId) => {
         const title = index.get(titleId)

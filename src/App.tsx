@@ -1,4 +1,4 @@
-import { MotionConfig } from 'framer-motion'
+import { LazyMotion, MotionConfig } from 'framer-motion'
 import { Component, lazy, Suspense, useEffect, type ComponentType, type ReactNode } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
@@ -9,6 +9,9 @@ import { FEEDBACK_MAILTO } from './lib/format'
 import { applyTheme, usePrefs } from './lib/prefs'
 import { Dashboard } from './pages/Dashboard'
 import { LibraryProvider } from './state/library'
+
+/** Animation features (drag, layout, gestures) arrive after first paint, so they aren't in the startup bundle. */
+const motionFeatures = () => import('./lib/motionFeatures').then((m) => m.default)
 
 /** A page's code, fetched when first opened. The service worker still precaches every chunk, so all of them work offline. */
 const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) => lazy(() => load().then((m) => ({ default: m[name] })))
@@ -73,6 +76,7 @@ export default function App() {
   return (
     // "user": with Reduce Motion on, Motion drops slides/scales and keeps gentle opacity fades.
     <MotionConfig reducedMotion="user">
+      <LazyMotion features={motionFeatures} strict>
       <CrashScreen>
         <BrowserRouter>
           <LibraryProvider>
@@ -121,6 +125,7 @@ export default function App() {
           </LibraryProvider>
         </BrowserRouter>
       </CrashScreen>
+      </LazyMotion>
     </MotionConfig>
   )
 }
