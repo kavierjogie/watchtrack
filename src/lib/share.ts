@@ -15,6 +15,8 @@ import type { MediaType, MetadataSource, Numbering, Title, WatchStatus } from '.
  * JSON (version 1): { "v": 1, "items": SharedItem[] }. Fields added later are optional, so older links still open
  * and older versions of the app ignore what they don't know.
  */
+/** The production site: the canonical link, and the address printed on share cards. */
+export const SITE_URL = 'https://watchtrack-eta.vercel.app'
 const SHARE_VERSION = 1
 const SHARE_PATH = '/shared'
 /** Longest payload we'll put in a link. Browsers cope with far more, but messaging apps and copy/paste get flaky. */

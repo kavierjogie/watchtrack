@@ -512,6 +512,17 @@ export function compareWithPreviousYear(index: ReviewIndex, year: number, today:
   }
 }
 
+export type MonthState = 'tracked' | 'untracked' | 'future'
+
+/** A month before the first logged watch isn't "zero", it wasn't tracked; one after today hasn't happened yet. */
+export function monthState(r: YearReview, m: number): MonthState {
+  const first = `${r.year}-${String(m + 1).padStart(2, '0')}-01`
+  const last = `${r.year}-${String(m + 1).padStart(2, '0')}-31`
+  if (last < r.coverage.from) return 'untracked'
+  if (first > r.coverage.to) return 'future'
+  return 'tracked'
+}
+
 /** Whole-number percentage change, or null when there's nothing to compare against. */
 export function percentChange(current: number, previous: number): number | null {
   return previous > 0 ? Math.round(((current - previous) / previous) * 100) : null

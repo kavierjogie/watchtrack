@@ -3,6 +3,7 @@ import { CalendarClock, CircleCheck, CirclePause, Compass, House, Library, ListP
 import { lazy, Suspense, useEffect, useMemo } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { OPEN_EVENT } from '../lib/alerts'
+import { SITE_URL } from '../lib/share'
 import type { WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
 import { useAutoSync } from '../state/useSync'
@@ -55,7 +56,7 @@ const ADD_STATUS: Record<string, WatchStatus> = { plan: 'plan', watching: 'watch
 /** index.html's title is the homepage title; app pages get "Label · WatchTrack". */
 const HOME_TITLE = document.title
 const PAGE_LABELS: Record<string, string> = { '/upcoming': 'Upcoming', '/notifications': 'Notifications', '/transfer': 'Move library', '/review': 'Year in review', ...Object.fromEntries(NAV.map((n) => [n.to, n.label])) }
-const SITE_URL = 'https://watchtrack-eta.vercel.app'
+
 
 /**
  * Only "/" is indexable. Every other app route shows this device's own (for a crawler: empty) library, so it's noindex.

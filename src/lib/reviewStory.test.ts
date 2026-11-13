@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { buildYearReview, indexHistory } from './review'
-import { lookingBack, PERSONALITY_MIN_WATCHES, reviewInsights, watchingPersonality } from './reviewStory'
+import { buildYearReview, indexHistory, type YearReview } from './review'
+import { lookingBack, PERSONALITY_MIN_WATCHES, reviewHeadline, reviewInsights, standoutRecord, watchingPersonality, type Personality } from './reviewStory'
 import { createTitle } from './titles'
 import type { HistoryEntry, MediaType, Title } from './types'
 
@@ -129,5 +129,35 @@ describe('looking back', () => {
     const t = make('Frieren', 'anime')
     const r = build([t], [1, 2, 3].map((d) => ep(t, at(2026, 4, d), d)))
     expect(lookingBack(r, null)).toBe('In 2026, you watched 3 episodes across 1 title, on 3 different days. Frieren kept pulling you back, 3 times in all. At your best, you didn\'t miss a day for 3 days straight.')
+  })
+})
+
+describe('headline and standout', () => {
+  const base = (over: Omit<Partial<YearReview>, 'stats'> & { stats?: Partial<YearReview['stats']> }): YearReview =>
+    ({
+      year: 2026,
+      inProgress: false,
+      titles: 3,
+      biggestDay: null,
+      busiestMonth: null,
+      coverage: { from: '2026-01-01', to: '2026-12-31', days: 365, startedThisYear: false },
+      ...over,
+      stats: { watches: 20, episodes: 20, movies: 0, minutes: 0, activeDays: 9, longestStreak: null, completedSeries: 0, ...over.stats },
+    }) as YearReview
+
+  it('picks the headline from the dominant habit, and from the numbers otherwise', () => {
+    const r = base({})
+    expect(reviewHeadline(r, { id: 'anime' } as Personality)).toBe('A year full of anime adventures.')
+    expect(reviewHeadline(r, null)).toBe('You watched your way through 2026.')
+    expect(reviewHeadline(base({ inProgress: true }), null)).toBe('Your 2026, one episode at a time.')
+    expect(reviewHeadline(base({ stats: { episodes: 0, movies: 8 } }), null)).toBe('Your 2026, one movie at a time.')
+    expect(reviewHeadline(base({ stats: { episodes: 400 } }), { id: 'easygoing' } as Personality)).toBe('Your year, measured in episodes.')
+  })
+
+  it('stands out with the best record the year has', () => {
+    expect(standoutRecord(base({ stats: { longestStreak: { days: 12, from: '2026-03-01', to: '2026-03-12' } } }))).toMatchObject({ value: '12', unit: 'days in a row' })
+    expect(standoutRecord(base({ biggestDay: { day: '2026-05-05', count: 9 } }))).toMatchObject({ value: '9', unit: 'watched in one day' })
+    expect(standoutRecord(base({ busiestMonth: { month: 7, count: 14 } }))).toMatchObject({ value: '14', unit: 'watches in August' })
+    expect(standoutRecord(base({}))).toMatchObject({ value: '9', unit: 'days with something on' })
   })
 })

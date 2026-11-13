@@ -1,18 +1,19 @@
 import { CalendarHeart, RefreshCw } from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../components/cards'
-import { ShareCards } from '../components/review/ShareCards'
-import { Calendar, Compared, DataNotes, Intro, Journey, LookingBack, Moments, PersonalityCard, Top5 } from '../components/review/sections'
+import { ShareStudio } from '../components/review/ShareCards'
+import { Calendar, Compared, DataNotes, Finale, Intro, Journey, LookingBack, Moments, PersonalityCard, Top5 } from '../components/review/sections'
 import { listAllHistory } from '../lib/db'
 import { buildYearReview, indexHistory, reviewYears } from '../lib/review'
 import type { ShareData } from '../lib/reviewImage'
-import { lookingBack, reviewInsights, watchingPersonality } from '../lib/reviewStory'
+import { lookingBack, reviewHeadline, reviewInsights, standoutRecord, watchingPersonality } from '../lib/reviewStory'
 import type { HistoryEntry } from '../lib/types'
 import { useLibrary } from '../state/library'
 
 /**
- * Your year in WatchTrack, as eight short chapters. Everything is worked out on this device from the watch history
+ * Your year in WatchTrack: an opening, seven chapters and a closing screen, on an always-midnight stage. Everything is worked out on this device from the watch history
  * (lib/review.ts for the numbers, lib/reviewStory.ts for the words); this page only lays it out.
  */
 export function YearReviewPage() {
@@ -23,6 +24,7 @@ export function YearReviewPage() {
   const [attempt, setAttempt] = useState(0)
   // Fixed for the visit, so the numbers don't shift while you read (and "so far" means when you opened it).
   const [now] = useState(() => Date.now())
+  const [sharing, setSharing] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -47,6 +49,7 @@ export function YearReviewPage() {
   const personality = useMemo(() => (review ? watchingPersonality(review) : null), [review])
   const insights = useMemo(() => (review ? reviewInsights(review) : []), [review])
   const share = useMemo<ShareData | null>(() => (review ? { review, personality, insights } : null), [review, personality, insights])
+  const topTitles = useMemo(() => (review ? review.top.map((t) => lib.byId(t.titleId)) : []), [review, lib])
 
   const chooseYear = useCallback((y: number) => setParams(y === years[0] ? {} : { year: String(y) }, { replace: true }), [setParams, years])
 
@@ -92,18 +95,20 @@ export function YearReviewPage() {
     )
 
   return (
-    <div className="mx-auto max-w-5xl space-y-14 pb-8 sm:space-y-20">
-      <Intro review={review} years={years} year={year} onYear={chooseYear} />
-      <Journey review={review} />
-      <Calendar review={review} />
-      <PersonalityCard review={review} personality={personality} />
-      <Moments review={review} />
-      <Top5 review={review} byId={lib.byId} />
-      <Compared review={review} />
-      <LookingBack summary={lookingBack(review, personality?.main ?? null)} insights={insights}>
-        <ShareCards data={share} />
-      </LookingBack>
-      <DataNotes review={review} undated={index.undated} duplicates={index.duplicates} />
+    <div className="dark review-stage relative -mx-4 overflow-hidden text-fg sm:mx-auto sm:max-w-6xl sm:rounded-[2rem] sm:border sm:border-white/6 sm:shadow-pop">
+      <Intro review={review} headline={reviewHeadline(review, personality?.main ?? null)} years={years} year={year} onYear={chooseYear} />
+      <div className="space-y-24 px-5 pb-12 pt-10 sm:space-y-32 sm:px-10 sm:pt-16 lg:px-14">
+        <Journey review={review} />
+        <Calendar review={review} />
+        <PersonalityCard review={review} personality={personality} />
+        <Moments review={review} byId={lib.byId} />
+        <Top5 review={review} byId={lib.byId} />
+        <Compared review={review} />
+        <LookingBack summary={lookingBack(review, personality?.main ?? null)} insights={insights} />
+        <Finale review={review} standout={standoutRecord(review)} byId={lib.byId} onShare={() => setSharing(true)} />
+        <DataNotes review={review} undated={index.undated} duplicates={index.duplicates} />
+      </div>
+      <AnimatePresence>{sharing && <ShareStudio key={year} data={share} titles={topTitles} onClose={() => setSharing(false)} />}</AnimatePresence>
     </div>
   )
 }

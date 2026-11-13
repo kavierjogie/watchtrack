@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildYearReview, indexHistory, type YearReview } from './review'
-import { drawReview, fileName, fit, H, wrap, W, type ShareData, type ShareVariant } from './reviewImage'
-import { reviewInsights, watchingPersonality } from './reviewStory'
+import { drawReview, fileName, fit, FOOTER_TOP, H, SITE_HOST, wrap, W, type Artwork, type ShareData, type ShareVariant } from './reviewImage'
+import { reviewHeadline, reviewInsights, watchingPersonality } from './reviewStory'
 import { createTitle } from './titles'
 import type { HistoryEntry, MediaType, Title } from './types'
 
@@ -28,6 +28,9 @@ function fakeContext() {
     fillStyle: '',
     strokeStyle: '',
     lineWidth: 1,
+    lineCap: 'butt',
+    lineJoin: 'miter',
+    images: 0,
     measureText(s: string) {
       const size = Number(/(\d+)px/.exec(this.font)?.[1] ?? 16)
       return { width: s.length * size * 0.6 }
@@ -37,6 +40,13 @@ function fakeContext() {
       drawn.push({ text: s, x, y, size, width: this.measureText(s).width, align: this.textAlign })
     },
     createRadialGradient: () => ({ addColorStop() {} }),
+    createLinearGradient: () => ({ addColorStop() {} }),
+    save() {},
+    restore() {},
+    clip() {},
+    drawImage() {
+      this.images++
+    },
     fillRect() {},
     beginPath() {},
     roundRect() {},
@@ -51,10 +61,12 @@ function fakeContext() {
 }
 
 let drawn: Drawn[] = []
+let ctxNow: ReturnType<typeof fakeContext>['ctx']
 const original = HTMLCanvasElement.prototype.getContext
 beforeEach(() => {
   const f = fakeContext()
   drawn = f.drawn
+  ctxNow = f.ctx
   HTMLCanvasElement.prototype.getContext = (() => f.ctx) as unknown as typeof original
 })
 afterEach(() => {
@@ -83,47 +95,73 @@ function busyYear(): ShareData {
 const VARIANTS: ShareVariant[] = ['summary', 'top', 'stats', 'personality']
 
 describe('share cards', () => {
-  it.each(VARIANTS)('%s: every line of text stays inside the 1080×1350 card, even with very long titles', (variant) => {
+  const FOOTER = ['Your watching story, your way.', 'Create your own Year in Review with WatchTrack.', SITE_HOST]
+  it.each(VARIANTS)('%s: every line of text stays inside the 1080×1350 card and clear of the sign-off, even with very long titles', (variant) => {
     const d = busyYear()
-    const canvas = drawReview(d, variant, 'watchtrack.example')
+    const canvas = drawReview(d, variant)
     expect([canvas.width, canvas.height]).toEqual([W, H])
     expect(drawn.length).toBeGreaterThan(5)
     for (const t of drawn) {
       const left = t.align === 'right' ? t.x - t.width : t.align === 'center' ? t.x - t.width / 2 : t.x
-      expect(left, t.text).toBeGreaterThanOrEqual(0)
-      expect(left + t.width, t.text).toBeLessThanOrEqual(W)
-      expect(t.y - t.size, t.text).toBeGreaterThanOrEqual(0)
-      expect(t.y, t.text).toBeLessThanOrEqual(H)
-      // Nothing runs into the footer (its divider sits 46px above the bottom margin).
-      const footer = t.text.startsWith('Tracked privately') || t.text === 'watchtrack.example'
-      if (!footer) expect(t.y, t.text).toBeLessThanOrEqual(H - 84 - 56)
+      // 80px safe margins on every side.
+      expect(left, t.text).toBeGreaterThanOrEqual(80 - 6)
+      expect(left + t.width, t.text).toBeLessThanOrEqual(W - 80)
+      expect(t.y - t.size, t.text).toBeGreaterThanOrEqual(80 - 6)
+      expect(t.y, t.text).toBeLessThanOrEqual(H - 80)
+      const footer = FOOTER.some((f) => t.text === f || (t.text.endsWith('…') && f.startsWith(t.text.slice(0, -1))))
+      if (footer) expect(t.y, t.text).toBeGreaterThan(FOOTER_TOP)
+      else expect(t.y, t.text).toBeLessThanOrEqual(FOOTER_TOP - 30)
     }
+  })
+
+  it.each(VARIANTS)('%s: signs off with WatchTrack and the site address', (variant) => {
+    drawReview(busyYear(), variant)
+    const texts = drawn.map((t) => t.text)
+    expect(texts).toContain(SITE_HOST)
+    expect(texts).toContain('Your watching story, your way.')
+    expect(texts.some((t) => t.startsWith('Create your own Year in Review'))).toBe(true)
+  })
+
+  it('leads the overview with a headline drawn from the year itself', () => {
+    const d = busyYear()
+    drawReview(d, 'summary')
+    const words = drawn.map((t) => t.text).join(' ')
+    for (const w of reviewHeadline(d.review, d.personality?.main ?? null).split(' ')) expect(words).toContain(w.replace(/[.…]$/, ''))
+  })
+
+  it('draws posters it has, and lettered tiles for the rest', () => {
+    const d = busyYear()
+    const art: Artwork = new Map([[d.review.top[0].titleId, { width: 300, height: 450 } as ImageBitmap]])
+    drawReview(d, 'top', art)
+    expect(ctxNow.images).toBe(1)
+    // The other four get their initial instead.
+    for (const t of d.review.top.slice(1)) expect(drawn.some((x) => x.text === t.title[0].toUpperCase())).toBe(true)
   })
 
   it('shows the same numbers as the review', () => {
     const d = busyYear()
-    drawReview(d, 'stats', 'x')
+    drawReview(d, 'stats')
     const texts = drawn.map((t) => t.text)
     expect(texts).toContain(d.review.stats.episodes.toLocaleString())
     expect(texts).toContain(d.review.stats.activeDays.toLocaleString())
     expect(texts).toContain(String(d.review.stats.longestStreak!.days))
     drawn.length = 0
-    drawReview(d, 'top', 'x')
+    drawReview(d, 'top')
     for (const t of d.review.top) expect(drawn.some((x) => x.text.startsWith(`${t.count.toLocaleString()} `))).toBe(true)
   })
 
   it('names the personality on its card and on the summary', () => {
     const d = busyYear()
     expect(d.personality).not.toBeNull()
-    drawReview(d, 'summary', 'x')
-    expect(drawn.map((t) => t.text).join(' ')).toContain(d.personality!.main.name)
+    drawReview(d, 'summary')
+    expect(drawn.map((t) => t.text).join(' ').toLowerCase()).toContain(d.personality!.main.name.toLowerCase())
   })
 
   it('works for a tiny year, a movies-only year, and a year still going', () => {
     const t = make('Frieren', 'anime')
-    for (const v of VARIANTS) expect(() => drawReview(data([t], [ep(t, at(2026, 2, 1))]), v, 'x')).not.toThrow()
+    for (const v of VARIANTS) expect(() => drawReview(data([t], [ep(t, at(2026, 2, 1))]), v)).not.toThrow()
     const films = [make('A', 'movie'), make('B', 'movie')]
-    expect(() => drawReview(data(films, films.map((f, i) => ep(f, at(2026, 3, i + 1), 'movie'))), 'summary', 'x')).not.toThrow()
+    expect(() => drawReview(data(films, films.map((f, i) => ep(f, at(2026, 3, i + 1), 'movie'))), 'summary')).not.toThrow()
     expect(drawn.some((x) => x.text === 'movies')).toBe(true)
   })
 

@@ -21,6 +21,11 @@ beforeEach(async () => {
   fetchMock.mockClear()
   // jsdom has no canvas: the share preview then simply doesn't draw.
   HTMLCanvasElement.prototype.getContext = (() => null) as unknown as typeof getContext
+  // jsdom has neither a top layer nor matchMedia.
+  HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+    this.setAttribute('open', '')
+  }
+  window.matchMedia ??= (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList
 })
 afterEach(() => {
   act(() => root?.unmount())
@@ -67,15 +72,17 @@ const text = () => document.body.textContent ?? ''
 const yearButtons = () => [...document.querySelectorAll<HTMLButtonElement>('[aria-label="Choose a year"] button')]
 
 describe('Year in review page', () => {
-  it('tells the whole year in eight chapters, from local history, without touching the network', async () => {
+  it('tells the whole year as an opening, seven chapters and an ending, from local history, without touching the network', async () => {
     await seed()
     await open()
     const chapters = [...document.querySelectorAll('section[aria-labelledby^="chapter-"] h2')].map((h) => h.textContent)
-    expect(chapters).toHaveLength(7) // + the introduction, which is the page's h1
+    expect(chapters).toHaveLength(7) // + the opening, which is the page's h1, and the finale
     expect(document.querySelector('h1')?.textContent).toMatch(/2026/)
+    expect(document.querySelector('#review-finale')?.textContent).toContain('That was your 2026')
     expect(text()).toContain('You watched')
     expect(text()).toContain('Month by month')
     expect(text()).toContain('3-day streak')
+    expect(text()).toContain('Longest streak')
     expect(text()).toContain('2026 against 2025')
     expect(text()).toContain('Frieren')
     // Corrections aren't counted, and the page says so.
@@ -92,16 +99,21 @@ describe('Year in review page', () => {
     expect(document.querySelector('h1')?.textContent).toContain('2025')
     // Nothing was logged before 2025: no comparison is invented.
     expect(text()).toContain('Your first year in WatchTrack')
+    // Unlogged history is named as untracked, never shown as zero.
+    expect(text()).toContain("isn't zero, it just wasn't tracked")
     expect(text()).not.toContain('2025 against 2024')
   })
 
   it('makes no network request when the share panel opens either', async () => {
     await seed()
     await open()
-    const make = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('Make a share card'))!
+    const make = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('Share your year'))!
     await act(async () => make.click())
-    await settle()
-    expect([...document.querySelectorAll('[aria-label="Card design"] button')].map((b) => b.textContent)).toEqual(['Year summary', 'Top titles', 'By the numbers'])
+    // The image code is a lazy chunk: give it a moment to load and (in jsdom) fail to draw.
+    for (let i = 0; i < 20 && !text().includes("Couldn't draw this card"); i++) await settle()
+    expect([...document.querySelectorAll('[aria-label="Card design"] button')].map((b) => b.textContent)).toEqual(['The Overview', 'The Top Five', 'The Numbers'])
+    // jsdom can't draw: the studio says so and offers a retry instead of hanging on a spinner.
+    expect(text()).toContain("Couldn't draw this card")
     expect(fetchMock).not.toHaveBeenCalled()
   })
 

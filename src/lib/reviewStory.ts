@@ -182,3 +182,46 @@ export function lookingBack(r: YearReview, personality: Personality | null): str
   if (personality && personality.id !== 'easygoing') parts.push(`All of which makes you ${personality.name.replace(/^The /, 'the ')}.`)
   return parts.join(' ')
 }
+
+// ---------- Headline and standout (shared by the page's opening and ending, and the share cards) ----------
+
+const HEADLINES: Partial<Record<PersonalityId, string>> = {
+  anime: 'A year full of anime adventures.',
+  binge: 'One more episode? Apparently, many.',
+  marathon: 'A year of marathon nights.',
+  completionist: 'A year of finishing what you started.',
+  weekend: 'Weekends, well spent.',
+  consistent: 'A little, often, all year long.',
+  movies: 'A year at the movies.',
+}
+
+/** The opening line, chosen from the year's dominant habit so it always says something true about you. */
+export function reviewHeadline(r: YearReview, personality: Personality | null): string {
+  const picked = personality && HEADLINES[personality.id]
+  if (picked) return picked
+  if (!r.stats.episodes) return `Your ${r.year}, one movie at a time.`
+  if (r.stats.episodes >= 300) return 'Your year, measured in episodes.'
+  return r.inProgress ? `Your ${r.year}, one episode at a time.` : `You watched your way through ${r.year}.`
+}
+
+export interface Standout {
+  /** The big number, already formatted. */
+  value: string
+  /** What it counts, read straight after the number ("days in a row"). */
+  unit: string
+  detail: string
+}
+
+/** The year's most impressive record, for the ending and the share cards. Always returns something for a non-empty year. */
+export function standoutRecord(r: YearReview): Standout {
+  const s = r.stats.longestStreak
+  if (s && s.days >= 7) return { value: String(s.days), unit: 'days in a row', detail: `Your longest streak, ${formatDay(s.from)} – ${formatDay(s.to)}.` }
+  if (r.biggestDay && r.biggestDay.count >= 6) return { value: String(r.biggestDay.count), unit: 'watched in one day', detail: `Your biggest day, on ${formatDay(r.biggestDay.day)}.` }
+  const m = standoutMonth(r)
+  if (m) return { value: m.count.toLocaleString(), unit: `watches in ${MONTHS[m.month]}`, detail: 'Your busiest month of the year.' }
+  if (s && s.days >= 3) return { value: String(s.days), unit: 'days in a row', detail: `Your longest streak, ${formatDay(s.from)} – ${formatDay(s.to)}.` }
+  return { value: r.stats.activeDays.toLocaleString(), unit: r.stats.activeDays === 1 ? 'day with something on' : 'days with something on', detail: `Across ${plural(r.titles, 'title')}.` }
+}
+
+/** One data-backed observation for a share card: the most interesting insight that isn't already on the card. */
+export const shareHighlight = (insights: Insight[]) => insights.find((i) => !['top', 'time', 'movies'].includes(i.id)) ?? null

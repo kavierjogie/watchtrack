@@ -293,3 +293,47 @@ dialog[data-closing]::backdrop {
     animation: none;
   }
 }
+
+/*
+ * The review "stage": always midnight, whatever the app theme (the wrapper also carries .dark, so every token inside
+ * switches with it). Layered glows give the long scroll depth without any image.
+ */
+.review-stage {
+  background:
+    radial-gradient(60rem 42rem at 100% -6rem, rgb(139 92 246 / 0.24), transparent 62%),
+    radial-gradient(52rem 40rem at -12% 38%, rgb(79 70 229 / 0.15), transparent 60%),
+    radial-gradient(44rem 32rem at 112% 78%, rgb(103 232 249 / 0.07), transparent 60%),
+    linear-gradient(180deg, #0e0a2a, #08071a 38%, #0b0922);
+}
+/* The signature gradient for the big numbers: violet → periwinkle → cyan. */
+.review-ink {
+  background: linear-gradient(100deg, #a78bfa, #a5b4fc 55%, #67e8f9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* Slow drift on the opening glows: felt more than seen. */
+@keyframes review-drift {
+  to {
+    transform: translate3d(-6%, 8%, 0) scale(1.1);
+  }
+}
+.review-orb {
+  animation: review-drift 16s ease-in-out infinite alternate;
+}
+/* The share preview cross-fades between designs. */
+@keyframes review-fade {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+.review-fade {
+  animation: review-fade 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .review-orb,
+  .review-fade {
+    animation: none;
+  }
+}
