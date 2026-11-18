@@ -105,7 +105,7 @@ export const THEMES: Theme[] = [
         ['justwatch', 'Low-chroma UI so posters carry the colour'],
       ],
       surfaces: 'Espresso layers as today; the home header gets a blurred backdrop from the show you are watching instead of a mint glow.',
-      cards: 'Hairline border, no drop shadow, 14px corners. Continue cards set the next episode in the display serif at 2× size.',
+      cards: 'Hairline border, no drop shadow, 14px corners. Continue cards set the next episode in bold Figtree at 2× size (the serif read too soft at that size).',
       nav: 'Unchanged structure; active item becomes a mint bar + text, no filled pill.',
       icons: 'Lucide at 1.75 stroke; the existing W-track mark stays.',
       motion: 'Watched: the episode number slides up to the next one (260ms, ease-out). Cards fade in; nothing loops.',

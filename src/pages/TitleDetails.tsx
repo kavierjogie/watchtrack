@@ -157,7 +157,7 @@ function Details({ t }: { t: Title }) {
             {p && pos && (
               <div className="max-w-md space-y-2 rounded-2xl border border-line bg-surface-2/80 p-4">
                 <p className="eyebrow">{pos.state === 'next' ? 'Up next' : 'Progress'}</p>
-                <p className="font-display overflow-hidden text-2xl leading-tight text-accent-text">
+                <p className="overflow-hidden text-2xl font-bold leading-tight tracking-tight text-accent-text tabular-nums">
                   <span key={describePosition(p)} className="tick">
                     {describePosition(p)}
                   </span>
