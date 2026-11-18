@@ -58,10 +58,11 @@ function NewEpisodes() {
 
 function Toggle({ label, hint, checked, disabled, onChange }: { label: string; hint?: string; checked: boolean; disabled?: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className={`flex items-start gap-3 ${disabled ? 'opacity-50' : 'cursor-pointer'}`}>
-      <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-accent" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+    <label className={`flex items-start gap-3 ${disabled ? '' : 'cursor-pointer'}`}>
+      {/* Dim only the control and its label: the hint often explains why it's disabled, so it stays readable. */}
+      <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-accent disabled:opacity-50" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
       <span className="text-sm">
-        <span className="font-medium">{label}</span>
+        <span className={`font-medium ${disabled ? 'text-muted' : ''}`}>{label}</span>
         {hint && <span className="block text-muted">{hint}</span>}
       </span>
     </label>
