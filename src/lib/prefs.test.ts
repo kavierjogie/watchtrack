@@ -9,16 +9,23 @@ describe('prefs', () => {
   })
 
   it('removes the TMDB key older versions saved, keeping the other preferences', async () => {
-    store.set('watchtrack:prefs', JSON.stringify({ theme: 'light', tmdbKey: 'secret-key' }))
+    store.set('watchtrack:prefs', JSON.stringify({ gridSize: 'lg', tmdbKey: 'secret-key' }))
     const { getPrefs } = await import('./prefs')
-    expect(getPrefs().theme).toBe('light')
+    expect(getPrefs().gridSize).toBe('lg')
     expect(store.get('watchtrack:prefs')).not.toContain('secret-key')
   })
 
   it('falls back to defaults for wrongly typed or unreadable values', async () => {
-    store.set('watchtrack:prefs', JSON.stringify({ alertsOn: 'yes', theme: 3 }))
+    store.set('watchtrack:prefs', JSON.stringify({ alertsOn: 'yes', gridSize: 3 }))
     const { getPrefs } = await import('./prefs')
-    expect(getPrefs()).toMatchObject({ alertsOn: true, theme: 'dark' })
+    expect(getPrefs()).toMatchObject({ alertsOn: true, gridSize: 'md' })
+  })
+
+  it('ignores the theme setting older versions saved (the app has one dark theme)', async () => {
+    store.set('watchtrack:prefs', JSON.stringify({ theme: 'light', gridSize: 'sm' }))
+    const { getPrefs } = await import('./prefs')
+    expect(getPrefs()).not.toHaveProperty('theme')
+    expect(getPrefs().gridSize).toBe('sm')
   })
 })
 

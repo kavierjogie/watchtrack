@@ -101,7 +101,7 @@ export function YearReviewPage() {
     )
 
   return (
-    <div className="dark review-stage relative -mx-4 overflow-hidden text-fg sm:mx-auto sm:max-w-6xl sm:rounded-[2rem] sm:border sm:border-white/6 sm:shadow-pop">
+    <div className="review-stage relative -mx-4 overflow-hidden text-fg sm:mx-auto sm:max-w-6xl sm:rounded-[2rem] sm:border sm:border-white/6 sm:shadow-pop">
       <Intro review={review} headline={reviewHeadline(review, personality?.main ?? null)} years={years} year={year} onYear={chooseYear} />
       <div className="space-y-24 px-5 pb-12 pt-10 sm:space-y-28 sm:px-10 sm:pt-16 lg:space-y-16 lg:px-10 lg:pt-6">
         <Journey review={review} />

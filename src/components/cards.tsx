@@ -170,8 +170,13 @@ export function ContinueCard({ t, extra }: { t: Title; extra?: ReactNode }) {
           </Link>
           {t.status === 'on_hold' && <StatusBadge status="on_hold" />}
         </div>
-        <p className="mt-0.5 text-lg font-semibold tracking-tight text-accent-text">
-          {waiting ? 'Caught up' : pos.state === 'next' ? `${formatEp(pos.next, p.numbering)} next` : describePosition(p)}
+        {/* Keyed on the text so marking an episode watched replays the tick (index.css). */}
+        <p className="font-display mt-0.5 overflow-hidden text-2xl leading-tight text-accent-text sm:text-[1.75rem]">
+          {[waiting ? 'Caught up' : pos.state === 'next' ? `${formatEp(pos.next, p.numbering)} next` : describePosition(p)].map((line) => (
+            <span key={line} className="tick">
+              {line}
+            </span>
+          ))}
         </p>
         {waiting && (
           <p className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-info">

@@ -81,7 +81,8 @@ let C: Palette = PALETTES.midnight
 /** Poster overlays sit on a dark scrim in both themes. */
 const ON_POSTER = { fg: '#ffffff', fg2: 'rgba(255,255,255,0.74)', ink: PALETTES.midnight.ink }
 
-const FONT = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+// The app's own face (self-hosted, see index.css), so the image matches the app. renderReview waits for it.
+const FONT = 'Figtree, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
 const MEDIA: Record<MediaType, string> = { anime: 'Anime', tv: 'Series', movie: 'Movie' }
 type Ctx = CanvasRenderingContext2D
 
@@ -747,7 +748,11 @@ const toBlob = (canvas: HTMLCanvasElement) =>
  * fonts first; if a poster somehow tainted the canvas, it's drawn again without artwork rather than failing.
  */
 export async function renderReview(d: ShareData, variant: ShareVariant, art?: Artwork, theme: ShareTheme = 'midnight'): Promise<Blob> {
-  await document.fonts?.ready
+  // A canvas never triggers a font download itself: ask for Figtree explicitly, then wait for anything still loading.
+  if (document.fonts) {
+    await Promise.all(['500 40px Figtree', '700 40px Figtree'].map((f) => document.fonts.load(f).catch(() => [])))
+    await document.fonts.ready
+  }
   try {
     return await toBlob(drawReview(d, variant, art, theme))
   } catch (err) {

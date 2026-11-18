@@ -1,13 +1,15 @@
 import { CircleCheck, CirclePause, Clapperboard, Cloud, Compass, Download, Library, ListPlus, Play, Plus, Share2, Smartphone, Sparkles, X } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ContinueCard, EmptyState, PosterGridSkeleton, Section, SeeAll, StatCard, TitleCard } from '../components/cards'
+import { usePosterUrl } from '../components/Poster'
 import { inAppBrowser } from '../components/InAppBrowserBanner'
 import { TitleMenu } from '../components/TitleMenu'
 import { daysSince } from '../lib/format'
 import { connectDrive, driveConfigured, useDrive } from '../lib/drive'
 import { backupNudgeDue, setPrefs, snoozeBackupNudge, usePrefs } from '../lib/prefs'
 import { byContinue, lastActivity } from '../lib/titles'
+import type { Title } from '../lib/types'
 import { useLibrary } from '../state/library'
 
 const byActivity = <T extends Parameters<typeof lastActivity>[0]>(a: T, b: T) => lastActivity(b).localeCompare(lastActivity(a))
@@ -74,6 +76,7 @@ export function Dashboard() {
   return (
     <div className="space-y-10">
       <Hero
+        art={watching[0]}
         title={greeting()}
         subtitle={
           watching.length
@@ -184,10 +187,20 @@ export function Dashboard() {
   )
 }
 
-function Hero({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+function Hero({ title, subtitle, art, children }: { title: string; subtitle: string; art?: Title; children: ReactNode }) {
+  const url = usePosterUrl(art?.poster ?? null)
+  const [shown, setShown] = useState<string | null>(null)
   return (
-    <header className="relative overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-card sm:p-8">
+    <header className="relative overflow-hidden rounded-3xl border border-line bg-surface p-5 sm:p-8">
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_90%_at_100%_0%,var(--glow),transparent_70%),radial-gradient(40%_60%_at_0%_100%,var(--glow),transparent_70%)]" />
+      {url && (
+        // The show you're watching, blurred and faded into the surface where the text sits. Shown only once it loads, so a
+        // missing or offline poster leaves the mint glow instead of an empty header.
+        <div aria-hidden className={`pointer-events-none absolute inset-0 transition-opacity duration-500 ${shown === url ? 'opacity-100' : 'opacity-0'}`}>
+          <img src={url} alt="" onLoad={() => setShown(url)} className="absolute -inset-10 size-[calc(100%+5rem)] max-w-none object-cover opacity-45 blur-2xl saturate-125" />
+          <div className="absolute inset-0 bg-linear-to-r from-surface via-surface/85 to-surface/30" />
+        </div>
+      )}
       <div className="relative">
         <p className="eyebrow text-accent-text">WatchTrack</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-4xl">{title}</h1>

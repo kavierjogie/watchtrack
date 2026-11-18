@@ -4,7 +4,6 @@ import type { MediaType, WatchStatus } from './types'
 
 /** Small UI preferences only — personal tracking data lives in IndexedDB. */
 export interface Prefs {
-  theme: 'dark' | 'light' | 'system'
   gridSize: 'sm' | 'md' | 'lg'
   libraryView: 'grid' | 'list'
   defaultType: MediaType | 'all'
@@ -27,7 +26,6 @@ export interface Prefs {
 
 const KEY = 'watchtrack:prefs'
 const DEFAULTS: Prefs = {
-  theme: 'dark',
   gridSize: 'md',
   libraryView: 'grid',
   defaultType: 'all',
@@ -101,20 +99,6 @@ export function usePrefs(): Prefs {
     getPrefs,
     getPrefs,
   )
-}
-
-export function applyTheme(theme: Prefs['theme']) {
-  const dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  const root = document.documentElement
-  // Ease real switches only: not the first paint (page still loading) and not when the user asked for less motion.
-  if (root.classList.contains('dark') !== dark && document.readyState === 'complete' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    root.classList.add('theme-fade')
-    setTimeout(() => root.classList.remove('theme-fade'), 300)
-  }
-  root.classList.toggle('dark', dark)
-  root.style.colorScheme = dark ? 'dark' : 'light'
-  // Match the phone's status bar to the page.
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#15120f' : '#f4efe9')
 }
 
 const NUDGE_TITLES = 5

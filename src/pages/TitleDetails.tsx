@@ -157,7 +157,11 @@ function Details({ t }: { t: Title }) {
             {p && pos && (
               <div className="max-w-md space-y-2 rounded-2xl border border-line bg-surface-2/80 p-4">
                 <p className="eyebrow">{pos.state === 'next' ? 'Up next' : 'Progress'}</p>
-                <p className="text-xl font-semibold text-accent-text">{describePosition(p)}</p>
+                <p className="font-display overflow-hidden text-2xl leading-tight text-accent-text">
+                  <span key={describePosition(p)} className="tick">
+                    {describePosition(p)}
+                  </span>
+                </p>
                 <p className="text-xs text-muted">
                   Last watched: {last ? formatEp(last, p.numbering) : '—'}
                   {t.lastWatchedAt && ` · ${timeAgo(t.lastWatchedAt)}`}

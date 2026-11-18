@@ -1,60 +1,25 @@
 @import 'tailwindcss';
 
-@custom-variant dark (&:where(.dark, .dark *));
 @custom-variant reduce-transparency (@media (prefers-reduced-transparency: reduce));
 
 /*
- * Espresso & Mint. Light: "oat milk", the daylight twin of the espresso theme. No pure white or black anywhere.
- * Depth runs recessed → raised: bg-2 (sidebar, inputs) < bg (canvas) < surface (cards) < overlay (modals, menus).
- * Shadows are tinted with the brown text colour rather than grey so they read as part of the palette. Status colours
- * are darkened to keep 4.5:1 on the warm backgrounds, and kept off mint/honey so they never read as the brand.
- * Values come from the Theme Studio (src/theme-studio/themes.ts), whose test checks every text pair against WCAG AA.
+ * Matinee: one dark theme (there is no light mode). Espresso layers carry the depth, mint is reserved for interaction and
+ * honey is a rare highlight. Depth runs recessed → raised: bg-2 (sidebar, inputs) < bg (canvas) < surface (cards) <
+ * overlay (modals, menus); on dark, lighter fills read as depth where shadows don't. Never pure black or pure white.
+ * Primary buttons are mint with espresso text: white on #7CC4A4 falls below 4.5:1. Status colours stay off mint/honey.
+ * Values come from the Theme Studio (src/theme-studio/themes.ts, "matinee"), whose test checks every text pair against
+ * WCAG AA. Keep the two in step.
  */
 :root {
-  --bg: #f4efe9;
-  --bg-2: #ede8e2;
-  --surface: #fbf8f4;
-  --surface-2: #f1eeea;
-  --overlay: #fdfbf8;
-  --border: #e3e0dc;
-  --divider: #e3ded8;
-  --border-strong: #8bb4a3;
-  --text: #221c17;
-  --text-2: #57514c;
-  --muted: #76716b;
-  --faint: #a49f99;
-  --accent: #2f7d61;
-  --accent-hover: #296e55;
-  --accent-strong: #26644e;
-  --accent-soft: #e3e9e2;
-  --accent-line: #bed3c8;
-  --accent-text: #2d7158;
-  --on-accent: #fbf8f4;
-  --danger: #9f4f4d;
-  --success: #687942;
-  --warn: #9c6341;
-  --info: #5e7193;
-  --shadow-card: 0 1px 2px rgb(34 28 23 / 0.05), 0 4px 14px -6px rgb(34 28 23 / 0.1);
-  --shadow-pop: 0 1px 3px rgb(34 28 23 / 0.06), 0 18px 48px -14px rgb(34 28 23 / 0.24);
-  --glow: rgb(47 125 97 / 0.06);
-  /* Coloured shadow under filled accent buttons: softer than the solid brand colour on a light page. */
-  --accent-glow: rgb(47 125 97 / 0.45);
-  --backdrop: rgb(34 28 23 / 0.32);
-}
-
-/*
- * Coffee-brown layers (bg → bg-2 → surface → surface-2) carry the depth; mint is reserved for interaction.
- * Primary buttons are mint with espresso text: white on #7CC4A4 falls below 4.5:1.
- */
-.dark {
+  color-scheme: dark;
   --bg: #15120f;
-  --bg-2: #1a1613;
-  --surface: #221d19;
-  --surface-2: #2f2a25;
-  --overlay: #28231f;
-  --border: #3b3632;
+  --bg-2: #191511;
+  --surface: #1f1a16;
+  --surface-2: #2c2723;
+  --overlay: #25201c;
+  --border: #38332f;
   --divider: #272420;
-  --border-strong: #547965;
+  --border-strong: #527864;
   --text: #f3eee7;
   --text-2: #bcb7b1;
   --muted: #96928c;
@@ -62,19 +27,67 @@
   --accent: #7cc4a4;
   --accent-hover: #8dcaad;
   --accent-strong: #639d83;
-  --accent-soft: #30382f;
-  --accent-line: #445c4e;
+  --accent-soft: #2e352d;
+  --accent-line: #425b4c;
   --accent-text: #7cc4a4;
   --on-accent: #15120f;
+  /* Honey: "new" markers, the busiest month, year-in-review highlights. Never for buttons. */
+  --highlight: #e9b872;
+  --highlight-soft: #3b3023;
   --danger: #e36a6a;
   --success: #a9cf6a;
   --warn: #e58e5a;
   --info: #86a9e6;
-  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.025) inset, 0 8px 24px -12px rgb(0 0 0 / 0.7);
+  /* Cards are flat (hairline, no shadow); only floating layers (menus, modals, toasts) cast one. */
+  --shadow-card: 0 0 #0000;
   --shadow-pop: 0 24px 60px -16px rgb(0 0 0 / 0.8), 0 0 0 1px rgb(255 255 255 / 0.02);
   --glow: rgb(124 196 164 / 0.08);
   --accent-glow: #639d83;
   --backdrop: rgb(11 9 8 / 0.72);
+}
+
+/* Self-hosted (public/fonts, precached by the service worker) so the app looks the same offline. latin-ext only downloads
+ * when a title needs it (Shōgun, Pokémon…); anything else falls back to the system font. */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/fraunces-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/fraunces-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/figtree-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/figtree-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@theme {
+  /* Tighter than Tailwind's defaults: cards 14px, controls 10px. */
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 14px;
+  --radius-3xl: 18px;
 }
 
 @theme inline {
@@ -97,14 +110,29 @@
   --color-accent-line: var(--accent-line);
   --color-accent-text: var(--accent-text);
   --color-on-accent: var(--on-accent);
+  --color-highlight: var(--highlight);
+  --color-highlight-soft: var(--highlight-soft);
   --color-danger: var(--danger);
   --color-success: var(--success);
   --color-warn: var(--warn);
   --color-info: var(--info);
   --shadow-card: var(--shadow-card);
   --shadow-pop: var(--shadow-pop);
-  /* The platform's own UI font: same look everywhere it's installed, with its optical sizing and tracking tuned in. */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Figtree for everything; Fraunces (one weight, 600) for page headings and the next-episode number. */
+  --font-sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+}
+
+/* Page and section headings speak in the display serif. Only weight 600 ships, so never fake a bold. */
+@layer base {
+  h1,
+  h2,
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-synthesis-weight: none;
+    letter-spacing: -0.015em;
+  }
 }
 
 html,
@@ -250,13 +278,22 @@ dialog[data-closing]::backdrop {
   background: rgb(0 0 0 / 0);
 }
 
-/* Brief cross-fade while switching light/dark, so the whole screen doesn't flash (added by applyTheme). */
-.theme-fade,
-.theme-fade * {
-  transition:
-    background-color 250ms ease,
-    border-color 250ms ease,
-    color 250ms ease !important;
+/* Matinee's signature: when an episode is marked watched, the next number slides up into place. Key the element on the
+ * episode so it remounts. Reduce Motion keeps it still. */
+@keyframes tick {
+  from {
+    opacity: 0;
+    transform: translateY(70%);
+  }
+}
+.tick {
+  display: inline-block;
+  animation: tick 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tick {
+    animation: none;
+  }
 }
 
 .scrollbar-none::-webkit-scrollbar {
@@ -307,8 +344,8 @@ dialog[data-closing]::backdrop {
 }
 
 /*
- * The review "stage": always espresso, whatever the app theme (the wrapper also carries .dark, so every token inside
- * switches with it). Layered glows give the long scroll depth without any image.
+ * The review "stage": a deeper espresso than the app with layered mint and honey glows, which give the long scroll depth
+ * without any image.
  */
 .review-stage {
   background:

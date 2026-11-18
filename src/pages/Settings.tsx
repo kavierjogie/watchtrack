@@ -293,7 +293,6 @@ export function SettingsPage() {
       </Card>
 
       <Card title="Appearance">
-        <Choice<Prefs['theme']> label="Theme" value={prefs.theme} options={[['dark', 'Dark'], ['light', 'Light'], ['system', 'System']]} onChange={(theme) => setPrefs({ theme })} />
         <Choice<Prefs['gridSize']> label="Poster size" value={prefs.gridSize} options={[['sm', 'Small'], ['md', 'Medium'], ['lg', 'Large']]} onChange={(gridSize) => setPrefs({ gridSize })} />
         <Choice<Prefs['libraryView']> label="Library layout" value={prefs.libraryView} options={[['grid', 'Poster grid'], ['list', 'Compact list']]} onChange={(libraryView) => setPrefs({ libraryView })} />
       </Card>

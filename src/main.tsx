@@ -3,10 +3,6 @@ import { createRoot } from 'react-dom/client'
 import { inject } from '@vercel/analytics'
 import App from './App'
 import './index.css'
-import { applyTheme, getPrefs } from './lib/prefs'
-
-// Apply theme before first paint to avoid a flash.
-applyTheme(getPrefs().theme)
 
 // A tab left open across a deploy asks for page chunks that no longer exist: reload onto the new build. At most once a
 // minute, so a chunk that's really broken reaches the crash screen instead of looping.

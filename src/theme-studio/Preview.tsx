@@ -266,7 +266,7 @@ function ContinueCard({ it, urls }: { it: Item; urls: Urls }) {
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
         <h3 className="truncate font-semibold">{it.title}</h3>
-        <p className="mt-0.5 text-lg font-semibold tracking-tight text-accent-text">{it.next} next</p>
+        <p className="display mt-0.5 text-2xl font-semibold leading-tight tracking-tight text-accent-text">{it.next} next</p>
         <p className="mt-0.5 text-xs text-muted">
           Last: {it.last} · watched {it.ago}
         </p>
@@ -351,7 +351,7 @@ function YearCard() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="eyebrow">This year</p>
-          <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">444</p>
+          <p className="display mt-1 text-3xl font-semibold tracking-tight tabular-nums">444</p>
           <p className="text-sm text-muted">episodes · 168 hours watched</p>
         </div>
         <span className="inline-flex items-center gap-1 rounded-full bg-(--accent-2-soft) px-2.5 py-1 text-xs font-medium text-(--accent-2)">
@@ -369,8 +369,8 @@ function YearCard() {
         <span>Dec</span>
       </div>
       <div className="mt-5 flex items-center gap-4 border-t border-divider pt-4">
-        <div className="relative size-16 shrink-0 rounded-full" style={{ background: `conic-gradient(${ring})` }}>
-          <div className="absolute inset-2.5 rounded-full bg-surface" />
+        <div className="keep-round relative size-16 shrink-0 rounded-full" style={{ background: `conic-gradient(${ring})` }}>
+          <div className="keep-round absolute inset-2.5 rounded-full bg-surface" />
         </div>
         <ul className="grid min-w-0 flex-1 grid-cols-2 gap-x-3 gap-y-1 text-xs">
           {split.map(([s, v]) => (
@@ -578,18 +578,26 @@ function ModalShowcase({ urls }: { urls: Urls }) {
 
 // ---------- The screen ----------
 
-export function Preview({ style }: { style: CSSProperties }) {
+/** `data` carries the concept's card / pill / backdrop switches for studio.css; `style` its tokens and look variables. */
+export function Preview({ style, data }: { style: CSSProperties; data?: Record<string, string> }) {
   const urls = usePosters()
   const watching = LIBRARY.filter((t) => t.status === 'watching')
   return (
-    <div className="@container bg-bg text-fg antialiased" style={style}>
+    <div className="concept @container bg-bg text-fg antialiased" style={style} {...data}>
       <div className="@5xl:grid @5xl:grid-cols-[15rem_minmax(0,1fr)]">
         <Sidebar />
         <div className="min-w-0">
           <MobileTop />
           <main className="space-y-10 px-4 pb-10 pt-5 @2xl:px-6 @5xl:px-10 @5xl:pt-10">
-            <header className="relative overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-card @2xl:p-8">
-              <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_90%_at_100%_0%,var(--glow),transparent_70%)]" />
+            <header className="hero relative overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-card @2xl:p-8">
+              <div aria-hidden className="hero-glow pointer-events-none absolute inset-0 bg-[radial-gradient(60%_90%_at_100%_0%,var(--glow),transparent_70%)]" />
+              {/* Backdrop concepts: the show you're watching, blurred and faded into the surface. */}
+              <div aria-hidden className="hero-art pointer-events-none absolute inset-0">
+                <div className="absolute -inset-8 opacity-45 blur-2xl saturate-125 [&_img]:size-full [&_img]:object-cover">
+                  <Art it={watching[0]} urls={urls} className="h-full" />
+                </div>
+                <div className="absolute inset-0 bg-linear-to-r from-surface via-surface/85 to-surface/30" />
+              </div>
               <div className="relative">
                 <p className="eyebrow text-accent-text">WatchTrack</p>
                 <h1 className="mt-2 text-2xl font-semibold tracking-tight @2xl:text-4xl">Good evening</h1>

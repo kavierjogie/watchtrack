@@ -234,7 +234,7 @@ function SideItem({ to, label, icon: Icon, count }: NavItem & { count?: number }
         className={({ isActive }) =>
           `relative flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors ${
             isActive
-              ? 'bg-accent-soft text-accent-text before:absolute before:inset-y-2.5 before:-left-3 before:w-1 before:rounded-r-full before:bg-accent'
+              ? 'text-accent-text before:absolute before:inset-y-2.5 before:-left-3 before:w-1 before:rounded-r-full before:bg-accent'
               : 'text-fg-2 hover:bg-surface-2 hover:text-fg'
           }`
         }

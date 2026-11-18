@@ -1,12 +1,11 @@
 import { LazyMotion, MotionConfig } from 'framer-motion'
-import { Component, lazy, Suspense, useEffect, type ComponentType, type ReactNode } from 'react'
+import { Component, lazy, Suspense, type ComponentType, type ReactNode } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { InAppBrowserBanner } from './components/InAppBrowserBanner'
 import { Layout } from './components/Layout'
 import { ConfirmProvider } from './components/Modal'
 import { FEEDBACK_MAILTO } from './lib/format'
-import { applyTheme, usePrefs } from './lib/prefs'
 import { Dashboard } from './pages/Dashboard'
 import { LibraryProvider } from './state/library'
 
@@ -63,17 +62,6 @@ class CrashScreen extends Component<{ children: ReactNode }, { failed: boolean; 
 }
 
 export default function App() {
-  const { theme } = usePrefs()
-
-  useEffect(() => {
-    applyTheme(theme)
-    if (theme !== 'system') return
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const on = () => applyTheme('system')
-    mq.addEventListener('change', on)
-    return () => mq.removeEventListener('change', on)
-  }, [theme])
-
   return (
     // "user": with Reduce Motion on, Motion drops slides/scales and keeps gentle opacity fades.
     <MotionConfig reducedMotion="user">
@@ -120,7 +108,7 @@ export default function App() {
               </Routes>
               <Toaster
                 position="top-center"
-                theme={theme === 'system' ? 'system' : theme}
+                theme="dark"
                 toastOptions={{ classNames: { toast: '!rounded-2xl !border-line !bg-overlay !text-fg !shadow-pop', description: '!text-muted', actionButton: '!bg-accent !text-on-accent' } }}
               />
             </ConfirmProvider>

@@ -336,7 +336,7 @@ export function Moments({ review: r, byId }: { review: YearReview; byId: (id: st
             </p>
             <div aria-hidden className="mt-5 flex flex-wrap gap-1 lg:mt-4">
               {Array.from({ length: Math.min(streak.days, 30) }, (_, i) => (
-                <span key={i} className="review-bar size-3 rounded-[4px] bg-linear-to-br from-accent to-[#e9b872]" style={{ '--rise-delay': `${i * 20}ms` } as CSSProperties} />
+                <span key={i} className="review-bar size-3 rounded-[4px] bg-linear-to-br from-accent to-highlight" style={{ '--rise-delay': `${i * 20}ms` } as CSSProperties} />
               ))}
               {streak.days > 30 && <span className="ml-1 text-xs leading-3 text-muted">+{streak.days - 30}</span>}
             </div>
@@ -429,7 +429,7 @@ export function Top5({ review: r, byId }: { review: YearReview; byId: (id: strin
               <p className="mt-2 text-fg-2">
                 {countText(first)} · ≈{plural(hoursOf(first.minutes), 'hour')}
               </p>
-              {first.completed && <p className="mt-3 inline-flex rounded-full border border-[#e9b872]/40 bg-[#e9b872]/10 px-3 py-1 text-xs font-semibold text-[#e9b872]">Completed in {r.year}</p>}
+              {first.completed && <p className="mt-3 inline-flex rounded-full border border-highlight/40 bg-highlight/10 px-3 py-1 text-xs font-semibold text-highlight">Completed in {r.year}</p>}
             </div>
           </Link>
         </li>
@@ -545,7 +545,7 @@ function Bar({ year, value, max, muted = false }: { year: number; value: number;
     <div className="flex items-center gap-3">
       <span className={`w-10 text-[11px] tabular-nums ${muted ? 'text-muted' : 'font-semibold text-fg'}`}>{year}</span>
       <span className="h-2 flex-1 overflow-hidden rounded-full bg-white/6">
-        <span className={`review-bar block h-full origin-left rounded-full ${muted ? 'bg-white/25' : 'bg-linear-to-r from-accent to-[#e9b872]'}`} style={{ width: `${(value / max) * 100}%` }} />
+        <span className={`review-bar block h-full origin-left rounded-full ${muted ? 'bg-white/25' : 'bg-linear-to-r from-accent to-highlight'}`} style={{ width: `${(value / max) * 100}%` }} />
       </span>
       <span className={`w-12 text-right text-sm tabular-nums ${muted ? 'text-muted' : 'font-semibold'}`}>{value.toLocaleString()}</span>
     </div>
