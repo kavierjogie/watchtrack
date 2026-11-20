@@ -55,6 +55,9 @@ describe('share store', () => {
   it('never stores the IP address itself', async () => {
     await post('abc')
     expect(JSON.stringify([...store.keys()])).not.toContain('1.2.3.4')
+    // Nor a plain hash of it, which anyone could reverse by hashing every IPv4 address.
+    const { createHash } = await import('node:crypto')
+    expect(JSON.stringify([...store.keys()])).not.toContain(createHash('sha256').update('1.2.3.4').digest('base64url'))
   })
 
   it.each([
