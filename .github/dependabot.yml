@@ -1,0 +1,18 @@
+# Weekly update PRs. Each one runs the Check workflow (lint, typecheck, tests, build) before it can be merged.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # Minor and patch updates in one PR; majors arrive one per PR so each can be reviewed on its own.
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]

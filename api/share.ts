@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHmac, randomBytes } from 'node:crypto'
 
 /**
  * Vercel function: stores share lists so a link can be short (/s/<id>) whatever the size of the list.
@@ -34,8 +34,12 @@ async function redis(env: { url: string; token: string }, ...commands: (string |
   return ((await res.json()) as { result: unknown }[]).map((r) => r.result)
 }
 
-/** Hashed so the store never holds an IP address. Vercel sets x-real-ip itself, so a caller can't choose it. */
-const rateKey = (req: Request) => `share:rate:${createHash('sha256').update(req.headers.get('x-real-ip') ?? 'unknown').digest('base64url')}`
+/**
+ * Keyed hash so the store never holds an IP address: a plain SHA-256 of one could be reversed by trying all 2^32 IPv4
+ * addresses. The key is the server-only Redis token, so someone reading the store alone can't do that. Vercel sets
+ * x-real-ip itself, so a caller can't choose it.
+ */
+const rateKey = (req: Request, key: string) => `share:rate:${createHmac('sha256', key).update(req.headers.get('x-real-ip') ?? 'unknown').digest('base64url')}`
 
 export async function POST(req: Request): Promise<Response> {
   if (req.headers.get('Origin') !== new URL(req.url).origin) return Response.json({ error: 'Not allowed.' }, { status: 403 })
@@ -44,7 +48,7 @@ export async function POST(req: Request): Promise<Response> {
   const payload = await req.text()
   if (payload.length > MAX_PAYLOAD_CHARS || !PAYLOAD.test(payload)) return Response.json({ error: 'Not a share list.' }, { status: 400 })
   try {
-    const key = rateKey(req)
+    const key = rateKey(req, env.token)
     const [count] = await redis(env, ['INCR', key], ['EXPIRE', key, 3600, 'NX'])
     if ((count as number) > MAX_PER_HOUR) return Response.json({ error: 'Too many links. Try again later.' }, { status: 429 })
     const id = randomBytes(8).toString('base64url')
