@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { alertUrl, describeAlert, detectEvents, recordAlerts, showSystemNotification, upcomingOf, useAlerts, type AlertEvent } from './alerts'
+import { alertUrl, describeAlert, detectEvents, markRead, recordAlerts, showSystemNotification, upcomingOf, useAlerts, type AlertEvent } from './alerts'
 import { parseBackup } from './backup'
 import { clearAll, getDb } from './db'
 import { mirrorAlertPrefs, readMirroredPrefs, setPrefs } from './prefs'
@@ -209,6 +209,21 @@ describe('alert store: dedupe, preferences, backups', () => {
     expect(await recordAlerts([{ title: show({ id: 't1' }), events: [ev('d', 'date_changed')] }])).toEqual([])
     const items = ((await (await getDb()).get('settings', 'alerts'))!.value as { items: { id: string; muted: boolean }[] }).items
     expect(items.filter((a) => a.muted).map((a) => a.id).sort()).toEqual(['d', 'x', 'y'])
+  })
+
+  it('the app icon badge shows unread, shown alerts and clears when they are read', async () => {
+    const setAppBadge = vi.fn(() => Promise.resolve())
+    vi.stubGlobal('navigator', { ...navigator, setAppBadge })
+    try {
+      await recordAlerts([{ title: show({ id: 't1' }), events: [ev('a'), ev('b')] }, { title: show({ id: 't2', alerts: false }), events: [ev('m')] }])
+      expect(setAppBadge).toHaveBeenLastCalledWith(2)
+      await markRead(['a'])
+      expect(setAppBadge).toHaveBeenLastCalledWith(1)
+      await markRead('all')
+      expect(setAppBadge).toHaveBeenLastCalledWith(0)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('a background check follows the prefs copied to IndexedDB, since a service worker has no localStorage', async () => {

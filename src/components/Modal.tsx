@@ -107,7 +107,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
             </button>
           </header>
         </div>
-        <div className="overflow-y-auto px-5 py-4">{children}</div>
+        <div className="overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
         {footer && <footer className="flex flex-wrap justify-end gap-2 border-t border-divider px-5 py-3">{footer}</footer>}
       </m.div>
     </dialog>

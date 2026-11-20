@@ -76,7 +76,7 @@ export function TitleCard({ t, showStatus = true }: { t: Title; showStatus?: boo
     <m.div layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }} className="group min-w-0">
       <div className="relative">
         {/* Duplicate target for the pointer only; keyboard and screen readers use the title link below. */}
-        <Link to={`/title/${t.id}`} tabIndex={-1} aria-hidden className="relative block overflow-hidden rounded-xl shadow-card">
+        <Link to={`/title/${t.id}`} viewTransition tabIndex={-1} aria-hidden className="relative block overflow-hidden rounded-xl shadow-card">
           <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} className="can-hover:group-hover:[&_img]:scale-[1.04]" />
           <div className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-transparent transition-colors can-hover:group-hover:ring-accent/50 group-has-focus-visible:ring-accent" />
           {showStatus && (
@@ -103,7 +103,7 @@ export function TitleCard({ t, showStatus = true }: { t: Title; showStatus?: boo
           </button>
         )}
       </div>
-      <Link to={`/title/${t.id}`} className="mt-2.5 block space-y-0.5 rounded-md px-0.5">
+      <Link to={`/title/${t.id}`} viewTransition className="mt-2.5 block space-y-0.5 rounded-md px-0.5">
         <h3 className="line-clamp-2 text-sm font-medium leading-snug transition-colors group-hover:text-accent-text">{t.title}</h3>
         <p className="truncate text-xs text-muted">{progressLine(t)}</p>
         <p className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted">
@@ -121,7 +121,7 @@ export function TitleCard({ t, showStatus = true }: { t: Title; showStatus?: boo
 export function TitleRow({ t }: { t: Title }) {
   return (
     <div className="flex items-center gap-1 rounded-xl pr-1 transition-colors hover:bg-surface-2">
-      <Link to={`/title/${t.id}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2">
+      <Link to={`/title/${t.id}`} viewTransition className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2">
         <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} className="w-11 shrink-0 rounded-lg" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{t.title}</p>
@@ -160,12 +160,12 @@ export function ContinueCard({ t, extra }: { t: Title; extra?: ReactNode }) {
       animate={{ opacity: 1, y: 0 }}
       className="card flex min-w-0 gap-3 p-3 sm:gap-4"
     >
-      <Link to={`/title/${t.id}`} className="w-20 shrink-0 sm:w-24" tabIndex={-1} aria-hidden>
+      <Link to={`/title/${t.id}`} viewTransition className="w-20 shrink-0 sm:w-24" tabIndex={-1} aria-hidden>
         <Poster poster={t.poster} source={t.source} title={t.title} mediaType={t.mediaType} />
       </Link>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-start justify-between gap-2">
-          <Link to={`/title/${t.id}`} className="min-w-0 hover:text-accent-text">
+          <Link to={`/title/${t.id}`} viewTransition className="min-w-0 hover:text-accent-text">
             <h3 className="truncate font-semibold">{t.title}</h3>
           </Link>
           {t.status === 'on_hold' && <StatusBadge status="on_hold" />}
@@ -234,7 +234,7 @@ export function ContinueCard({ t, extra }: { t: Title; extra?: ReactNode }) {
               <Play className="size-4" aria-hidden /> Resume
             </button>
           ) : (
-            <Link to={`/title/${t.id}`} className="btn-ghost min-h-9 px-3">
+            <Link to={`/title/${t.id}`} viewTransition className="btn-ghost min-h-9 px-3">
               Continue <ChevronRight className="size-4" aria-hidden />
             </Link>
           )}

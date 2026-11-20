@@ -183,6 +183,17 @@ const listeners = new Set<() => void>()
 const set = (s: Partial<Snap>) => {
   snap = { ...snap, ...s }
   listeners.forEach((l) => l())
+  if (s.items) updateBadge(s.items)
+}
+
+/**
+ * Unread count on the installed app's icon (iOS 16.4+ home-screen apps, desktop Chrome/Edge; not Android Chrome).
+ * Also runs in the service worker after a background check. Unsupported or no permission: nothing happens.
+ */
+export function updateBadge(items: Alert[]) {
+  const nav = globalThis.navigator as (Navigator & { setAppBadge?: (n: number) => Promise<void> }) | undefined
+  const n = visible(items).filter((a) => !a.read).length
+  nav?.setAppBadge?.(n).catch(() => {})
 }
 
 const read = (v: unknown): Saved => {

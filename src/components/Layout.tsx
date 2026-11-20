@@ -1,8 +1,9 @@
 import { AnimatePresence } from 'framer-motion'
 import { CalendarClock, CircleCheck, CirclePause, Compass, House, Library, ListPlus, Play, Plus, Settings, Share2, type LucideIcon } from 'lucide-react'
-import { lazy, Suspense, useEffect, useMemo } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { OPEN_EVENT } from '../lib/alerts'
+import { sharedQuery } from '../lib/format'
 import { SITE_URL } from '../lib/share'
 import type { WatchStatus } from '../lib/types'
 import { useLibrary } from '../state/library'
@@ -51,7 +52,9 @@ function useNotificationClicks() {
   }, [navigate])
 }
 
-const ADD_STATUS: Record<string, WatchStatus> = { plan: 'plan', watching: 'watching', on_hold: 'on_hold', completed: 'completed' }
+const SHARE_KEYS = ['share_title', 'share_text', 'share_url']
+
+const ADD_STATUS: Record<string, WatchStatus> ={ plan: 'plan', watching: 'watching', on_hold: 'on_hold', completed: 'completed' }
 
 /** index.html's title is the homepage title; app pages get "Label · WatchTrack". */
 const HOME_TITLE = document.title
@@ -84,9 +87,25 @@ export function Layout() {
     return c
   }, [titles])
 
-  useEffect(() => {
+  // Layout effect: runs before a view transition takes its "after" snapshot, so the new page fades in at the top.
+  useLayoutEffect(() => {
     window.scrollTo(0, 0)
   }, [pathname])
+
+  // Something shared into the installed app (manifest share_target): open Add title searching for it.
+  const shared = SHARE_KEYS.some((k) => params.has(k))
+  useEffect(() => {
+    if (!shared) return
+    setParams(
+      (p) => {
+        const q = sharedQuery(p.get('share_title'), p.get('share_text'), p.get('share_url'))
+        const next = new URLSearchParams({ add: '1' })
+        if (q) next.set('q', q)
+        return next
+      },
+      { replace: true },
+    )
+  }, [shared, setParams])
 
   const openAdd = () =>
     setParams((p) => {
@@ -166,7 +185,7 @@ export function Layout() {
           <Logo />
         </Link>
         <div className="flex items-center">
-          <NavLink to="/upcoming" className={({ isActive }) => `icon-btn ${isActive ? 'text-accent-text' : ''}`} aria-label="Upcoming releases">
+          <NavLink to="/upcoming" viewTransition className={({ isActive }) => `icon-btn ${isActive ? 'text-accent-text' : ''}`} aria-label="Upcoming releases">
             <CalendarClock className="size-5" aria-hidden />
           </NavLink>
           <AlertBell />
@@ -175,7 +194,7 @@ export function Layout() {
               <Share2 className="size-5" aria-hidden />
             </Link>
           )}
-          <NavLink to="/settings" className={({ isActive }) => `icon-btn ${isActive ? 'text-accent-text' : ''}`} aria-label="Settings">
+          <NavLink to="/settings" viewTransition className={({ isActive }) => `icon-btn ${isActive ? 'text-accent-text' : ''}`} aria-label="Settings">
             <Settings className="size-5" aria-hidden />
           </NavLink>
         </div>
@@ -230,6 +249,7 @@ function SideItem({ to, label, icon: Icon, count }: NavItem & { count?: number }
     <li>
       <NavLink
         to={to}
+        viewTransition
         end={to === '/'}
         className={({ isActive }) =>
           `relative flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors ${
@@ -252,6 +272,7 @@ function MobileItem({ to, label, icon: Icon }: NavItem) {
     <li>
       <NavLink
         to={to}
+        viewTransition
         end={to === '/'}
         className={({ isActive }) =>
           `group flex min-h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium ${isActive ? 'text-accent-text' : 'text-fg-2 hover:text-fg'}`

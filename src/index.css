@@ -386,3 +386,17 @@ dialog[data-closing]::backdrop {
     animation: none;
   }
 }
+
+/* Page changes from links with viewTransition: a quick cross-fade. The bars are identical in both snapshots, so they stay put. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 160ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isInAppBrowser, releaseBucket, timeAgo } from './format'
+import { isInAppBrowser, releaseBucket, sharedQuery, timeAgo } from './format'
 
 describe('isInAppBrowser', () => {
   it('spots browsers built into other apps', () => {
@@ -67,5 +67,25 @@ describe('releaseBucket', () => {
     expect(releaseBucket('2026-11-01', endOfMonth)).toBe('This Week')
     expect(releaseBucket('2026-11-08', endOfMonth)).toBe('Next Week')
     expect(releaseBucket('2026-11-09', endOfMonth)).toBe('Later')
+  })
+})
+
+describe('sharedQuery (share target)', () => {
+  it('uses the page title without the site suffix or brackets', () => {
+    expect(sharedQuery('Frieren: Beyond Journey’s End (TV Series 2023– ) - IMDb', '', 'https://www.imdb.com/title/tt22248376/')).toBe('Frieren: Beyond Journey’s End')
+    expect(sharedQuery('Past Lives (2023) | Letterboxd')).toBe('Past Lives')
+  })
+
+  it('falls back to the text with links removed, then to a name in the link', () => {
+    expect(sharedQuery(null, 'Spy x Family https://example.com/x', null)).toBe('Spy x Family')
+    expect(sharedQuery(null, 'https://myanimelist.net/anime/52991/Sousou_no_Frieren', null)).toBe('Sousou no Frieren')
+    expect(sharedQuery('', '', 'https://www.themoviedb.org/tv/1396-breaking-bad')).toBe('breaking bad')
+    expect(sharedQuery('', '', 'https://letterboxd.com/film/past-lives/')).toBe('past lives')
+  })
+
+  it('gives nothing for ids or junk rather than a wrong search', () => {
+    expect(sharedQuery('', '', 'https://www.imdb.com/title/tt0903747/')).toBe('')
+    expect(sharedQuery(null, null, 'not a url')).toBe('')
+    expect(sharedQuery('   ', '', '')).toBe('')
   })
 })

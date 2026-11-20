@@ -1,6 +1,6 @@
 import { LazyMotion, MotionConfig } from 'framer-motion'
 import { Component, lazy, Suspense, type ComponentType, type ReactNode } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { createBrowserRouter, createRoutesFromElements, Outlet, Route, RouterProvider, useRouteError } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { InAppBrowserBanner } from './components/InAppBrowserBanner'
 import { Layout } from './components/Layout'
@@ -29,6 +29,31 @@ const TitleDetails = page(() => import('./pages/TitleDetails'), 'TitleDetails')
 const TransferPage = page(() => import('./pages/Transfer'), 'TransferPage')
 const YearReviewPage = page(() => import('./pages/YearReview'), 'YearReviewPage')
 
+/** Shown instead of a blank page after a render error. */
+function CrashMessage({ message }: { message: string }) {
+  return (
+    <main className="mx-auto max-w-md space-y-4 px-6 py-20 text-center">
+      <h1 className="text-xl font-semibold">Something went wrong</h1>
+      <p className="text-sm text-muted">WatchTrack hit an unexpected error. Your library is still saved on this device.</p>
+      {message && <p className="font-mono text-xs wrap-anywhere text-muted">{message}</p>}
+      <div className="flex justify-center gap-2">
+        <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
+          Reload
+        </button>
+        <a href="/settings" className="btn-secondary">
+          Open Settings
+        </a>
+      </div>
+      <p className="text-sm text-muted">
+        Keeps happening?{' '}
+        <a href={FEEDBACK_MAILTO} className="underline hover:text-fg">
+          Let me know
+        </a>
+      </p>
+    </main>
+  )
+}
+
 /** Last line of defence: a render error shows a way out instead of a blank page. Saved data is never touched. */
 class CrashScreen extends Component<{ children: ReactNode }, { failed: boolean; message: string }> {
   state = { failed: false, message: '' }
@@ -36,30 +61,72 @@ class CrashScreen extends Component<{ children: ReactNode }, { failed: boolean; 
     return { failed: true, message: error instanceof Error ? error.message : String(error) }
   }
   render() {
-    if (!this.state.failed) return this.props.children
-    return (
-      <main className="mx-auto max-w-md space-y-4 px-6 py-20 text-center">
-        <h1 className="text-xl font-semibold">Something went wrong</h1>
-        <p className="text-sm text-muted">WatchTrack hit an unexpected error. Your library is still saved on this device.</p>
-        {this.state.message && <p className="font-mono text-xs wrap-anywhere text-muted">{this.state.message}</p>}
-        <div className="flex justify-center gap-2">
-          <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
-            Reload
-          </button>
-          <a href="/settings" className="btn-secondary">
-            Open Settings
-          </a>
-        </div>
-        <p className="text-sm text-muted">
-          Keeps happening?{' '}
-          <a href={FEEDBACK_MAILTO} className="underline hover:text-fg">
-            Let me know
-          </a>
-        </p>
-      </main>
-    )
+    return this.state.failed ? <CrashMessage message={this.state.message} /> : this.props.children
   }
 }
+
+/** Inside the router (providers and dialogs use its hooks); a data router so links can opt into view transitions. */
+function Root() {
+  return (
+    <LibraryProvider>
+      <ConfirmProvider>
+        <InAppBrowserBanner />
+        <Outlet />
+        <Toaster
+          position="top-center"
+          theme="dark"
+          toastOptions={{ classNames: { toast: '!rounded-2xl !border-line !bg-overlay !text-fg !shadow-pop', description: '!text-muted', actionButton: '!bg-accent !text-on-accent' } }}
+        />
+      </ConfirmProvider>
+    </LibraryProvider>
+  )
+}
+
+/** A data router catches render errors itself; show the same screen CrashScreen would. */
+function RouteCrash() {
+  const error = useRouteError()
+  return <CrashMessage message={error instanceof Error ? error.message : String(error ?? '')} />
+}
+
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<Root />} errorElement={<RouteCrash />}>
+      <Route element={<Layout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="continue" element={<ContinuePage />} />
+        <Route path="library" element={<LibraryPage />} />
+        <Route path="discover" element={<DiscoverPage />} />
+        <Route path="plan" element={<PlanPage />} />
+        <Route path="on-hold" element={<OnHoldPage />} />
+        <Route path="completed" element={<CompletedPage />} />
+        <Route path="upcoming" element={<UpcomingPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="title/:id" element={<TitleDetails />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="transfer" element={<TransferPage />} />
+        <Route path="review" element={<YearReviewPage />} />
+        <Route path="*" element={<Dashboard />} />
+      </Route>
+      {/* Outside Layout: a friend opening a link sees just the shared list, not an empty app. */}
+      <Route
+        path="shared"
+        element={
+          <Suspense fallback={null}>
+            <SharedPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="s/:id"
+        element={
+          <Suspense fallback={null}>
+            <SharedPage />
+          </Suspense>
+        }
+      />
+    </Route>,
+  ),
+)
 
 export default function App() {
   return (
@@ -67,53 +134,7 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <LazyMotion features={motionFeatures} strict>
       <CrashScreen>
-        <BrowserRouter>
-          <LibraryProvider>
-            <ConfirmProvider>
-              <InAppBrowserBanner />
-              <Routes>
-                <Route element={<Layout />}>
-                  <Route index element={<Dashboard />} />
-                  <Route path="continue" element={<ContinuePage />} />
-                  <Route path="library" element={<LibraryPage />} />
-                  <Route path="discover" element={<DiscoverPage />} />
-                  <Route path="plan" element={<PlanPage />} />
-                  <Route path="on-hold" element={<OnHoldPage />} />
-                  <Route path="completed" element={<CompletedPage />} />
-                  <Route path="upcoming" element={<UpcomingPage />} />
-                  <Route path="notifications" element={<NotificationsPage />} />
-                  <Route path="title/:id" element={<TitleDetails />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                  <Route path="transfer" element={<TransferPage />} />
-                  <Route path="review" element={<YearReviewPage />} />
-                  <Route path="*" element={<Dashboard />} />
-                </Route>
-                {/* Outside Layout: a friend opening a link sees just the shared list, not an empty app. */}
-                <Route
-                  path="shared"
-                  element={
-                    <Suspense fallback={null}>
-                      <SharedPage />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path="s/:id"
-                  element={
-                    <Suspense fallback={null}>
-                      <SharedPage />
-                    </Suspense>
-                  }
-                />
-              </Routes>
-              <Toaster
-                position="top-center"
-                theme="dark"
-                toastOptions={{ classNames: { toast: '!rounded-2xl !border-line !bg-overlay !text-fg !shadow-pop', description: '!text-muted', actionButton: '!bg-accent !text-on-accent' } }}
-              />
-            </ConfirmProvider>
-          </LibraryProvider>
-        </BrowserRouter>
+        <RouterProvider router={router} />
       </CrashScreen>
       </LazyMotion>
     </MotionConfig>

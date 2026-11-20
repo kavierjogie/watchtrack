@@ -151,3 +151,54 @@ export async function copyText(text: string, field: HTMLInputElement | null): Pr
 }
 
 export const errMsg = (err: unknown) => (err instanceof Error ? err.message : 'Something went wrong.')
+
+// ---------- Share target (another app shared into the installed app) ----------
+
+const LINK = /https?:\/\/\S+/g
+/** Path words that are a site's section, not a title. */
+const GENERIC = new Set(['anime', 'manga', 'title', 'titles', 'tv', 'movie', 'movies', 'film', 'films', 'show', 'shows', 'series', 'watch', 'details'])
+
+/** "Frieren (TV Series 2023– ) - IMDb" → "Frieren": first part before a " - " / " | " site suffix, no brackets. */
+const cleanShared = (s: string) =>
+  s
+    .replace(LINK, ' ')
+    .split(/\s+[|•·–—-]\s+/)[0]
+    .replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 100)
+
+/** A name from a link's path: myanimelist.net/anime/52991/Sousou_no_Frieren → "Sousou no Frieren". IMDb ids give nothing. */
+function nameFromLink(link: string): string {
+  let segments: string[]
+  try {
+    segments = new URL(link).pathname.split('/').reverse()
+  } catch {
+    return ''
+  }
+  for (const seg of segments) {
+    let s: string
+    try {
+      s = decodeURIComponent(seg)
+    } catch {
+      continue
+    }
+    s = s.replace(/^\d+-/, '').replace(/[-_+]+/g, ' ').trim()
+    if (/\p{L}{2}/u.test(s) && !/^tt\d+$/i.test(s) && !GENERIC.has(s.toLowerCase())) return s.slice(0, 100)
+  }
+  return ''
+}
+
+/** What was shared into WatchTrack, as a title search: the page title, else the text, else a name in a link. '' = nothing usable. */
+export function sharedQuery(title?: string | null, text?: string | null, url?: string | null): string {
+  for (const s of [title, text]) {
+    const q = cleanShared(s ?? '')
+    if (q) return q
+  }
+  const links = [url ?? '', ...Array.from(`${title ?? ''} ${text ?? ''}`.matchAll(LINK), (m) => m[0])]
+  for (const l of links) {
+    const q = l && nameFromLink(l)
+    if (q) return q
+  }
+  return ''
+}

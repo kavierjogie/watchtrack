@@ -23,6 +23,14 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         scope: '/',
+        // Long-press / right-click the installed app's icon (Android, desktop Chrome/Edge; iOS ignores it).
+        shortcuts: [
+          { name: 'Continue watching', short_name: 'Continue', url: '/continue' },
+          { name: 'Upcoming releases', short_name: 'Upcoming', url: '/upcoming' },
+          { name: 'Add title', short_name: 'Add', url: '/?add=1' },
+        ],
+        // Installed app shows up in Android's share sheet; Layout turns what's shared into a search (see sharedQuery).
+        share_target: { action: '/', method: 'GET', params: { title: 'share_title', text: 'share_text', url: 'share_url' } },
         icons: [
           { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
